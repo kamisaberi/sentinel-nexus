@@ -1,0 +1,27 @@
+server:
+  bind_address: "0.0.0.0"
+  grpc_port: 50051
+  rest_api_port: 9443
+  ws_stream_port: 9444
+  worker_threads: 16
+
+tls:
+  enabled: false # Set true when mTLS certs are deployed
+  ca_cert: "configs/certs/ca.crt"
+  server_cert: "configs/certs/server.crt"
+  server_key: "configs/certs/server.key"
+
+fleet:
+  heartbeat_timeout_seconds: 15
+  prune_offline_after_hours: 24
+
+forge_bridge:
+  enabled: true
+  forge_ingest_path: "/var/lib/sentinel-nexus/forge_buffer/"
+  uncertainty_threshold_min: 0.40
+  uncertainty_threshold_max: 0.60
+  max_buffer_vectors: 500000
+
+intelligence:
+  ioc_propagation_enabled: true
+  default_block_ttl_seconds: 86400 # 24 Hours
