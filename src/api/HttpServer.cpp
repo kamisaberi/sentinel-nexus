@@ -8,6 +8,7 @@
 #include "intelligence/GlobalThreatCache.hpp" 
 #include "reporting/CmmcAuditEngine.hpp"
 #include "reporting/ScadaAuditEngine.hpp"
+#include "fleet/GroupManager.hpp"
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -145,6 +146,11 @@ std::string HttpServer::route_request(const std::string& method,
 
 
     // REST API Routes
+
+    if (route_path == "/api/v1/fleet/groups") {
+        content_type = "application/json";
+        return fleet::GroupManager::instance().generate_groups_json();
+    }
 
     if (route_path == "/api/v1/reports/cmmc") {
         content_type = "application/json";
