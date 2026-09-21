@@ -1,0 +1,30 @@
+[Unit]
+Description=Sentinel Nexus - Collective Fleet Defense Command Plane (Tier 6)
+After=network.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/kami/sentinel-nexus
+ExecStart=/usr/local/bin/sentinel-nexus /home/kami/sentinel-nexus/configs/nexus.yaml
+Restart=always
+RestartSec=5s
+
+# Hardening & Resource Controls
+LimitNOFILE=65536
+TasksMax=4096
+MemoryHigh=4G
+MemoryMax=8G
+
+# Process Priorities
+Nice=-5
+CPUSchedulingPolicy=rr
+CPUSchedulingPriority=50
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sentinel-nexus
+
+[Install]
+WantedBy=multi-user.target
