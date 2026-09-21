@@ -10,6 +10,7 @@
 #include "reporting/ScadaAuditEngine.hpp"
 #include "fleet/GroupManager.hpp"
 #include "ota/ModelRepository.hpp"
+#include "api/TelemetryStreamer.hpp"
 
 #include <sys/socket.h>
 #include <netinet/in.h>
