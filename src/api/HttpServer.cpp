@@ -148,6 +148,23 @@ std::string HttpServer::route_request(const std::string& method,
 
     // REST API Routes
 
+    if (route_path == "/api/v1/models") {
+        content_type = "application/json";
+        return ota::ModelRepository::instance().generate_models_json();
+    }
+    if (route_path.rfind("/models/", 0) == 0) {
+        std::string model_file = route_path.substr(8);
+        ota::StoredModel m;
+        if (ota::ModelRepository::instance().get_model(model_file, m)) {
+            content_type = "application/octet-stream";
+            status_code = 200;
+            std::ifstream f(m.full_path, std::ios::binary);
+            std::ostringstream ss;
+            ss << f.rdbuf();
+            return ss.str();
+        }
+    }
+
     if (route_path == "/api/v1/fleet/groups") {
         content_type = "application/json";
         return fleet::GroupManager::instance().generate_groups_json();
