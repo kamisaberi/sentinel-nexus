@@ -12,6 +12,7 @@
 #include "intelligence/IocBroadcaster.hpp"
 #include "ota/CanaryOrchestrator.hpp"
 #include "reporting/ReportGenerator.hpp"
+#include "api/HttpServer.hpp"
 
 #include "rpc/FleetServiceImpl.hpp"
 #include "rpc/TelemetryServiceImpl.hpp"
@@ -47,18 +48,21 @@ int main(int argc, char** argv) {
     cfg_mgr.load_config(config_path);
     const auto& config = cfg_mgr.get();
 
-    // 1. Initialize Retraining Bridge and Canary Orchestrator
+    // 1. Initialize Continuous Retraining Bridge and Canary Orchestrator
     sentinel::nexus::telemetry::ForgeBridge::instance().initialize(config.forge_buffer_path);
     sentinel::nexus::ota::CanaryOrchestrator::instance().initialize(
         "network_threat_v1.onnx", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "/models/v1.onnx");
 
-    // 2. Instantiate gRPC Services
+    // 2. Launch HTTP REST & Web Command Server (Port 9443)
+    sentinel::nexus::api::HttpServer::instance().start(config.bind_address, config.rest_port, "web");
+
+    // 3. Instantiate gRPC Services
     sentinel::nexus::rpc::FleetServiceImpl fleet_service;
     sentinel::nexus::rpc::TelemetryServiceImpl telemetry_service;
     sentinel::nexus::rpc::IntelligenceServiceImpl intelligence_service;
     sentinel::nexus::rpc::ModelOtaServiceImpl model_ota_service;
 
-    // 3. Build & Launch Multi-Threaded gRPC Server
+    // 4. Build & Launch Multi-Threaded gRPC Server (Port 50051)
     std::string server_address = config.bind_address + ":" + std::to_string(config.grpc_port);
     grpc::EnableDefaultHealthCheckService(true);
     grpc::reflection::InitProtoReflectionServerBuilderPlugin();
@@ -73,7 +77,7 @@ int main(int argc, char** argv) {
     std::unique_ptr<grpc::Server> server(builder.BuildAndStart());
     NEXUS_LOG_INFO("Sentinel-Nexus gRPC server actively listening on " + server_address);
 
-    // 4. Background Fleet Health-Monitor Thread
+    // 5. Background Fleet Health-Monitor Thread
     std::jthread health_monitor([&config](std::stop_token st) {
         while (!st.stop_requested() && g_running) {
             std::this_thread::sleep_for(std::chrono::seconds(5));
@@ -81,20 +85,11 @@ int main(int argc, char** argv) {
         }
     });
 
-    // 5. Periodic Forge Batch Flusher Thread
+    // 6. Periodic Forge Batch Flusher Thread
     std::jthread forge_flusher([](std::stop_token st) {
         while (!st.stop_requested() && g_running) {
             std::this_thread::sleep_for(std::chrono::seconds(30));
             sentinel::nexus::telemetry::ForgeBridge::instance().flush_batch_to_disk();
-        }
-    });
-
-    // 6. Periodic Audit & Compliance Report Thread (Every 60s)
-    std::jthread report_printer([](std::stop_token st) {
-        while (!st.stop_requested() && g_running) {
-            std::this_thread::sleep_for(std::chrono::seconds(60));
-            std::string report = sentinel::nexus::reporting::ReportGenerator::instance().generate_text_audit_report();
-            std::cout << "\n" << report << std::endl;
         }
     });
 
@@ -103,6 +98,7 @@ int main(int argc, char** argv) {
     }
 
     NEXUS_LOG_INFO("Shutdown initiated: stopping gRPC server and flushing telemetry buffers...");
+    sentinel::nexus::api::HttpServer::instance().stop();
     server->Shutdown();
     sentinel::nexus::telemetry::ForgeBridge::instance().flush_batch_to_disk();
     NEXUS_LOG_INFO("Teardown complete. All services halted safely.");
