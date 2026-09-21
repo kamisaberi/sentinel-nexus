@@ -3,7 +3,6 @@
 #include <vector>
 #include <mutex>
 #include <filesystem>
-#include <fstream>
 #include "telemetry.pb.h"
 
 namespace sentinel::nexus::telemetry {
@@ -28,9 +27,7 @@ public:
                     float max_uncertainty = 0.60f,
                     size_t batch_flush_size = 1000);
 
-    // Ingests candidate vectors from appliances, selectively buffers them,
-    // and flushes to disk when the batch limit is reached.
-    bool ingest_vector(const CandidateVector& vector);
+    bool ingest_vector(const ::sentinel::nexus::CandidateVector& vector);
     void flush_batch_to_disk();
 
     size_t buffered_count() const;
