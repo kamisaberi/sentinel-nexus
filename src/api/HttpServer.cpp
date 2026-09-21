@@ -6,6 +6,8 @@
 #include "ota/CanaryOrchestrator.hpp"
 #include "telemetry/ForgeBridge.hpp"
 #include "intelligence/GlobalThreatCache.hpp" 
+#include "reporting/CmmcAuditEngine.hpp"
+#include "reporting/ScadaAuditEngine.hpp"
 
 #include <sys/socket.h>
 #include <netinet/in.h>
