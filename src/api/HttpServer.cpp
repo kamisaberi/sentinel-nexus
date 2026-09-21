@@ -100,7 +100,7 @@ void HttpServer::handle_client(int client_sock) {
     std::string method, path, protocol;
     req_stream >> method >> path >> protocol;
 
-    // Locate body if POST
+    // 1. Locate HTTP body if this is a POST request
     std::string raw_req(buffer, bytes_read);
     std::string body;
     size_t header_end = raw_req.find("\r\n\r\n");
@@ -108,11 +108,28 @@ void HttpServer::handle_client(int client_sock) {
         body = raw_req.substr(header_end + 4);
     }
 
+    // 2. Strip query parameters for clean path matching (e.g. /api/v1/telemetry/stream?t=123)
+    std::string route_path = path;
+    size_t qmark = route_path.find('?');
+    if (qmark != std::string::npos) {
+        route_path = route_path.substr(0, qmark);
+    }
+
+    // 3. REAL-TIME STREAM INTERCEPTION:
+    // If the browser requests the SSE stream, pass the open socket to TelemetryStreamer.
+    // We RETURN IMMEDIATELY so that close(client_sock) is NEVER called here!
+    if (route_path == "/api/v1/telemetry/stream") {
+        TelemetryStreamer::instance().add_client(client_sock);
+        return; // Socket remains alive and managed by TelemetryStreamer
+    }
+
+    // 4. Standard Request/Response cycle for REST API and HTML/CSS/JS files
     std::string content_type = "text/plain";
     int status_code = 200;
     std::string response_payload = route_request(method, path, body, content_type, status_code);
 
-    std::string status_text = (status_code == 200) ? "200 OK" : ((status_code == 404) ? "404 Not Found" : "500 Internal Server Error");
+    std::string status_text = (status_code == 200) ? "200 OK" : 
+                              ((status_code == 404) ? "404 Not Found" : "500 Internal Server Error");
 
     std::ostringstream resp_stream;
     resp_stream << "HTTP/1.1 " << status_text << "\r\n"
@@ -126,8 +143,12 @@ void HttpServer::handle_client(int client_sock) {
 
     std::string resp_str = resp_stream.str();
     send(client_sock, resp_str.data(), resp_str.size(), 0);
+
+    // Standard HTTP request is finished; close socket
     close(client_sock);
 }
+
+
 
 std::string HttpServer::route_request(const std::string& method, 
                                      const std::string& path, 

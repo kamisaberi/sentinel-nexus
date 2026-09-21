@@ -74,6 +74,7 @@ set(NEXUS_SOURCES
     src/fleet/GroupManager.cpp
     src/telemetry/ForgeBridge.cpp
     src/telemetry/DatasetCurator.cpp
+    src/telemetry/ForgeTrigger.cpp
     src/intelligence/IocBroadcaster.cpp
     src/intelligence/GlobalThreatCache.cpp
     src/ota/CanaryOrchestrator.cpp
@@ -84,6 +85,7 @@ set(NEXUS_SOURCES
     src/reporting/ScadaAuditEngine.cpp
     src/storage/StateDatabase.cpp
     src/api/HttpServer.cpp
+    src/api/TelemetryStreamer.cpp
     src/rpc/FleetServiceImpl.cpp
     src/rpc/TelemetryServiceImpl.cpp
     src/rpc/IntelligenceServiceImpl.cpp
@@ -91,6 +93,8 @@ set(NEXUS_SOURCES
     ${PROTO_GEN_SRCS}
     ${GRPC_GEN_SRCS}
 )
+
+
 # 1. Main Daemon Target
 add_executable(sentinel-nexus ${NEXUS_SOURCES})
 target_link_libraries(sentinel-nexus
