@@ -78,6 +78,7 @@ set(NEXUS_SOURCES
     src/intelligence/GlobalThreatCache.cpp
     src/ota/CanaryOrchestrator.cpp
     src/ota/RollbackGuard.cpp
+    src/ota/ModelRepository.cpp
     src/reporting/ReportGenerator.cpp
     src/reporting/CmmcAuditEngine.cpp
     src/reporting/ScadaAuditEngine.cpp
@@ -90,7 +91,6 @@ set(NEXUS_SOURCES
     ${PROTO_GEN_SRCS}
     ${GRPC_GEN_SRCS}
 )
-
 # 1. Main Daemon Target
 add_executable(sentinel-nexus ${NEXUS_SOURCES})
 target_link_libraries(sentinel-nexus
