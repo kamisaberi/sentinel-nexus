@@ -4,12 +4,12 @@
 
 namespace sentinel::nexus::rpc {
 
-class TelemetryServiceImpl final : public telemetry::TelemetryService::Service {
+class TelemetryServiceImpl final : public ::sentinel::nexus::TelemetryService::Service {
 public:
     grpc::Status StreamCandidateVectors(
         grpc::ServerContext* context, 
-        grpc::ServerReader<telemetry::FeatureVectorStream>* reader, 
-        telemetry::IngestSummary* response) override;
+        grpc::ServerReader<::sentinel::nexus::FeatureVectorStream>* reader, 
+        ::sentinel::nexus::IngestSummary* response) override;
 };
 
 } // namespace sentinel::nexus::rpc
