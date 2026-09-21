@@ -9,6 +9,7 @@
 #include "reporting/CmmcAuditEngine.hpp"
 #include "reporting/ScadaAuditEngine.hpp"
 #include "fleet/GroupManager.hpp"
+#include "ota/ModelRepository.hpp"
 
 #include <sys/socket.h>
 #include <netinet/in.h>
