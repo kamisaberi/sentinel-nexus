@@ -116,6 +116,9 @@ int main(int argc, char** argv) {
             auto nodes = sentinel::nexus::fleet::NodeRegistry::instance().get_all_nodes();
             sentinel::nexus::storage::StateDatabase::instance().save_fleet_state(nodes);
             sentinel::nexus::telemetry::ForgeBridge::instance().flush_batch_to_disk();
+
+            sentinel::nexus::telemetry::CuratedDatasetInfo info;
+            sentinel::nexus::telemetry::DatasetCurator::instance().curate_training_dataset(info);
         }
     });
 
