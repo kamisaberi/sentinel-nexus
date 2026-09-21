@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  sentinel-nexus:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    container_name: sentinel-nexus
+    restart: unless-stopped
+    ports:
+      - "50051:50051" # gRPC Fleet Ingestion & Collective Defense
+      - "9443:9443"   # Air-Gapped Web Command Center & REST API
+      - "9444:9444"   # Real-Time Telemetry Stream
+    volumes:
+      - nexus-data:/opt/sentinel-nexus/data
+      - nexus-models:/opt/sentinel-nexus/models
+      - nexus-buffer:/var/lib/sentinel-nexus/forge_buffer
+    environment:
+      - NEXUS_ENV=production
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+volumes:
+  nexus-data:
+  nexus-models:
+  nexus-buffer:
