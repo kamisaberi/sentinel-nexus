@@ -5,8 +5,8 @@
 namespace sentinel::nexus::rpc {
 
 grpc::Status FleetServiceImpl::RegisterAppliance(grpc::ServerContext* context, 
-                                                const fleet::RegistrationRequest* request, 
-                                                fleet::RegistrationResponse* response) {
+                                                const ::sentinel::nexus::RegistrationRequest* request, 
+                                                ::sentinel::nexus::RegistrationResponse* response) {
     (void)context;
     
     if (request->identity().machine_uuid().empty() && request->identity().hostname().empty()) {
@@ -28,8 +28,8 @@ grpc::Status FleetServiceImpl::RegisterAppliance(grpc::ServerContext* context,
 }
 
 grpc::Status FleetServiceImpl::SendHeartbeat(grpc::ServerContext* context, 
-                                            const fleet::HeartbeatRequest* request, 
-                                            fleet::HeartbeatResponse* response) {
+                                            const ::sentinel::nexus::HeartbeatRequest* request, 
+                                            ::sentinel::nexus::HeartbeatResponse* response) {
     (void)context;
 
     bool updated = fleet::NodeRegistry::instance().update_heartbeat(
@@ -37,7 +37,7 @@ grpc::Status FleetServiceImpl::SendHeartbeat(grpc::ServerContext* context,
 
     if (!updated) {
         response->set_acknowledged(false);
-        response->set_config_drift_detected(true); // Signal appliance to re-register
+        response->set_config_drift_detected(true);
         return grpc::Status::OK;
     }
 
