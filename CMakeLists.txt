@@ -73,13 +73,16 @@ include_directories(
 
 # Source Files
 set(NEXUS_SOURCES
-    src/main.cpp
+src/main.cpp
     src/core/ConfigManager.cpp
     src/fleet/NodeRegistry.cpp
+    src/fleet/AttestationValidator.cpp
     src/telemetry/ForgeBridge.cpp
     src/intelligence/IocBroadcaster.cpp
+    src/intelligence/GlobalThreatCache.cpp
     src/ota/CanaryOrchestrator.cpp
     src/reporting/ReportGenerator.cpp
+    src/storage/StateDatabase.cpp
     src/api/HttpServer.cpp
     src/rpc/FleetServiceImpl.cpp
     src/rpc/TelemetryServiceImpl.cpp
