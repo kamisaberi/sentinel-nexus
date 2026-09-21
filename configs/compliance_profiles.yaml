@@ -1,0 +1,15 @@
+# Regulatory & Framework Mapping Profiles
+cmmc_level_2:
+  enforce_tpm_quote: true
+  allowed_tpm_types:
+    - DEVICE_PHYSICAL_TPM2
+    - DEVICE_VIRTUAL_TPM
+  max_mitigation_latency_us: 1000.0 # Strict < 1.0ms SLA
+
+iec_62443:
+  monitored_scada_protocols:
+    - MODBUS_TCP
+    - DNP3
+    - PROFINET
+    - S7COMM
+  enforce_zero_trust_zoning: true
