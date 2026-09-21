@@ -146,6 +146,15 @@ std::string HttpServer::route_request(const std::string& method,
 
     // REST API Routes
 
+    if (route_path == "/api/v1/reports/cmmc") {
+        content_type = "application/json";
+        return reporting::CmmcAuditEngine::instance().generate_cmmc_assessment_json();
+    }
+    if (route_path == "/api/v1/reports/scada") {
+        content_type = "application/json";
+        return reporting::ScadaAuditEngine::instance().generate_iec62443_assessment_json();
+    }
+
     if (route_path == "/api/v1/threats/mitre") {
         content_type = "application/json";
         return intelligence::GlobalThreatCache::instance().generate_mitre_summary_json();
