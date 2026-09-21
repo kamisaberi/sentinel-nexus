@@ -1,0 +1,10 @@
+# Sentinel Nexus: Over-the-Air Model Staging & Safety Thresholds
+policy:
+  version: "1.0"
+  max_allowed_false_positive_spike_pct: 0.05
+  min_shadow_observation_hours: 24
+  canary_stage_cohort_pct: 5
+  auto_rollback:
+    enabled: true
+    trigger_on_unhandled_crash: true
+    trigger_on_mitigation_latency_exceeded_us: 1000.0
