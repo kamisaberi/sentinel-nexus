@@ -73,7 +73,7 @@ include_directories(
 
 # Source Files
 set(NEXUS_SOURCES
-src/main.cpp
+    src/main.cpp
     src/core/ConfigManager.cpp
     src/fleet/NodeRegistry.cpp
     src/fleet/AttestationValidator.cpp
@@ -82,6 +82,8 @@ src/main.cpp
     src/intelligence/GlobalThreatCache.cpp
     src/ota/CanaryOrchestrator.cpp
     src/reporting/ReportGenerator.cpp
+    src/reporting/CmmcAuditEngine.cpp
+    src/reporting/ScadaAuditEngine.cpp
     src/storage/StateDatabase.cpp
     src/api/HttpServer.cpp
     src/rpc/FleetServiceImpl.cpp
@@ -92,9 +94,8 @@ src/main.cpp
     ${GRPC_GEN_SRCS}
 )
 
-# Executable Target
+# 1. Main Daemon Target
 add_executable(sentinel-nexus ${NEXUS_SOURCES})
-
 target_link_libraries(sentinel-nexus
     PRIVATE
         Threads::Threads
@@ -105,4 +106,8 @@ target_link_libraries(sentinel-nexus
         gRPC::grpc++_reflection
 )
 
-install(TARGETS sentinel-nexus DESTINATION /usr/local/bin)
+# 2. Operations CLI Target
+add_executable(nexus-ctl tools/nexus-ctl/main.cpp)
+target_link_libraries(nexus-ctl PRIVATE Threads::Threads)
+
+install(TARGETS sentinel-nexus nexus-ctl DESTINATION /usr/local/bin)
