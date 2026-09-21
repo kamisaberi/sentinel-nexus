@@ -5,6 +5,7 @@
 #include "intelligence/IocBroadcaster.hpp"
 #include "ota/CanaryOrchestrator.hpp"
 #include "telemetry/ForgeBridge.hpp"
+#include "intelligence/GlobalThreatCache.hpp" 
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -140,7 +141,14 @@ std::string HttpServer::route_request(const std::string& method,
         route_path = route_path.substr(0, qmark);
     }
 
+
     // REST API Routes
+
+    if (route_path == "/api/v1/threats/mitre") {
+        content_type = "application/json";
+        return intelligence::GlobalThreatCache::instance().generate_mitre_summary_json();
+    }
+    
     if (route_path == "/api/v1/fleet/nodes") {
         content_type = "application/json";
         return handle_get_nodes();
