@@ -4,15 +4,15 @@
 
 namespace sentinel::nexus::rpc {
 
-class FleetServiceImpl final : public fleet::FleetService::Service {
+class FleetServiceImpl final : public ::sentinel::nexus::FleetService::Service {
 public:
     grpc::Status RegisterAppliance(grpc::ServerContext* context, 
-                                   const fleet::RegistrationRequest* request, 
-                                   fleet::RegistrationResponse* response) override;
+                                   const ::sentinel::nexus::RegistrationRequest* request, 
+                                   ::sentinel::nexus::RegistrationResponse* response) override;
 
     grpc::Status SendHeartbeat(grpc::ServerContext* context, 
-                              const fleet::HeartbeatRequest* request, 
-                              fleet::HeartbeatResponse* response) override;
+                              const ::sentinel::nexus::HeartbeatRequest* request, 
+                              ::sentinel::nexus::HeartbeatResponse* response) override;
 };
 
 } // namespace sentinel::nexus::rpc
