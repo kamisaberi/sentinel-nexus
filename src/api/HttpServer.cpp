@@ -133,38 +133,45 @@ std::string HttpServer::route_request(const std::string& method,
         return "";
     }
 
+    // Strip query parameters for routing (e.g. /api/v1/nodes?ts=123)
+    std::string route_path = path;
+    size_t qmark = route_path.find('?');
+    if (qmark != std::string::npos) {
+        route_path = route_path.substr(0, qmark);
+    }
+
     // REST API Routes
-    if (path == "/api/v1/fleet/nodes") {
+    if (route_path == "/api/v1/fleet/nodes") {
         content_type = "application/json";
         return handle_get_nodes();
     }
-    if (path == "/api/v1/reports/compliance") {
+    if (route_path == "/api/v1/reports/compliance") {
         content_type = "application/json";
         return handle_get_compliance();
     }
-    if (path == "/api/v1/ota/status") {
+    if (route_path == "/api/v1/ota/status") {
         content_type = "application/json";
         return handle_get_ota();
     }
-    if (path == "/api/v1/threats/broadcast" && method == "POST") {
+    if (route_path == "/api/v1/threats/broadcast" && method == "POST") {
         content_type = "application/json";
         return handle_post_broadcast(body);
     }
-    if (path == "/api/v1/ota/stage" && method == "POST") {
+    if (route_path == "/api/v1/ota/stage" && method == "POST") {
         content_type = "application/json";
         return handle_post_ota_stage(body);
     }
-    if (path == "/api/v1/ota/advance" && method == "POST") {
+    if (route_path == "/api/v1/ota/advance" && method == "POST") {
         content_type = "application/json";
         return handle_post_ota_advance();
     }
-    if (path == "/api/v1/ota/rollback" && method == "POST") {
+    if (route_path == "/api/v1/ota/rollback" && method == "POST") {
         content_type = "application/json";
         return handle_post_ota_rollback();
     }
 
     // Static Web Dashboard Files
-    return serve_static_file(path, content_type, status_code);
+    return serve_static_file(route_path, content_type, status_code);
 }
 
 std::string HttpServer::handle_get_nodes() {
@@ -207,7 +214,6 @@ std::string HttpServer::handle_get_ota() {
 }
 
 std::string HttpServer::handle_post_broadcast(const std::string& body) {
-    // Simple parser for {"ip": "x.x.x.x"}
     std::string ip;
     size_t pos = body.find("\"ip\"");
     if (pos != std::string::npos) {
@@ -232,6 +238,7 @@ std::string HttpServer::handle_post_broadcast(const std::string& body) {
 }
 
 std::string HttpServer::handle_post_ota_stage(const std::string& body) {
+    (void)body;
     ota::CanaryOrchestrator::instance().stage_candidate_model(
         "network_threat_v2.onnx", "8fa9c89b3f4618e47f5255470d9a690e7da3c6046e297893a776", "/models/v2.onnx");
     return "{\"status\": \"candidate_staged\", \"stage\": \"SHADOW_MODE\"}";
@@ -256,22 +263,50 @@ std::string HttpServer::handle_post_ota_rollback() {
 }
 
 std::string HttpServer::serve_static_file(const std::string& req_path, std::string& content_type, int& status_code) {
-    std::string clean_path = (req_path == "/" || req_path.empty()) ? "/index.html" : req_path;
-    std::filesystem::path full_path = std::filesystem::path(web_root_) / clean_path.substr(1);
-
-    if (!std::filesystem::exists(full_path)) {
-        status_code = 404;
-        return "404 Not Found";
+    std::string clean_path = (req_path == "/" || req_path.empty()) ? "index.html" : req_path;
+    if (!clean_path.empty() && clean_path.front() == '/') {
+        clean_path = clean_path.substr(1);
     }
 
-    std::string ext = full_path.extension().string();
+    // Smart Multi-Path Resolution:
+    // 1. Current working directory (./web/...)
+    // 2. Parent directory (../web/... when running from build/)
+    // 3. Executable's parent directory (/home/kami/sentinel-nexus/web/...)
+    std::vector<std::filesystem::path> search_paths = {
+        std::filesystem::path(web_root_) / clean_path,
+        std::filesystem::path("..") / web_root_ / clean_path
+    };
+
+    try {
+        auto exe_dir = std::filesystem::canonical("/proc/self/exe").parent_path();
+        search_paths.push_back(exe_dir / web_root_ / clean_path);
+        search_paths.push_back(exe_dir.parent_path() / web_root_ / clean_path);
+    } catch (...) {}
+
+    std::filesystem::path target_file;
+    bool found = false;
+    for (const auto& p : search_paths) {
+        if (std::filesystem::exists(p) && !std::filesystem::is_directory(p)) {
+            target_file = p;
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        NEXUS_LOG_WARN("HTTP 404: Could not find requested file: " + clean_path);
+        status_code = 404;
+        return "404 Not Found: " + clean_path;
+    }
+
+    std::string ext = target_file.extension().string();
     if (ext == ".html") content_type = "text/html; charset=utf-8";
     else if (ext == ".css") content_type = "text/css; charset=utf-8";
     else if (ext == ".js") content_type = "application/javascript; charset=utf-8";
     else if (ext == ".json") content_type = "application/json";
     else content_type = "application/octet-stream";
 
-    std::ifstream file(full_path, std::ios::binary);
+    std::ifstream file(target_file, std::ios::binary);
     std::ostringstream buffer;
     buffer << file.rdbuf();
     status_code = 200;
