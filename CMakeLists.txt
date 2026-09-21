@@ -6,7 +6,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Optimization & Compiler Flags
 add_compile_options(
     -Wall -Wextra -Wpedantic
     -Wno-unused-parameter
@@ -14,13 +13,11 @@ add_compile_options(
     -pthread
 )
 
-# Find Required Dependencies
 find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
 
-# Protobuf & gRPC Code Generation
 set(PROTO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/proto")
 set(PROTO_SRCS
     ${PROTO_DIR}/common.proto
@@ -40,7 +37,6 @@ set(GRPC_GEN_SRCS)
 
 foreach(proto_file ${PROTO_SRCS})
     get_filename_component(proto_name ${proto_file} NAME_WLE)
-    
     set(proto_hdr "${GENERATED_PROTO_DIR}/${proto_name}.pb.h")
     set(proto_src "${GENERATED_PROTO_DIR}/${proto_name}.pb.cc")
     set(grpc_hdr  "${GENERATED_PROTO_DIR}/${proto_name}.grpc.pb.h")
@@ -64,23 +60,24 @@ foreach(proto_file ${PROTO_SRCS})
     )
 endforeach()
 
-# Include Paths
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${GENERATED_PROTO_DIR}
     ${OPENSSL_INCLUDE_DIR}
 )
 
-# Source Files
 set(NEXUS_SOURCES
     src/main.cpp
     src/core/ConfigManager.cpp
     src/fleet/NodeRegistry.cpp
     src/fleet/AttestationValidator.cpp
+    src/fleet/GroupManager.cpp
     src/telemetry/ForgeBridge.cpp
+    src/telemetry/DatasetCurator.cpp
     src/intelligence/IocBroadcaster.cpp
     src/intelligence/GlobalThreatCache.cpp
     src/ota/CanaryOrchestrator.cpp
+    src/ota/RollbackGuard.cpp
     src/reporting/ReportGenerator.cpp
     src/reporting/CmmcAuditEngine.cpp
     src/reporting/ScadaAuditEngine.cpp
@@ -110,18 +107,24 @@ target_link_libraries(sentinel-nexus
 add_executable(nexus-ctl tools/nexus-ctl/main.cpp)
 target_link_libraries(nexus-ctl PRIVATE Threads::Threads)
 
-
-install(TARGETS sentinel-nexus nexus-ctl DESTINATION /usr/local/bin)
-
-
-# 3. High-Throughput Benchmark Target
+# 3. High-Throughput Ingestion Benchmark Target
 add_executable(benchmark_ingest 
     tests/benchmark/benchmark_ingest.cpp
     src/telemetry/ForgeBridge.cpp
     ${PROTO_GEN_SRCS}
 )
-target_link_libraries(benchmark_ingest
-    PRIVATE
-        Threads::Threads
-        protobuf::libprotobuf
+target_link_libraries(benchmark_ingest PRIVATE Threads::Threads protobuf::libprotobuf)
+
+# 4. Core Unit Test Suite Target
+add_executable(test_nexus_core
+    tests/unit/test_nexus_core.cpp
+    src/fleet/NodeRegistry.cpp
+    src/fleet/AttestationValidator.cpp
+    src/fleet/GroupManager.cpp
+    src/ota/CanaryOrchestrator.cpp
+    src/ota/RollbackGuard.cpp
+    ${PROTO_GEN_SRCS}
 )
+target_link_libraries(test_nexus_core PRIVATE Threads::Threads OpenSSL::Crypto protobuf::libprotobuf)
+
+install(TARGETS sentinel-nexus nexus-ctl DESTINATION /usr/local/bin)
