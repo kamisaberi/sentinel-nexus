@@ -20,6 +20,10 @@
 #include "rpc/IntelligenceServiceImpl.hpp"
 #include "rpc/ModelOtaServiceImpl.hpp"
 
+#include "fleet/GroupManager.hpp"
+#include "ota/RollbackGuard.hpp"
+#include "telemetry/DatasetCurator.hpp"
+
 static std::atomic<bool> g_running{true};
 
 void signal_handler(int sig) {
