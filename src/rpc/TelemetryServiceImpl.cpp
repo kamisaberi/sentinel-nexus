@@ -6,11 +6,11 @@ namespace sentinel::nexus::rpc {
 
 grpc::Status TelemetryServiceImpl::StreamCandidateVectors(
     grpc::ServerContext* context, 
-    grpc::ServerReader<telemetry::FeatureVectorStream>* reader, 
-    telemetry::IngestSummary* response) {
+    grpc::ServerReader<::sentinel::nexus::FeatureVectorStream>* reader, 
+    ::sentinel::nexus::IngestSummary* response) {
     (void)context;
 
-    telemetry::FeatureVectorStream stream_batch;
+    ::sentinel::nexus::FeatureVectorStream stream_batch;
     uint64_t total_received = 0;
     uint64_t total_routed_to_forge = 0;
 
