@@ -74,13 +74,17 @@ include_directories(
 # Source Files
 set(NEXUS_SOURCES
 src/main.cpp
+src/main.cpp
     src/core/ConfigManager.cpp
     src/fleet/NodeRegistry.cpp
     src/telemetry/ForgeBridge.cpp
     src/intelligence/IocBroadcaster.cpp
+    src/ota/CanaryOrchestrator.cpp
+    src/reporting/ReportGenerator.cpp
     src/rpc/FleetServiceImpl.cpp
     src/rpc/TelemetryServiceImpl.cpp
     src/rpc/IntelligenceServiceImpl.cpp
+    src/rpc/ModelOtaServiceImpl.cpp
     ${PROTO_GEN_SRCS}
     ${GRPC_GEN_SRCS}
 )
