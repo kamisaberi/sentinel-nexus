@@ -135,3 +135,39 @@ body {
 .ota-btn-row { display: flex; flex-direction: column; gap: 0.5rem; }
 .console-feedback { margin-top: 0.75rem; font-size: 0.75rem; color: var(--accent-blue); min-height: 1.2rem; }
 .empty-state { text-align: center; color: var(--text-secondary); padding: 2rem !important; }
+
+
+/* MITRE ATT&CK Grid Styling */
+.mitre-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-top: 0.5rem;
+}
+
+.mitre-tile {
+    background: #111822;
+    border: 1px solid #1f293d;
+    border-left: 4px solid var(--accent-red);
+    border-radius: 4px;
+    padding: 0.85rem;
+    transition: transform 0.2s ease;
+}
+
+.mitre-tile:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-red);
+}
+
+.mitre-tech-id { font-size: 0.85rem; font-weight: 700; color: var(--accent-red); }
+.mitre-tech-name { font-size: 0.9rem; font-weight: 600; margin: 0.2rem 0; }
+.mitre-tactic { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
+.mitre-count-badge {
+    display: inline-block;
+    background: #2a1215;
+    color: var(--accent-red);
+    font-size: 0.7rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 3px;
+    border: 1px solid #541d21;
+}
