@@ -1,6 +1,7 @@
 #include "ForgeBridge.hpp"
 #include "core/Logger.hpp"
 #include <chrono>
+#include <fstream>
 
 namespace sentinel::nexus::telemetry {
 
