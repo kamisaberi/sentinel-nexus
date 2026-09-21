@@ -4,11 +4,11 @@
 
 namespace sentinel::nexus::rpc {
 
-class IntelligenceServiceImpl final : public intelligence::IntelligenceService::Service {
+class IntelligenceServiceImpl final : public ::sentinel::nexus::IntelligenceService::Service {
 public:
     grpc::Status SyncCollectiveImmunity(
         grpc::ServerContext* context, 
-        grpc::ServerReaderWriter<intelligence::FleetDefenseRule, intelligence::ThreatIndicator>* stream) override;
+        grpc::ServerReaderWriter<::sentinel::nexus::FleetDefenseRule, ::sentinel::nexus::ThreatIndicator>* stream) override;
 };
 
 } // namespace sentinel::nexus::rpc
