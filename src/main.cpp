@@ -81,6 +81,11 @@ int main(int argc, char** argv) {
     sentinel::nexus::rpc::IntelligenceServiceImpl intelligence_service;
     sentinel::nexus::rpc::ModelOtaServiceImpl model_ota_service;
 
+
+    sentinel::nexus::ota::RollbackGuard::instance().initialize(1000.0f, 500);
+    sentinel::nexus::telemetry::DatasetCurator::instance().initialize(config.forge_buffer_path, "/var/lib/sentinel-nexus/forge_datasets");
+
+
     // 5. Build & Launch Multi-Threaded gRPC Server (Port 50051)
     std::string server_address = config.bind_address + ":" + std::to_string(config.grpc_port);
     grpc::EnableDefaultHealthCheckService(true);
