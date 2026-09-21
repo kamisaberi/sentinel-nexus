@@ -110,4 +110,18 @@ target_link_libraries(sentinel-nexus
 add_executable(nexus-ctl tools/nexus-ctl/main.cpp)
 target_link_libraries(nexus-ctl PRIVATE Threads::Threads)
 
+
 install(TARGETS sentinel-nexus nexus-ctl DESTINATION /usr/local/bin)
+
+
+# 3. High-Throughput Benchmark Target
+add_executable(benchmark_ingest 
+    tests/benchmark/benchmark_ingest.cpp
+    src/telemetry/ForgeBridge.cpp
+    ${PROTO_GEN_SRCS}
+)
+target_link_libraries(benchmark_ingest
+    PRIVATE
+        Threads::Threads
+        protobuf::libprotobuf
+)
