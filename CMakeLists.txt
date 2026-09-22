@@ -99,7 +99,6 @@ set(NEXUS_SOURCES
     ${PROTO_GEN_SRCS}
     ${GRPC_GEN_SRCS}
 )
-
 # 1. Main Daemon Target
 add_executable(sentinel-nexus ${NEXUS_SOURCES})
 target_link_libraries(sentinel-nexus
