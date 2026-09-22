@@ -1,273 +1,232 @@
-# Brand, Architecture & UI/UX Master Brief: Aryorithm.com
+# Aryorithm Corporate & Commercial Web Architecture: Expanded Pages Brief
+
+This document provides the complete UI/UX blueprint, technical copywriting, and information architecture for the commercial, operational, and user-facing expansion pages of **`aryorithm.com`**.
 
 ---
 
-## 1. Brand Identity & Product Hierarchy
-
-### The Company: Aryorithm (`aryorithm.com`)
-* **Core Positioning:** Deep-Tech Cyber-Physical Security & Autonomous Edge AI Silicon Systems.
-* **Tagline:** *"Deterministic Sub-Millisecond Active Defense for Sovereign Infrastructure."*
-* **The Mission:** Transition enterprise, defense, and industrial cybersecurity from slow, cloud-dependent log collection (15–60s alert delays) to autonomous, air-gapped, sub-millisecond edge mitigation ($< 0.84\,\mu\text{s}$ eBPF kernel drops).
-
----
-
-### The Product Portfolio Structure
+## 1. Information Architecture & Expanded Sitemap
 
 ```text
-================================================================================================
-                                ARYORITHM ECOSYSTEM PORTFOLIO
-================================================================================================
-
- [ FLAGSHIP COMMERCIAL PRODUCTS ]
- ├── 1. SENTINEL NEXUS (Tier 6)
- │      └── Category: Central Autonomous Fleet Orchestrator & Collective Defense Grid
- │      └── Target: CISOs, SOC Teams, Enterprise Enclaves, Multi-Site Critical Infrastructure
- │
- ├── 2. BLACKBOX SENTINEL (Tier 3)
- │      └── Category: Cyber-Physical Edge XDR & SIEM Appliance (Hardware & Virtual)
- │      └── Target: Plant Managers, Substation Engineers, Datacenter Ops, Defense Vessels
- │
- ├── 3. XINFER FORGE (Tier 4)
- │      └── Category: Continuous Autonomous On-Device Retraining Daemon (MAE / InfoNCE)
- │      └── Target: ML Ops, Autonomous Systems, Closed Air-Gapped Networks
-
- [ OPEN-CORE & DEVELOPER ENGINES (C++20 LIBRARIES) ]
- ├── 4. xINFER ENGINE (`libxinfer.so` - Tier 1)
- │      └── Category: Universal Heterogeneous AI Runtime (15 Silicon Backends)
- │      └── Target: Embedded Developers, Silicon Vendors, Edge AI Engineers
- │
- ├── 5. BLACKBOX ENGINE (`libblackbox.so` - Tier 2)
- │      └── Category: Sub-Millisecond eBPF/XDP Mitigation & TPM 2.0 Security Core
- │      └── Target: Kernel Engineers, Systems Programmers, Low-Latency Defense
-
- [ ACADEMIC RESEARCH & BENCHMARKS ]
- └── 6. SENTINEL-LAB (Tier 5)
-        └── Category: Open Research Testbed, SLAB Protocol & Thesis Platform
-        └── Target: Researchers, PhD/Master Candidates, Reproducible Benchmark Community
-================================================================================================
+aryorithm.com
+├── /platform                     (Sentinel Nexus Fleet Grid)
+├── /products                     (Blackbox Sentinel Edge Appliance)
+├── /technology                   (xInfer & Blackbox C++20 Core Engines)
+├── /research                     (Sentinel-Lab Academic Preprint & Benchmarks)
+│
+├── [ EXPANDED COMMERCIAL & CORPORATE PAGES ]
+├── /about                        (Company Story, Engineering Ethos & Sovereignty)
+├── /team                         (Leadership, Kernel Engineers, Silicon Architects & Careers)
+├── /pricing                      (Licensing Tiers, Hardware Appliances & ROI Calculator)
+├── /contact                      (Defense Procurement, POC Units & Encrypted PGP Comms)
+├── /portal                       (Customer Enclave: Login, Air-Gapped Licensing & WebAuthn)
+│   ├── /portal/login
+│   ├── /portal/register
+│   └── /portal/license-activate
+├── /insights                     (Zero-Day Advisories, Benchmark Papers & Engineering Logs)
+├── /faq                          (Deep-Tech Technical FAQ & Architectural Comparisons)
+└── /trust                        (Compliance Center: CMMC 2.0, NIST SP 800-171, IEC 62443)
 ```
 
 ---
 
-## 2. Design System & Visual Language (UI Foundations)
-
-### Design Philosophy: *Industrial Sovereign Cyber-Physical*
-The aesthetic merges high-performance Linux kernel systems (dark terminal aesthetics) with mission-critical defense operations. It avoids generic SaaS startup styles (no pastel cartoons, no floating bloated 3D shapes).
-
-* **Color Palette:**
-  * **Obsidian Foundation:** `#07090E` (Deep spatial background)
-  * **Panel Slate:** `#0D111A` (Card & container surfaces)
-  * **Border Grid:** `#1A2232` (Structural line work)
-  * **Active Defense Cyan:** `#00E5FF` (Primary interactive highlights, AI inference paths)
-  * **Kernel Mitigation Green:** `#00FFA3` (Zero packet loss, healthy nodes, TPM verified)
-  * **Threat Alert Crimson:** `#FF3366` (eBPF packet drops, malicious signatures, attack waves)
-  * **Telemetry Gold:** `#FFB800` (Continuous retraining, active learning uncertainty window)
-  * **Text Primary:** `#F0F4F8` / **Text Secondary:** `#8A99AD`
-
-* **Typography:**
-  * **Headings:** Modern, technical geometric sans-serif (*Space Grotesk* or *Söhne Breit*).
-  * **Body:** Clean, legible neo-grotesque (*Inter* or *Geist*).
-  * **Data / Code / Latency Metrics:** Monospace engineered for high read-speed (*JetBrains Mono* or *Fira Code*).
-
-* **Visual Assets & Accents:**
-  * Technical grid backdrops with subtle dynamic radial glows.
-  * Live-rendered interactive canvas nodes (replicating the Nexus radial topology).
-  * Real-time code execution windows and live benchmark toggle sliders.
+## 2. Page-by-Page Detailed Blueprints
 
 ---
 
-## 3. Global Information Architecture & Navigation
+### Page 1: About Us (`/about`) — *The Sovereign Engineering Mission*
+
+#### Page Intent
+Establishes Aryorithm as a mission-driven, deep-tech research and engineering firm rather than another venture-backed SaaS repackaging cloud APIs. It explains the philosophical and mathematical necessity of moving from **retrospective cloud querying** to **deterministic edge mitigation**.
+
+#### Wireframe & Visual Sections
+1. **Hero Banner:**
+   * **Badge:** `MISSION DIRECTIVE`
+   * **Headline:** *"Engineered for the Millisecond Where Cloud Defense Fails."*
+   * **Subheadline:** *"When a kinetic cyber-physical attack targets an electrical grid, a naval vessel, or an automated production line, cloud-bound SIEMs taking 15 to 60 seconds to query logs are already post-mortems. Aryorithm was founded to enforce sub-microsecond, hardware-attested mitigation at the physical edge."*
+2. **The "Why We Exist" Manifesto:**
+   * Two visual columns: On the left, a schematic of a weaponized SCADA exploit hitting a turbine in $3.2\,\text{ms}$; on the right, the traditional cloud pipeline (log collection $\rightarrow$ transport $\rightarrow$ ingestion $\rightarrow$ elastic index $\rightarrow$ ticket generation $\rightarrow$ manual human drop = **38 seconds**).
+   * Aryorithm’s answer: In-kernel eBPF drop executed in **`0.84 microseconds`**.
+3. **Core Engineering Axioms (Interactive Cards):**
+   * **Axiom 1: Deterministic C++20 Fast-Path:** Zero garbage collection, zero Python runtime in the mitigation path, zero thread-blocking mutexes.
+   * **Axiom 2: Cryptographic Silicon Roots:** Security cannot rest on software MAC addresses. Every appliance is attested via physical TPM 2.0 silicon quotes.
+   * **Axiom 3: Absolute Air-Gap Sovereignty:** Zero cloud dependencies, zero external CDNs, and zero data leakage. High-value telemetry stays on the owner’s premises.
+4. **Company Milestones & Lineage:**
+   * Interactive vertical timeline showing the technical progression from foundational Linux kernel eBPF/XDP research to 15-backend silicon inference runtimes, culminating in Sentinel Nexus fleet orchestration.
+
+---
+
+### Page 2: Team, Leadership & Careers (`/team` & `/careers`)
+
+#### Page Intent
+Instills high confidence in defense contractors, enterprise CISOs, and silicon partners by highlighting deep systems engineering credentials (kernel contributors, hardware architects, and machine learning researchers).
+
+#### Wireframe & Visual Sections
+1. **Leadership & Architecture Board:**
+   * High-contrast, monochromatic executive cards with glowing border hovers:
+     * **Founder & Chief Systems Architect:** Background in low-latency Linux kernel internals, eBPF, and real-time defense computing.
+     * **Head of Silicon AI & Inference:** Specialist in heterogeneous acceleration (NVIDIA TensorRT, Intel OpenVINO, NPU compilation).
+     * **Director of Cyber-Physical Systems (CPS):** Veteran of SCADA/ICS critical infrastructure, Modbus/DNP3 reverse engineering.
+     * **Head of Cryptography & Hardware Security:** Specializing in TCG TPM 2.0 specifications, zero-trust attestation, and side-channel power analysis.
+2. **The Advisory Enclave:**
+   * Former industrial control system CISOs, naval electrical engineers, and high-performance computing researchers.
+3. **Engineering Culture (`/careers` section):**
+   * **Headline:** *"We Do Not Build CRUD Apps. We Write Systems That Cannot Fail."*
+   * **Tech Stack Showcase:** `C++20`, `Linux Kernel (XDP/eBPF)`, `CUDA / TensorRT`, `TCG TPM 2.0`, `PyTorch (MAE/InfoNCE)`, `Zero-Copy DMA-BUF`.
+4. **Open Roles (Filterable Technical Openings):**
+   * *Staff Systems Engineer (Linux Kernel & eBPF/XDP)*
+   * *Senior AI Silicon Compiler Engineer (OpenVINO / TensorRT / RKNN)*
+   * *Industrial Protocol Security Researcher (SCADA / Modbus / DNP3 / S7)*
+   * *Lead UI/UX Systems Designer (High-Density Air-Gapped Web Dashboards)*
+   * Each job listing includes an interactive `"Engineering Challenge"` terminal modal where candidates can paste C++ or eBPF patches to fast-track their interview.
+
+---
+
+### Page 3: Pricing, Licensing & Enclave Tiers (`/pricing`)
+
+#### Page Intent
+Transparently structures commercialization across three tiers: Open-Core/Academic, Turnkey Edge Appliances, and Enterprise Multi-Site Orchestration.
 
 ```text
-[ ARYORITHM ]    Platform ▼    Technology ▼    Research    Benchmarks    Company    [ Schedule Briefing ]
+========================================================================================================
+ TIER 1: OPEN RESEARCH         TIER 2: EDGE APPLIANCE         TIER 3: SENTINEL NEXUS         TIER 4: SOVEREIGN DEFENSE
+ (Academic & Community)       (Single Node Commercial)       (Enterprise Fleet Grid)         (Classified / Air-Gapped)
+--------------------------------------------------------------------------------------------------------
+ • libxinfer.so Core           • 1x Blackbox Sentinel Node    • Central Nexus Orchestrator   • Dedicated Custom Silicon
+ • libblackbox.so Core         • All 26 Decoupled Modules     • Up to 5,000 Edge Appliances  • Link-16 / Military Plugins
+ • Sentinel-Lab Benchmarks     • 30 Industrial OT/IT Plugins  • Sub-50ms Collective Defense  • Cryptographic Sneakernet
+ • Community Discord Support   • Local eBPF (<1ms Drop)       • Automated Canary OTA Rollout • Custom Safety Gates
+ • Free / Open-Core            • Air-Gapped Web UI (8443)     • CMMC / IEC 62443 Reporting   • L3 24/7 Cleared Support
+                               • Hardware or Virtual VM       • xinfer-forge Retraining Farm • Custom SLA & Source Escrow
+ Free & Open Source            $4,800 / node / year           Contact for Deployment Quote   Custom Sovereign Contract
+========================================================================================================
 ```
 
-1. **Platform (Enterprise Solutions):**
-   * **Sentinel Nexus:** Central Collective Defense Grid & Fleet Command.
-   * **Blackbox Sentinel:** Cyber-Physical Edge XDR/SIEM Appliance (26 Modules, 30 Plugins).
-   * **xInfer Forge:** Air-gapped continuous learning & safety-gated retraining.
-2. **Technology (Core Engines & Open-Core):**
-   * **xInfer Engine:** Universal zero-copy C++20 AI runtime across 15 silicon platforms.
-   * **Blackbox Core:** eBPF/XDP nanosecond packet dropper & lock-free SPMC engine.
-3. **Research:**
-   * **Sentinel-Lab:** Academic preprint, SLAB binary wire protocol, reproducible CIC-IDS-2017 evaluation.
-4. **Benchmarks:**
-   * Interactive benchmark comparison against Splunk, Elastic, QRadar, and Suricata.
-5. **Company:**
-   * Mission, Hardware Attestation (TPM 2.0 / Sovereignty), Contact / Defense Procurement.
+#### Interactive Elements
+1. **Interactive Fleet ROI Calculator:**
+   * **Inputs:** Sliders for `Number of Sites` (1 to 500) and `Daily NetFlow Volume` (GB/day).
+   * **Outputs:** 
+     * *Cloud SIEM Ingestion & Egress Cost:* Displays estimated annual AWS/Splunk bills (e.g., $180,000/yr).
+     * *Aryorithm Sentinel Nexus Cost:* Displays edge fixed cost with **`$0 Cloud Egress`** and **`94% Cost Reduction`**.
+2. **Appliance Form Factor Selector:**
+   * Toggle between **Turnkey 1U Rugged Hardware** (shipped pre-configured with TPM 2.0 and Intel/NVIDIA accelerators) and **Virtual Appliance** (OVA/QCOW2 image ready for VMware vSphere, KVM, or Proxmox).
 
 ---
 
-## 4. Page-by-Page Layout & Content Blueprint
+### Page 4: Contact Us & Defense Procurement (`/contact`)
+
+#### Page Intent
+Provides tailored communication paths for enterprise POC requests, military/defense procurement, and cryptographically secure zero-day vulnerability disclosures.
+
+#### Wireframe & Visual Sections
+1. **Split-Screen Contact Hub:**
+   * **Left Side: Direct Procurement Inquiries**
+     * Interactive intake form:
+       * Work Email & Organization Name
+       * Deployment Scope (Critical Infrastructure OT, Defense/Government Enclave, Enterprise IT/DMZ, Academic Research)
+       * Silicon Architecture of Interest (Intel OpenVINO, NVIDIA TensorRT, Rockchip RKNN, Hailo, Qualcomm)
+       * Request Type: *Request Evaluation Unit (Hardware POC)*, *Schedule Technical Briefing*, or *Procurement Contract (Cage Code / DUNS)*.
+   * **Right Side: Sovereign & Cleared Communications**
+     * **PGP Public Key:** Visual block showing the fingerprint and a 1-click `[ Copy PGP Key ]` button for sensitive/classified RFP submissions.
+     * **Encrypted Security Channel:** Dedicated contact for responsible vulnerability disclosure.
+     * **Physical Lab Locations:** Primary testing facility in Amsterdam, Netherlands, and secure evaluation enclaves.
 
 ---
 
-### Page 1: Homepage (`/`) — The Flagship Hook
+### Page 5: Customer Enclave Portal (`/login` & `/register`)
 
-#### Section 1: The Hero Section (Above the Fold)
-* **Headline:**  
-  *“From 60-Second Cloud Detection to 0.84-Microsecond Kernel Mitigation.”*
-* **Subheadline:**  
-  *“Aryorithm delivers the world’s first autonomous cyber-physical active defense ecosystem. Powered by `libxinfer` (15 silicon backends) and native Linux eBPF/XDP, Sentinel Nexus turns distributed edge appliances into an air-gapped, collective immunity grid.”*
-* **Live KPI Badge Row:**
-  * `0.84 µs` — Wire-Speed Mitigation Latency
-  * `1,250,000 EPS` — Sustained Single-Node Throughput
-  * `15 Targets` — Silicon AI Backends (OpenVINO, TensorRT, RKNN, etc.)
-  * `$0 Cloud Egress` — 100% Air-Gapped Operation
-* **Hero Visual:**
-  * Interactive 3D/Canvas rendering of **Sentinel Nexus** at the center with glowing pulse-lines connecting 5 edge nodes (Intel NUC, NVIDIA Jetson, Rockchip OT gateway, SCADA PLC, and hospital PACS server).
-* **CTAs:**
-  * `[ Explore Sentinel Nexus Platform ]` (Primary Cyan Button)
-  * `[ View Academic Paper & Benchmarks ]` (Secondary Ghost Button)
+#### Page Intent
+Authentication for licensed customers. Designed as an ultra-hardened, zero-trust terminal interface without social sign-ins (no Google/GitHub buttons).
+
+#### UX & Visual Design
+* **Interface Style:** Centered minimalist black card (`#0D111A`) framed by a cyan laser border and real-time TLS connection telemetry.
+* **Authentication Options:**
+  1. **FIDO2 / WebAuthn Hardware Security Key (Default):** Prompts for physical YubiKey or Titan security key touch.
+  2. **TPM 2.0 Hardware Machine Certificate:** mTLS mutual handshake verifying the engineer’s machine identity.
+  3. **Enterprise SSO / SAML:** For Okta, Ping Identity, and Microsoft Entra ID with mandatory TOTP MFA.
+* **Air-Gapped Offline Activation Modal (`/portal/license-activate`):**
+  * For isolated facilities without internet access:
+    * Paste the appliance hardware quote generated by `./sentinel --generate-hardware-token`.
+    * Download an offline, cryptographically signed `.lic` envelope to activate enterprise modules on-premise.
 
 ---
 
-#### Section 2: The Core Problem vs. The Aryorithm Paradigm
-A visual comparison table or side-by-side interactive split:
+### Page 6: Technical Insights, News & Research (`/insights`)
 
-| Traditional Cloud SIEM / XDR | Aryorithm Autonomous Active Defense |
-| :--- | :--- |
-| **Passive & Retrospective:** Queries logs 15 to 60 seconds *after* an attack completes. | **Inline & Predictive:** Intercepts traffic at driver rings in $< 1.0\,\mu\text{s}$ before host execution. |
-| **Massive Bandwidth & Cloud Egress:** Streams terabytes of raw logs to AWS/Azure. | **Edge Latent Processing:** Keeps 100% of data local; streams only high-uncertainty embeddings. |
-| **Fragile Software Identity:** Easily spoofed VM MAC addresses and software tokens. | **Cryptographic Silicon Trust:** Bound to physical TPM 2.0 PCR quotes and DMI UUID hardware. |
-| **Fragmented Stacks:** Relies on third-party python agents, bloated runtimes, and external CDNs. | **Native Native C++20:** Zero Python or Java in the mitigation path. Air-gapped SPA with zero CDNs. |
+#### Page Intent
+Demonstrates technical authority through deep-dive engineering whitepapers, benchmark releases, and zero-day threat analysis rather than generic marketing blog posts.
 
----
-
-#### Section 3: The Three-Pillar Platform Architecture
-Three interactive card modules with terminal previews:
-
-1. **The Grid Command: Sentinel Nexus**
-   * *“Collective Immunity across 10,000 Appliances.”*
-   * Attacked once at an edge substation; immune everywhere in $<50\,\text{ms}$ via bidirectional gRPC kernel sync.
-   * Automated Over-The-Air canary rollouts with SLA latency guards ($>1{,}000\,\mu\text{s}$ auto-rollback).
-
-2. **The Edge Guardian: Blackbox Sentinel**
-   * *“Cyber-Physical XDR & SIEM in a Single Appliance.”*
-   * 26 decoupled native modules (`siem_core`, `ueba`, `cwpp`, `bad`, `iot_sec`, `cps_sec`).
-   * 30 industrial plugins for SCADA/OT (Modbus, DNP3, PROFINET, S7Comm, MAVLink, DICOM).
-
-3. **The Intelligence Core: xInfer & Forge**
-   * *“Continuous Silicon-Agnostic Learning without Cloud Access.”*
-   * Universal runtime executing `.onnx` models across 15 architectures.
-   * Self-supervised MAE/InfoNCE continuous adaptation protected by non-negotiable golden attack safety gates.
+#### Content Taxonomy & Sample Articles
+1. **Advisories & Exploit Dissections:**
+   * *“Dissecting the Modbus Function Code 0x05 Exploit: How eBPF Kernel Drops Prevent PLC Valve Manipulation in Under 1 Microsecond.”*
+   * *“Why Prompt Injection Firewalls (Module 23) Fail in Python and How In-Memory C++ Hook Guards Succeed.”*
+2. **Silicon Acceleration Engineering:**
+   * *“Pushing 1.25 Million Packets/sec with AF_XDP and Zero-Copy DMA-BUF Across Intel Xeon and Core i9-14900K.”*
+   * *“Porting YOLOv8 & NetFlow Autoencoders to Rockchip RKNN and Hailo-8: A Comparative Power-Performance Study.”*
+3. **Continuous Learning & AI Safety:**
+   * *“Defeating Adversarial Model Poisoning at the Edge: Formalizing the Golden Attack Regression Safety Gate.”*
+4. **Features:**
+   * Filter tags by silicon (`OpenVINO`, `TensorRT`, `eBPF`, `SCADA`).
+   * Clean syntax-highlighted C++20 and eBPF code snippets using dark terminal formatting.
+   * Direct links to download PDF versions and raw benchmark data artifacts.
 
 ---
 
-#### Section 4: Live Interactive Benchmark Module
-An interactive slider where visitors adjust network traffic from `10,000 EPS` to `1,000,000 EPS`:
-* Shows live comparison bars for **Mitigation Latency**, **CPU Utilization**, and **RAM Footprint** between **Aryorithm Sentinel**, **Splunk**, **Elastic**, **QRadar**, and **Suricata**.
-* Displays verified industrial bare-metal hardware specs (Intel Core i9-14900K, 192GB DDR5, Intel X520 10GbE SFP+).
+### Page 7: Technical Knowledge Base & FAQ (`/faq`)
+
+#### Page Intent
+Addresses technical, architectural, and procurement questions asked by CISOs, network engineers, and compliance auditors.
+
+#### Structured Questions & Answers
+* **Q1: Why use Linux eBPF/XDP instead of Suricata or Snort?**
+  * *Answer:* Suricata and Snort operate in userspace via `libpcap` or `NFQUEUE`. Packets must traverse the entire Linux network stack, undergo socket allocation, and cross kernel-user boundaries, introducing 5.0 to 15.0 milliseconds of latency. Aryorithm’s `xdp_filter.o` executes directly at the network interface card (NIC) driver level before socket memory is allocated, dropping malicious packets in **0.84 microseconds**—over 5,000 times faster.
+* **Q2: How does `xinfer-forge` adapt models without an internet connection?**
+  * *Answer:* Forge runs as an on-premise background daemon implementing Self-Supervised Masked Autoencoding (MAE) on ambient, unlabeled site NetFlow vectors. It does not send data offsite. Before any candidate model is compiled to ONNX, it must achieve 100% detection on an immutable local suite of `golden_attacks.yaml`. If a candidate misses a single known threat, it is aborted automatically.
+* **Q3: What happens if an edge appliance loses connection to Sentinel Nexus?**
+  * *Answer:* Appliances are autonomous by design. If a WAN link drops, the edge appliance continues running its local eBPF filter and `libxinfer` engine without degradation. When reconnected, buffered candidate vectors and drop logs are automatically synchronized.
+* **Q4: Can Blackbox Sentinel run inside VMware or virtualized environments?**
+  * *Answer:* Yes. `libblackbox` utilizes an adaptive 3-tier hardware identity engine. It first queries `/dev/tpmrm0` for physical TPM 2.0; if virtualized, it identifies VMware vTPM / QEMU swtpm; if neither is present, it computes a cryptographic hash from the motherboard DMI product UUID.
+* **Q5: Which regulatory compliance standards does Aryorithm support out of the box?**
+  * *Answer:* Nexus generates automated, cryptographically verifiable compliance reports for **CMMC 2.0 (Level 2)**, **NIST SP 800-171**, and **IEC 62443-3-3 / 4-2** for industrial critical infrastructure.
 
 ---
 
-#### Section 5: Built for High-Assurance Enclaves (Trust & Compliance)
-Badges with architectural proofs:
-* **CMMC 2.0 (Level 2) & NIST SP 800-171:** Sub-millisecond incident response and TPM 2.0 attestation proofs.
-* **IEC 62443-3-3 / 4-2:** Industrial automated protocol constraint enforcement for OT.
-* **100% Air-Gapped Guarantee:** Operates with zero internet connectivity and zero external CDN script tags.
+### Page 8: Trust, Compliance & Verification Center (`/trust`)
+
+#### Page Intent
+Serves as the central repository for enterprise security audits, cryptographic verification keys, and compliance mapping.
+
+#### Key Content Blocks
+1. **Compliance Matrix:**
+   * **CMMC 2.0 Level 2 / NIST SP 800-171:** Control mappings for `AC.L2-3.1.1` (Access Control), `IA.L2-3.5.1` (Hardware Identification & Authentication), and `SI.L2-3.14.1` (Sub-millisecond Incident Response SLA).
+   * **IEC 62443:** Zone segmentation, SCADA protocol constraint validation (Modbus, DNP3, PROFINET).
+2. **Software Bill of Materials (SBOM):**
+   * Downloadable cryptographically signed CycloneDX and SPDX SBOMs proving zero hidden third-party cloud dependencies.
+3. **Cryptographic Checksum Repository:**
+   * Public SHA-256 and GPG verification signatures for all released `.onnx` models, `libxinfer.so`, `libblackbox.so`, and appliance ISOs.
 
 ---
 
-### Page 2: The Enterprise Platform (`/platform/nexus`)
+## 3. UI/UX Component Specifications for Frontend Engineers
 
-Dedicated to the flagship product: **Sentinel Nexus**.
+To ensure seamless implementation by your web development team, build the site using these specific UI components:
 
-* **Interactive Hero:** Live interactive preview of the Web Command Center UI (Fleet Topology, MITRE ATT&CK Matrix, eBPF Drop Table, and Canary Staging).
-* **Key Feature Grid:**
-  1. **Collective Defense Engine (`IocBroadcaster`):** Technical breakdown of how a zero-day payload on Node 1 fans out to the `blocked_ip_map` of all other appliances.
-  2. **Active Learning Bridge (`ForgeBridge` & `DatasetCurator`):** How high-uncertainty NetFlow vectors ($[0.40, 0.60]$) are sampled without choking WAN links.
-  3. **Automated Canary Rollout Engine:** Visualizing the three-phase staged deployment (`Shadow Mode` $\rightarrow$ `5% Canary` $\rightarrow$ `Fleet-Wide`) with the `RollbackGuard` SLA monitor.
-  4. **TPM 2.0 Remote Attestation:** Cryptographic verification of node identity before admission into the defense grid.
-  5. **Air-Gapped Sneakernet Suite:** How air-gapped nuclear/defense facilities export `.snbundle` encrypted packages for offline retraining.
-* **Management Interface:** Showcase of `nexus-ctl` (the terminal operations CLI) with interactive dark-mode copyable command snippets.
+```text
+[ ARYORITHM FRONTEND ATOMIC COMPONENT LIBRARY ]
+ ├── Primitives/
+ │   ├── TerminalWindow.tsx      -> Dark macOS/Linux style header with code block & copy button
+ │   ├── MetricBadge.tsx         -> Glowing monospace metric indicator (e.g. "0.84 µs")
+ │   ├── LaserBorderCard.tsx     -> Panel with subtle animated gradient stroke on hover
+ │   └── StatusPulse.tsx         -> Green/Red/Cyan heartbeat dot indicator
+ │
+ ├── Interactive Modules/
+ │   ├── LatencyComparator.tsx   -> Slider comparing eBPF vs Cloud SIEM tick clock
+ │   ├── SiliconGridSelector.tsx -> 15-target clickable chip matrix (OpenVINO, TensorRT, etc.)
+ │   ├── WebCliEmulator.tsx      -> In-browser interactive `nexus-ctl` command sandbox
+ │   └── EnclaveMap.tsx          -> HTML5 Canvas radial fleet topology animation
+ │
+ └── Modals & Forms/
+     ├── PgpModal.tsx            -> 1-click GPG public key modal with fingerprint verification
+     └── HardwareQuoteForm.tsx   -> Interactive hardware configuration builder for POC units
+```
 
----
-
-### Page 3: The Edge Appliance (`/products/sentinel`)
-
-Dedicated to **Blackbox Sentinel**.
-
-* **Appliance Form Factors:**
-  * **Industrial Rugged Hardware Appliance (1U / DIN-Rail):** For substations, oil rigs, naval vessels, and remote plants.
-  * **Enterprise Virtual Appliance (vSphere / KVM / Proxmox):** For enterprise DMZs, private clouds, and datacenter enclaves.
-* **The 26 Subsystem Deep-Dive:** An interactive accordion or filterable matrix displaying each module:
-  * IT/Cloud: `01_siem_core`, `02_ueba`, `05_waf`, `09_cwpp`, `14_ato`.
-  * Physical & OT: `17_iot_sec` (DICOM PACS), `18_cps_sec` (SCADA Modbus/DNP3), `21_side_channel` (Power/EM analysis).
-* **The 30 Industrial Protocol Plugins:** Showcase of custom C++ dissectors for critical infrastructure: Modbus, DNP3, PROFINET, S7Comm, MAVLink, and AIS Maritime.
-
----
-
-### Page 4: Developer & Open-Core Silicon Engines (`/technology`)
-
-Targeted at kernel engineers, AI researchers, and embedded developers.
-
-#### Tab A: `xInfer Engine` (`libxinfer.so`)
-* **Core Value:** *"Write once, infer natively across 15 silicon targets."*
-* **15-Platform Matrix Table:** Detailed interactive grid showing backend loader, supported formats (`.engine`, `.xml`, `.rknn`, `.hef`), and zero-copy memory paths (`DMA-BUF`, `NVMM`, host-pinned).
-* **C++20 API Walkthrough:** Clean code snippet showcasing how easy it is to initialize `xinfer::InferenceEngine`, load dynamic `.so` plugins via `dlopen`, and run model execution without Python overhead.
-
-#### Tab B: `Blackbox Core` (`libblackbox.so`)
-* **Core Value:** *"Kernel-space defense at hardware wire-speed."*
-* **eBPF/XDP Deep Dive:** Architectural breakdown of `xdp_filter.c` running at driver hooks, executing nanosecond packet drops via BPF hash maps before network packets reach the Linux TCP/IP stack.
-* **SPMC Lock-Free Ring Buffer:** How `EventRingBuffer` transfers millions of events to userspace inference without mutex contention or thread blocking.
-
----
-
-### Page 5: Research & Academic Testbed (`/research/sentinel-lab`)
-
-Positions Aryorithm as an authoritative deep-tech scientific pioneer.
-
-* **Academic Preprint Paper:**
-  * Direct PDF download of `paper.tex` preprint: *"Autonomous Cyber-Physical Threat Mitigation: A Sub-Millisecond Active Defense Architecture on Heterogeneous Silicon"*.
-* **SLAB Binary Wire Protocol Specification:**
-  * Interactive byte-packet dissector: `[Magic (SLAB) | EventID | GroundTruth | NumFeatures | Float32 Array]`.
-* **Reproducible Evaluation Pipeline:**
-  * Open benchmark suite running the CIC-IDS-2017 PortScan dataset at 60k+ EPS on dual backends (Intel OpenVINO CPU/NPU vs. NVIDIA TensorRT GPU).
-  * Direct GitHub link to `sentinel-lab`.
-
----
-
-### Page 6: Company & Mission (`/about` & `/contact`)
-
-* **Executive Mission:** Built by engineers who refused to accept that 60 seconds of data egress delay is acceptable when modern physical attacks destroy machinery in milliseconds.
-* **Defense & Enterprise Enquiries Form:**
-  * Interactive hardware qualification selector (e.g., Selecting deployment environment: Substation SCADA, Naval/Aviation Enclave, Healthcare Datacenter, Enterprise Corporate Network).
-  * Request a Hardware Evaluation Unit or Pilot Appliance Deployment.
-
----
-
-## 5. High-Converting Interactive UX Modules (Key Differentiators)
-
-To make `aryorithm.com` immediately memorable to CISOs and engineers, incorporate these three interactive widgets:
-
-### 1. Interactive Sub-Millisecond Latency Visualizer
-* A split-screen real-time timer animation.
-* On the left: **Aryorithm Sentinel** triggers an eBPF drop in **`0.00084 milliseconds`** (green flash: *Mitigated at Kernel Hook*).
-* On the right: **Traditional Cloud SIEM** clock ticks continuously for **`24.3 seconds`** (gray text: *Packet buffered $\rightarrow$ Log ingested $\rightarrow$ Cloud forwarded $\rightarrow$ Index query evaluated $\rightarrow$ Ticket created*).
-
-### 2. The 15-Silicon Hardware Backend Selector
-* An interactive grid of logos: Intel, NVIDIA, Qualcomm, Rockchip, AMD/Xilinx, Apple, Hailo, Google Coral, etc.
-* Clicking any chip reveals:
-  * Supported runtime file format (`.xml`, `.engine`, `.rknn`, `.hef`).
-  * Execution latency on MobileNet/ResNet models.
-  * Memory copy path (Zero-copy DMA-BUF vs. Host Pinned).
-
-### 3. Interactive Web Terminal (Try `nexus-ctl` in Browser)
-* An embedded dark terminal emulator where visitors can type real commands:
-  * `nexus-ctl fleet list` $\rightarrow$ Displays a simulated table of 5 active edge nodes.
-  * `nexus-ctl threat drop 198.51.100.77` $\rightarrow$ Animates sub-50ms fanout across nodes.
-  * `nexus-ctl report cmmc` $\rightarrow$ Displays the real CMMC 2.0 Level 2 compliance evaluation score.
-
----
-
-## 6. Recommended Frontend Tech Stack & Implementation
-
-To mirror the air-gapped, zero-bloat philosophy of the products:
-
-* **Framework:** **Next.js 14+ (App Router)** or **Astro 4+** (for maximum performance and pure static export capability).
-* **Styling:** **Tailwind CSS** with custom cyberpunk/industrial dark themes (`bg-[#07090E]`, cyan glow accents).
-* **Animations:** **Framer Motion** for smooth hardware telemetry graphs and canvas rendering.
-* **Syntax Highlighting:** **Shiki** (ultra-fast, zero-runtime overhead code highlighter for C++20 and eBPF code snippets).
-* **Icons:** **Lucide Icons** (clean, crisp, technical SVG icons).
-* **Static Deployment:** Can be exported via `next export` into pure static HTML/CSS/JS, allowing the marketing site itself to be hosted directly on an air-gapped Sentinel appliance!
+This comprehensive design brief equips your design and frontend development team to build an authoritative, deep-tech web presence at **`aryorithm.com`** that communicates the sovereign performance of the Blackbox Sentinel ecosystem.
