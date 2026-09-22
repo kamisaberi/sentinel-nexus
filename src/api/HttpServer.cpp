@@ -232,6 +232,12 @@ namespace sentinel::nexus::api
             return handle_get_ota();
         }
 
+        if (route_path == "/api/v1/models")
+        {
+            content_type = "application/json";
+            return controllers::ModelController::list_models_json();
+        }
+
         if (route_path == "/api/v1/reports/cmmc")
         {
             content_type = "application/json";
