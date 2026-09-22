@@ -244,7 +244,7 @@ namespace sentinel::nexus::api
             return intelligence::GlobalThreatCache::instance().generate_mitre_summary_json();
         }
 
-                if (route_path == "/api/v1/threats/broadcast" && method == "POST")
+        if (route_path == "/api/v1/threats/broadcast" && method == "POST")
         {
             content_type = "application/json";
             return handle_post_broadcast(body);
@@ -265,8 +265,6 @@ namespace sentinel::nexus::api
             return handle_post_ota_rollback();
         }
 
-
-
         if (route_path == "/api/v1/reports/cmmc")
         {
             content_type = "application/json";
@@ -277,8 +275,6 @@ namespace sentinel::nexus::api
             content_type = "application/json";
             return reporting::ScadaAuditEngine::instance().generate_iec62443_assessment_json();
         }
-
-
 
         // Static Web Dashboard Files
         return serve_static_file(route_path, content_type, status_code);
