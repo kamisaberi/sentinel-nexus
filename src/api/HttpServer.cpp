@@ -11,6 +11,10 @@
 #include "fleet/GroupManager.hpp"
 #include "ota/ModelRepository.hpp"
 #include "api/TelemetryStreamer.hpp"
+#include "controllers/FleetController.hpp"
+#include "controllers/ThreatController.hpp"
+#include "controllers/ModelController.hpp"
+
 
 #include <sys/socket.h>
 #include <netinet/in.h>
