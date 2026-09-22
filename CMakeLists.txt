@@ -72,18 +72,24 @@ set(NEXUS_SOURCES
     src/fleet/NodeRegistry.cpp
     src/fleet/AttestationValidator.cpp
     src/fleet/GroupManager.cpp
+    src/fleet/HeartbeatMonitor.cpp
     src/telemetry/ForgeBridge.cpp
+    src/telemetry/VectorIngestQueue.cpp
+    src/telemetry/UncertaintySampler.cpp
     src/telemetry/DatasetCurator.cpp
     src/telemetry/ForgeTrigger.cpp
     src/intelligence/IocBroadcaster.cpp
     src/intelligence/GlobalThreatCache.cpp
+    src/intelligence/MitreAggregator.cpp
     src/ota/CanaryOrchestrator.cpp
     src/ota/RollbackGuard.cpp
     src/ota/ModelRepository.cpp
     src/reporting/ReportGenerator.cpp
     src/reporting/CmmcAuditEngine.cpp
     src/reporting/ScadaAuditEngine.cpp
+    src/reporting/LatencySlaReporter.cpp
     src/storage/StateDatabase.cpp
+    src/storage/TimeSeriesEngine.cpp
     src/api/HttpServer.cpp
     src/api/TelemetryStreamer.cpp
     src/rpc/FleetServiceImpl.cpp
@@ -93,7 +99,6 @@ set(NEXUS_SOURCES
     ${PROTO_GEN_SRCS}
     ${GRPC_GEN_SRCS}
 )
-
 
 # 1. Main Daemon Target
 add_executable(sentinel-nexus ${NEXUS_SOURCES})
