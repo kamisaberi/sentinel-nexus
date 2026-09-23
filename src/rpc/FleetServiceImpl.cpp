@@ -52,5 +52,24 @@ namespace sentinel::nexus::rpc
 
         return grpc::Status::OK;
     }
+    grpc::Status FleetServiceImpl::DeregisterAppliance(grpc::ServerContext *context,
+                                                       const ::sentinel::nexus::DeregistrationRequest *request,
+                                                       ::sentinel::nexus::ResponseStatus *response)
+    {
+        (void)context;
+
+        bool ok = fleet::NodeRegistry::instance().mark_node_offline(
+            request->node_id(), request->reason());
+
+        // Instant SSE broadcast to all open web command center browsers
+        api::TelemetryStreamer::instance().broadcast_event(
+            "heartbeat_sync", "{\"node_id\":\"" + request->node_id() + "\",\"status\":\"OFFLINE\"}");
+
+        response->set_success(ok);
+        response->set_message(ok ? "Node marked OFFLINE." : "Node ID not found.");
+        response->set_code(ok ? 200 : 404);
+
+        return grpc::Status::OK;
+    }
 
 } // namespace sentinel::nexus::rpc
