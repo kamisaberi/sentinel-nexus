@@ -34,6 +34,7 @@ public:
 
     std::string register_node(const RegistrationRequest& req);
     bool update_heartbeat(const std::string& node_id, const DeviceMetrics& metrics);
+    bool mark_node_offline(const std::string& node_id, const std::string& reason = "CLEAN_SHUTDOWN");
     void evaluate_node_health(uint32_t timeout_seconds);
 
     size_t active_node_count() const;
