@@ -13,6 +13,10 @@ public:
     grpc::Status SendHeartbeat(grpc::ServerContext* context, 
                               const ::sentinel::nexus::HeartbeatRequest* request, 
                               ::sentinel::nexus::HeartbeatResponse* response) override;
+
+    grpc::Status DeregisterAppliance(grpc::ServerContext* context,
+                                    const ::sentinel::nexus::DeregistrationRequest* request,
+                                    ::sentinel::nexus::ResponseStatus* response) override;
 };
 
 } // namespace sentinel::nexus::rpc
