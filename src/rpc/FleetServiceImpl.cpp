@@ -1,5 +1,6 @@
 #include "FleetServiceImpl.hpp"
 #include "fleet/NodeRegistry.hpp"
+#include "api/TelemetryStreamer.hpp"
 #include "core/Logger.hpp"
 
 namespace sentinel::nexus::rpc
@@ -27,6 +28,10 @@ namespace sentinel::nexus::rpc
         response->set_node_id(assigned_id);
         response->set_heartbeat_interval_seconds(5);
 
+        // Notify connected browsers immediately
+        api::TelemetryStreamer::instance().broadcast_event(
+            "heartbeat_sync", "{\"node_id\":\"" + assigned_id + "\",\"status\":\"ONLINE\"}");
+
         return grpc::Status::OK;
     }
 
@@ -52,6 +57,7 @@ namespace sentinel::nexus::rpc
 
         return grpc::Status::OK;
     }
+
     grpc::Status FleetServiceImpl::DeregisterAppliance(grpc::ServerContext *context,
                                                        const ::sentinel::nexus::DeregistrationRequest *request,
                                                        ::sentinel::nexus::ResponseStatus *response)
