@@ -53,6 +53,19 @@ bool NodeRegistry::update_heartbeat(const std::string& node_id, const DeviceMetr
     return true;
 }
 
+bool NodeRegistry::mark_node_offline(const std::string& node_id, const std::string& reason) {
+    std::unique_lock lock(mutex_);
+    auto it = nodes_.find(node_id);
+    if (it == nodes_.end()) {
+        return false;
+    }
+
+    it->second.status = NodeHealthStatus::OFFLINE;
+    NEXUS_LOG_WARN("Appliance disconnected (" + reason + "): " + node_id + 
+                   " (" + it->second.site_identifier + ")");
+    return true;
+}
+
 void NodeRegistry::evaluate_node_health(uint32_t timeout_seconds) {
     std::unique_lock lock(mutex_);
     auto now = std::chrono::system_clock::now();
