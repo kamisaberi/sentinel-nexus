@@ -9,6 +9,9 @@
 1. **Active Learning Feeder (`xinfer-forge`):** Selectively ingests high-uncertainty NetFlow feature vectors and eBPF drop records, curating them into training datasets for continuous adaptation.
 2. **Collective Defense ("Attacked Once, Immune Everywhere"):** Bidirectional gRPC stream propagates zero-day IoCs fleet-wide in $<50\,\text{ms}$, injecting attacker IPs directly into every edge appliance's kernel `blocked_ip_map`.
 3. **Automated Canary Staged Rollout & SLA Guard:** Phased deployment (`Shadow Mode` $\rightarrow$ `5% Canary` $\rightarrow$ `Fleet-Wide`) with automated emergency rollback if candidate models exceed the $1{,}000\,\mu\text{s}$ mitigation SLA.
+
+
+
 4. **Hardware Identity & Remote Attestation:** Validates physical TPM 2.0 / vTPM cryptographic quotes and machine identities.
 5. **Air-Gapped Web Command Center:** Modern SPA with zero CDN dependencies, featuring live fleet metrics, radial link topology, and an interactive MITRE ATT&CK heatmap.
 
