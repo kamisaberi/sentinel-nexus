@@ -209,6 +209,11 @@ namespace sentinel::nexus::api
             }
         }
 
+        if (route_path == "/api/v1/threats/xai")
+        {
+            content_type = "application/json";
+            return intelligence::GlobalThreatCache::instance().generate_xai_summary_json();
+        }
         if (route_path == "/api/v1/fleet/nodes")
         {
             content_type = "application/json";
