@@ -10,8 +10,17 @@ struct NexusConfig {
     uint16_t rest_port = 9443;
     uint16_t ws_port = 9444;
     uint32_t worker_threads = 8;
-    
     uint32_t heartbeat_timeout_sec = 15;
+
+
+     // SaaS Cloud Sync configuration
+    bool saas_enabled = true;
+    std::string saas_endpoint = "http://127.0.0.1:8000/api/v1";
+    std::string saas_tenant_id = "tenant-dev-local";
+    std::string saas_api_key = "ary_dev_secret_key_8000";
+    uint32_t saas_sync_interval = 5;
+
+
     bool forge_enabled = true;
     std::string forge_buffer_path = "/tmp/sentinel_nexus_forge/";
 };
