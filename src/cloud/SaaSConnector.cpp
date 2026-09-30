@@ -7,18 +7,17 @@
 
 #include <iostream>
 #include <sstream>
+#include <fstream>
 #include <iomanip>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <unistd.h>
-#include <openssl/ssl.h>
-#include <openssl/err.h>
+#include <filesystem>
 
 namespace sentinel::nexus::cloud {
 
-// Helper to parse URL: protocol, host, port, path
 struct ParsedUrl {
     bool is_https;
     std::string host;
@@ -27,7 +26,7 @@ struct ParsedUrl {
 };
 
 static ParsedUrl parse_url(const std::string& url) {
-    ParsedUrl res{false, "api.aryorithm.com", 80, "/api/v1"};
+    ParsedUrl res{false, "127.0.0.1", 8000, "/api/v1"};
     std::string temp = url;
 
     if (temp.rfind("https://", 0) == 0) {
@@ -57,24 +56,40 @@ static ParsedUrl parse_url(const std::string& url) {
     return res;
 }
 
+static std::string extract_json_field(const std::string& body, const std::string& key) {
+    size_t pos = body.find("\"" + key + "\"");
+    if (pos == std::string::npos) return "";
+
+    size_t colon = body.find(':', pos);
+    if (colon == std::string::npos) return "";
+
+    size_t quote_start = body.find('"', colon + 1);
+    if (quote_start == std::string::npos) return "";
+
+    size_t quote_end = body.find('"', quote_start + 1);
+    if (quote_end == std::string::npos) return "";
+
+    return body.substr(quote_start + 1, quote_end - quote_start - 1);
+}
+
 bool SaaSConnector::start(const SaaSConfig& config) {
     config_ = config;
 
     if (!config_.enabled) {
-        NEXUS_LOG_INFO("SaaS Connector disabled in configuration. Operating in 100% Sovereign Air-Gapped mode.");
+        NEXUS_LOG_INFO("SaaS Connector disabled. Operating in 100% Sovereign Air-Gapped mode.");
         return true;
     }
 
-    if (config_.api_key.empty() || config_.tenant_id.empty()) {
-        NEXUS_LOG_WARN("SaaS Connector enabled but missing api_key or tenant_id. Cloud sync suspended.");
-        return false;
+    running_.store(true);
+    NEXUS_LOG_INFO("SaaS Connector booting. Cloud endpoint: " + config_.cloud_endpoint);
+
+    // Try loading cached token from disk, otherwise authenticate with credentials
+    if (!load_token_from_disk()) {
+        if (!authenticate()) {
+            NEXUS_LOG_WARN("Initial authentication failed with " + config_.auth_email + ". Background workers will retry.");
+        }
     }
 
-    running_.store(true);
-    NEXUS_LOG_INFO("SaaS Connector initialized. Uplink destination: " + config_.cloud_endpoint + 
-                   " (Tenant ID: " + config_.tenant_id + ")");
-
-    // Launch dedicated background sync and listener workers
     sync_thread_ = std::jthread([this](std::stop_token st) { outbound_sync_worker(st); });
     threat_feed_thread_ = std::jthread([this](std::stop_token st) { inbound_threat_feed_worker(st); });
     command_thread_ = std::jthread([this](std::stop_token st) { remote_command_worker(st); });
@@ -85,6 +100,136 @@ bool SaaSConnector::start(const SaaSConfig& config) {
 void SaaSConnector::stop() {
     running_.store(false);
     cloud_connected_.store(false);
+}
+
+bool SaaSConnector::authenticate() {
+    std::lock_guard<std::mutex> lock(auth_mutex_);
+
+    NEXUS_LOG_INFO("Authenticating Nexus with cloud backend (" + config_.auth_email + ")...");
+
+    ParsedUrl purl = parse_url(config_.cloud_endpoint);
+    std::string auth_path = purl.path + "/auth/login";
+
+    // Build payload: compatible with both custom JSON and FastAPI OAuth2
+    std::string json_body = "{\"email\":\"" + config_.auth_email + "\",\"password\":\"" + config_.auth_password + "\",\"username\":\"" + config_.auth_email + "\"}";
+
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) return false;
+
+    struct hostent* server = gethostbyname(purl.host.c_str());
+    if (!server) {
+        close(sock);
+        return false;
+    }
+
+    sockaddr_in serv_addr{};
+    serv_addr.sin_family = AF_INET;
+    memcpy(&serv_addr.sin_addr.s_addr, server->h_addr, server->h_length);
+    serv_addr.sin_port = htons(purl.port);
+
+    if (connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
+        close(sock);
+        return false;
+    }
+
+    std::ostringstream req;
+    req << "POST " << auth_path << " HTTP/1.1\r\n"
+        << "Host: " << purl.host << ":" << purl.port << "\r\n"
+        << "Content-Type: application/json\r\n"
+        << "Content-Length: " << json_body.size() << "\r\n"
+        << "Connection: close\r\n\r\n"
+        << json_body;
+
+    std::string req_str = req.str();
+    send(sock, req_str.data(), req_str.size(), 0);
+
+    char buffer[4096];
+    std::string resp;
+    ssize_t bytes;
+    while ((bytes = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
+        buffer[bytes] = '\0';
+        resp.append(buffer, bytes);
+    }
+    close(sock);
+
+    // If FastAPI expects form-encoded (OAuth2PasswordRequestForm standard), retry if 422
+    if (resp.find("422 Unprocessable") != std::string::npos) {
+        std::string form_body = "username=" + config_.auth_email + "&password=" + config_.auth_password;
+        sock = socket(AF_INET, SOCK_STREAM, 0);
+        if (sock >= 0 && connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == 0) {
+            std::ostringstream form_req;
+            form_req << "POST " << auth_path << " HTTP/1.1\r\n"
+                     << "Host: " << purl.host << ":" << purl.port << "\r\n"
+                     << "Content-Type: application/x-www-form-urlencoded\r\n"
+                     << "Content-Length: " << form_body.size() << "\r\n"
+                     << "Connection: close\r\n\r\n"
+                     << form_body;
+            std::string f_str = form_req.str();
+            send(sock, f_str.data(), f_str.size(), 0);
+            resp.clear();
+            while ((bytes = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
+                buffer[bytes] = '\0';
+                resp.append(buffer, bytes);
+            }
+            close(sock);
+        }
+    }
+
+    // Extract access_token
+    std::string token = extract_json_field(resp, "access_token");
+    if (token.empty()) token = extract_json_field(resp, "token");
+
+    if (!token.empty()) {
+        jwt_token_ = token;
+        cloud_connected_.store(true);
+        save_token_to_disk(jwt_token_);
+        NEXUS_LOG_INFO("\033[32m[+] Authentication SUCCESS! Acquired JWT Bearer token (" + token.substr(0, 16) + "...)\033[0m");
+        return true;
+    }
+
+    NEXUS_LOG_ERROR("[-] Authentication FAILED. Response from backend: " + resp.substr(0, 120));
+    return false;
+}
+
+bool SaaSConnector::ensure_authenticated() {
+    if (jwt_token_.empty()) {
+        return authenticate();
+    }
+    return true;
+}
+
+bool SaaSConnector::save_token_to_disk(const std::string& token) {
+    std::error_code ec;
+    std::filesystem::path path(config_.token_storage_path);
+    std::filesystem::create_directories(path.parent_path(), ec);
+
+    std::ofstream f(path);
+    if (!f.is_open()) return false;
+
+    f << "{\n  \"access_token\": \"" << token << "\",\n  \"saved_at\": " 
+      << std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count() 
+      << "\n}";
+    return true;
+}
+
+bool SaaSConnector::load_token_from_disk() {
+    std::ifstream f(config_.token_storage_path);
+    if (!f.is_open()) return false;
+
+    std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    std::string token = extract_json_field(content, "access_token");
+    if (!token.empty()) {
+        std::lock_guard<std::mutex> lock(auth_mutex_);
+        jwt_token_ = token;
+        NEXUS_LOG_INFO("Loaded cached JWT token from " + config_.token_storage_path);
+        return true;
+    }
+    return false;
+}
+
+std::string SaaSConnector::get_active_token() const {
+    std::lock_guard<std::mutex> lock(auth_mutex_);
+    return jwt_token_;
 }
 
 void SaaSConnector::push_threat_to_cloud(const std::string& attacker_ip, 
@@ -107,14 +252,13 @@ void SaaSConnector::push_threat_to_cloud(const std::string& attacker_ip,
     pending_threat_payloads_.push_back(ss.str());
 }
 
-// -----------------------------------------------------------------------------
-// WORKER 1: Outbound Telemetry Synchronization (Pushes node health & metrics)
-// -----------------------------------------------------------------------------
 void SaaSConnector::outbound_sync_worker(std::stop_token st) {
     while (!st.stop_requested() && running_.load()) {
         std::this_thread::sleep_for(std::chrono::seconds(config_.sync_interval_sec));
 
-        // 1. Flush any pending real-time threat broadcasts
+        if (!ensure_authenticated()) continue;
+
+        // 1. Flush pending real-time threat alerts
         std::vector<std::string> threats_to_flush;
         {
             std::lock_guard<std::mutex> lock(queue_mutex_);
@@ -155,16 +299,11 @@ void SaaSConnector::outbound_sync_worker(std::stop_token st) {
                 cloud_connected_.store(true);
                 last_sync_time_.store(std::chrono::duration_cast<std::chrono::seconds>(
                     std::chrono::system_clock::now().time_since_epoch()).count());
-            } else {
-                cloud_connected_.store(false);
             }
         }
     }
 }
 
-// -----------------------------------------------------------------------------
-// WORKER 2: Inbound Threat Intelligence Feed ("Global Immunity")
-// -----------------------------------------------------------------------------
 void SaaSConnector::inbound_threat_feed_worker(std::stop_token st) {
     while (!st.stop_requested() && running_.load()) {
         std::this_thread::sleep_for(std::chrono::seconds(20));
@@ -172,7 +311,6 @@ void SaaSConnector::inbound_threat_feed_worker(std::stop_token st) {
 
         std::string response;
         if (http_get_json("/threats/global-feed", response)) {
-            // Parse global IoC array: e.g. [{"ip": "185.x.x.x"}]
             size_t pos = 0;
             while ((pos = response.find("\"ip\":", pos)) != std::string::npos) {
                 size_t start = response.find('"', pos + 5);
@@ -180,15 +318,13 @@ void SaaSConnector::inbound_threat_feed_worker(std::stop_token st) {
                 if (start != std::string::npos && end != std::string::npos) {
                     std::string global_ip = response.substr(start + 1, end - start - 1);
                     
-                    // Inject directly into local Collective Defense engine
                     ::sentinel::nexus::ThreatIndicator global_threat;
-                    global_threat.set_origin_node_id("ARYORITHM-GLOBAL-FEED");
+                    global_threat.set_origin_node_id("ARYORITHM-CLOUD-FEED");
                     global_threat.set_attacker_ip(global_ip);
                     global_threat.set_type(::sentinel::nexus::THREAT_EXPLOIT_PAYLOAD);
                     global_threat.set_confidence(0.999f);
 
                     intelligence::IocBroadcaster::instance().broadcast_threat(global_threat);
-                    NEXUS_LOG_INFO("Injected Global Threat Feed IoC [" + global_ip + "] into local eBPF grid.");
                 }
                 pos = end;
             }
@@ -196,9 +332,6 @@ void SaaSConnector::inbound_threat_feed_worker(std::stop_token st) {
     }
 }
 
-// -----------------------------------------------------------------------------
-// WORKER 3: Remote CISO Cloud Commands (Emergency Rollback, Policy Tuning)
-// -----------------------------------------------------------------------------
 void SaaSConnector::remote_command_worker(std::stop_token st) {
     while (!st.stop_requested() && running_.load()) {
         std::this_thread::sleep_for(std::chrono::seconds(10));
@@ -206,9 +339,8 @@ void SaaSConnector::remote_command_worker(std::stop_token st) {
 
         std::string response;
         if (http_get_json("/tenants/" + config_.tenant_id + "/commands/pending", response)) {
-            // Check for emergency remote commands
             if (response.find("EMERGENCY_ROLLBACK") != std::string::npos) {
-                NEXUS_LOG_CRIT("Received Cloud Remote Command: EMERGENCY_ROLLBACK from CISO Dashboard.");
+                NEXUS_LOG_CRIT("Received Cloud Remote Command: EMERGENCY_ROLLBACK.");
                 ota::CanaryOrchestrator::instance().trigger_emergency_rollback();
             } else if (response.find("ADVANCE_MODEL") != std::string::npos) {
                 NEXUS_LOG_INFO("Received Cloud Remote Command: ADVANCE_MODEL.");
@@ -218,10 +350,7 @@ void SaaSConnector::remote_command_worker(std::stop_token st) {
     }
 }
 
-// -----------------------------------------------------------------------------
-// Client HTTP/HTTPS Network Engine
-// -----------------------------------------------------------------------------
-bool SaaSConnector::http_post_json(const std::string& url_path, const std::string& json_body, std::string& out_response) {
+bool SaaSConnector::http_post_json(const std::string& url_path, const std::string& json_body, std::string& out_response, bool retry_on_401) {
     ParsedUrl purl = parse_url(config_.cloud_endpoint);
     std::string full_path = purl.path + url_path;
 
@@ -244,11 +373,17 @@ bool SaaSConnector::http_post_json(const std::string& url_path, const std::strin
         return false;
     }
 
+    std::string token = get_active_token();
+
     std::ostringstream req;
     req << "POST " << full_path << " HTTP/1.1\r\n"
-        << "Host: " << purl.host << "\r\n"
-        << "X-API-Key: " << config_.api_key << "\r\n"
-        << "X-Tenant-ID: " << config_.tenant_id << "\r\n"
+        << "Host: " << purl.host << ":" << purl.port << "\r\n";
+    
+    if (!token.empty()) {
+        req << "Authorization: Bearer " << token << "\r\n";
+    }
+    
+    req << "X-Tenant-ID: " << config_.tenant_id << "\r\n"
         << "Content-Type: application/json\r\n"
         << "Content-Length: " << json_body.size() << "\r\n"
         << "Connection: close\r\n\r\n"
@@ -264,12 +399,20 @@ bool SaaSConnector::http_post_json(const std::string& url_path, const std::strin
         buffer[bytes] = '\0';
         out_response.append(buffer, bytes);
     }
-
     close(sock);
+
+    // If token expired (401 Unauthorized), auto-reauthenticate and retry once
+    if (retry_on_401 && out_response.find("401 Unauthorized") != std::string::npos) {
+        NEXUS_LOG_WARN("JWT Token expired (401 Unauthorized). Re-authenticating with backend...");
+        if (authenticate()) {
+            return http_post_json(url_path, json_body, out_response, false);
+        }
+    }
+
     return out_response.find("200 OK") != std::string::npos || out_response.find("201 Created") != std::string::npos;
 }
 
-bool SaaSConnector::http_get_json(const std::string& url_path, std::string& out_response) {
+bool SaaSConnector::http_get_json(const std::string& url_path, std::string& out_response, bool retry_on_401) {
     ParsedUrl purl = parse_url(config_.cloud_endpoint);
     std::string full_path = purl.path + url_path;
 
@@ -292,11 +435,17 @@ bool SaaSConnector::http_get_json(const std::string& url_path, std::string& out_
         return false;
     }
 
+    std::string token = get_active_token();
+
     std::ostringstream req;
     req << "GET " << full_path << " HTTP/1.1\r\n"
-        << "Host: " << purl.host << "\r\n"
-        << "X-API-Key: " << config_.api_key << "\r\n"
-        << "X-Tenant-ID: " << config_.tenant_id << "\r\n"
+        << "Host: " << purl.host << ":" << purl.port << "\r\n";
+
+    if (!token.empty()) {
+        req << "Authorization: Bearer " << token << "\r\n";
+    }
+
+    req << "X-Tenant-ID: " << config_.tenant_id << "\r\n"
         << "Connection: close\r\n\r\n";
 
     std::string req_str = req.str();
@@ -309,8 +458,15 @@ bool SaaSConnector::http_get_json(const std::string& url_path, std::string& out_
         buffer[bytes] = '\0';
         out_response.append(buffer, bytes);
     }
-
     close(sock);
+
+    if (retry_on_401 && out_response.find("401 Unauthorized") != std::string::npos) {
+        NEXUS_LOG_WARN("JWT Token expired on GET (401). Re-authenticating with backend...");
+        if (authenticate()) {
+            return http_get_json(url_path, out_response, false);
+        }
+    }
+
     return out_response.find("200 OK") != std::string::npos;
 }
 
