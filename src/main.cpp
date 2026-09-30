@@ -88,6 +88,9 @@ int main(int argc, char** argv) {
         .push_telemetry = true,
         .pull_global_threats = true
     };
+
+
+    
     sentinel::nexus::cloud::SaaSConnector::instance().start(saas_cfg);
 
 
