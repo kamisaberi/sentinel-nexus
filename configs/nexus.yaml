@@ -35,3 +35,6 @@ saas:
   sync_interval_sec: 5                                # Fast sync interval for development
   push_telemetry: true                                # POST /fleet/sync to FastAPI
   pull_global_threats: true                           # GET /threats/global-feed from FastAPI
+  auth_email: "kamisaberi@gmail.com"
+  auth_password: "12345678"
+  token_storage_path: "data/cloud_session.json"
