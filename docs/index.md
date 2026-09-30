@@ -731,33 +731,3 @@ The diagram below maps the interaction between edge defense appliances (`blackbo
 ```
 ```
 
----
-
-### Complete in Part 1
-- `sentinel-nexus/docs/mkdocs.yml`
-- `sentinel-nexus/docs/index.md`
-- `sentinel-nexus/docs/getting-started/overview.md`
-- `sentinel-nexus/docs/getting-started/system-requirements.md`
-- `sentinel-nexus/docs/getting-started/installation-and-build.md`
-- `sentinel-nexus/docs/getting-started/ten-minute-quickstart.md`
-- `sentinel-nexus/docs/getting-started/systemd-deployment.md`
-- `sentinel-nexus/docs/getting-started/docker-deployment.md`
-- `sentinel-nexus/docs/getting-started/verifying-services.md`
-- `sentinel-nexus/docs/getting-started/architecture-at-a-glance.md`
-
-All 10 root configuration and onboarding files are now generated.
-
----
-
-### Files to be Generated in Part 2
-
-The next phase covers **Deep Systems Design** (`architecture/` - 6 files):
-
-1. `architecture/command-plane-architecture.md` (Multi-threaded core engine & thread pool architecture)
-2. `architecture/ports-and-protocols-matrix.md` (gRPC HTTP/2 port 50051 vs. REST port 9443 vs. SSE Stream port 9444)
-3. `architecture/in-memory-state-engine.md` (Read-heavy `std::shared_mutex` synchronization & `NodeRegistry`)
-4. `architecture/data-persistence-model.md` (`StateDatabase` / `nexus_state.json` & `TimeSeriesEngine`)
-5. `architecture/air-gapped-sovereignty.md` (Operating without WAN egress & zero external CDN scripts)
-6. `architecture/high-availability-clustering.md` (Multi-Nexus cluster design and failover topology)
-
-Confirm when you are ready to proceed with Part 2.
