@@ -1,24 +1,114 @@
-# Verifying Services
+---
 
-> **Status:** Draft — placeholder content. Final technical prose is forthcoming.
+### File: `sentinel-nexus/docs/getting-started/verifying-services.md`
 
+```markdown
+# Verifying Services & Port Status
 
-Validating gRPC (50051), REST (9443), and SSE (9444) ports.
+Confirm that all three network services exposed by `sentinel-nexus` are bound and accepting traffic.
 
-## Checks
+---
 
-One probe per port; all three must answer before appliances connect.
+## 1. Network Port Verification
 
-## TLS
-
-mTLS on 50051, HTTPS on 9443, event stream on 9444.
+Run `ss` or `netstat` to verify listener bindings:
 
 ```bash
-$ nexus-ctl fleet list          # 50051 alive
-$ curl -sk https://localhost:9443/api/v1/ota/status
-$ curl -sN https://localhost:9444/api/v1/telemetry/stream | head
+sudo ss -tulpn | grep -E '50051|9443|9444'
+```
+
+### Expected Output
+```text
+tcp   LISTEN 0      4096   0.0.0.0:50051   0.0.0.0:*   users:(("sentinel-nexus",pid=12040,fd=14))
+tcp   LISTEN 0      128    0.0.0.0:9443    0.0.0.0:*   users:(("sentinel-nexus",pid=12040,fd=18))
+tcp   LISTEN 0      128    0.0.0.0:9444    0.0.0.0:*   users:(("sentinel-nexus",pid=12040,fd=22))
 ```
 
 ---
 
-*Part of the sentinel-nexus documentation set. See mkdocs.yml for navigation.*
+## 2. Verifying the REST API & Web Command Center (Port 9443)
+
+Query the health endpoint:
+
+```bash
+curl -k -s https://localhost:9443/api/v1/health | jq .
+```
+
+### Response:
+```json
+{
+  "status": "HEALTHY",
+  "version": "2.4.0",
+  "active_appliances": 1,
+  "collective_defense_bus": "ARMED",
+  "active_model_sha256": "e9a2c31e847b2c94b13a7b41e2d9010000000000000000000000000000000000"
+}
+```
+
+---
+
+## 3. Testing the Real-Time SSE Stream (Port 9444)
+
+Listen to the continuous Server-Sent Events stream:
+
+```bash
+curl -N http://localhost:9444/stream
+```
+
+### Stream Output:
+```text
+event: fleet_tick
+data: {"timestamp_ns":1791172800184000000,"online_nodes":1,"total_drops_today":1420,"fleet_sla_us":0.82}
+```
+```
+
+---
+
+### File: `sentinel-nexus/docs/getting-started/architecture-at-a-glance.md`
+
+```markdown
+# Architecture at a Glance
+
+The diagram below maps the interaction between edge defense appliances (`blackbox-sentinel`), the central command hub (`sentinel-nexus`), continual AI retraining (`xinfer-forge`), and cloud visibility (`app.aryorithm.com`).
+
+---
+
+```text
+ ┌──────────────────────────────────────────────────────────────────────────────────────────┐
+ │ CLOUD SAAS PORTAL: app.aryorithm.com (Optional Multi-Tenant Executive Dashboard)         │
+ └──────────────────────────────────────────▲───────────────────────────────────────────────┘
+                                            │ Outbound HTTPS Sync (POST /api/v1/fleet/sync)
+                                            │ Decoupled SaaSConnector ($0.00 Egress Local)
+ ┌──────────────────────────────────────────┴───────────────────────────────────────────────┐
+ │ SENTINEL-NEXUS CENTRAL COMMAND PLANE (Tier 6 Hub)                                        │
+ │                                                                                          │
+ │  ┌──────────────────────────────────────────────┐  ┌──────────────────────────────────┐  │
+ │  │ Sub-50ms Collective Defense Bus              │  │ DatasetCurator (Active Learning) │  │
+ │  │ • Fans out FleetDefenseRules to 5,000 nodes  │  │ • Curation window: [0.40 - 0.60] │  │
+ │  │ • Originator loopback suppression            │  │ • Emits forge_dataset_*.csv      │  │
+ │  └──────────────────────┬───────────────────────┘  └────────────────┬─────────────────┘  │
+ │                         │                                           │                    │
+ │                         │                                           ▼ File Watcher       │
+ │                         │                      ┌──────────────────────────────────────┐  │
+ │                         │                      │ Tier 4: xinfer-forge Continual AI    │  │
+ │                         │                      │ • Self-Supervised Tabular MAE        │  │
+ │                         │                      │ • Golden Attacks Safety Gate (100%)  │  │
+ │                         │                      │ • Automated ONNX Opset 17 Export     │  │
+ │                         │                      └────────────────────┬─────────────────┘  │
+ │                         │                                           │                    │
+ │                         ▼ Bi-Directional mTLS Channels              ▼ POST /ota/stage    │
+ │  ┌──────────────────────────────────────────────────────────────────┴─────────────────┐  │
+ │  │ gRPC Fleet Service (Port 50051)                                                    │  │
+ │  │ • StreamFleetRules (< 50ms propagation) • SubmitHeartbeats • Canary OTA Updates    │  │
+ │  └──────────────────────┬─────────────────────────────────────────────────────────────┘  │
+ └─────────────────────────┼────────────────────────────────────────────────────────────────┘
+                           │
+        ┌──────────────────┼──────────────────┐ Parallel Distribution
+        ▼                  ▼                  ▼ (Up to 5,000 Nodes)
+ ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+ │ Appliance 1  │   │ Appliance 2  │   │ Appliance N  │
+ │ (Substation) │   │ (Water Plant)│   │ (Hospital)   │
+ └──────────────┘   └──────────────┘   └──────────────┘
+```
+```
+
