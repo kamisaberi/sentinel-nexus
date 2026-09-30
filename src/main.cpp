@@ -78,12 +78,15 @@ int main(int argc, char** argv) {
     // 3. Launch HTTP REST & Web Command Server (Port 9443)
     sentinel::nexus::api::HttpServer::instance().start(config.bind_address, config.rest_port, "web");
 
-    // 3.1. Cloud SaaS Sync Agent (Outbound to aryorithm.com if enabled)
+    // 3.1. Start Cloud SaaS Sync Agent targeting your local FastAPI backend
     sentinel::nexus::cloud::SaaSConfig saas_cfg{
-        .enabled = false, // Set to true when customer configures cloud sync
-        .cloud_endpoint = "https://api.aryorithm.com/api/v1",
-        .tenant_id = "tenant-prod-01",
-        .api_key = "ary_live_key"
+        .enabled = config.saas_enabled,
+        .cloud_endpoint = config.saas_endpoint,
+        .tenant_id = config.saas_tenant_id,
+        .api_key = config.saas_api_key,
+        .sync_interval_sec = config.saas_sync_interval,
+        .push_telemetry = true,
+        .pull_global_threats = true
     };
     sentinel::nexus::cloud::SaaSConnector::instance().start(saas_cfg);
 
