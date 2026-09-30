@@ -346,29 +346,3 @@ Navigate to **Threat Management $\to$ Active In-Kernel Rules**, select the targe
 Every emergency purge action generates a tamper-evident audit record logged to `data/nexus_state.json` containing the operator's identity, timestamp, and justification.
 ```
 
----
-
-### Complete in Part 3
-- `sentinel-nexus/docs/collective-defense/collective-defense-overview.md`
-- `sentinel-nexus/docs/collective-defense/ioc-broadcaster-mechanics.md`
-- `sentinel-nexus/docs/collective-defense/sub-50ms-fanout-timeline.md`
-- `sentinel-nexus/docs/collective-defense/originator-loop-suppression.md`
-- `sentinel-nexus/docs/collective-defense/fleet-defense-rule-schema.md`
-- `sentinel-nexus/docs/collective-defense/emergency-ip-purge.md`
-
-All 6 Collective Defense files for `sentinel-nexus` are now generated.
-
----
-
-### Files to be Generated in Part 4
-
-The next phase covers the **Active Learning Pipeline** (`active-learning-pipeline/` - 6 files):
-
-1. `active-learning-pipeline/active-learning-architecture.md` (Edge vector streaming to Forge dataset generation)
-2. `active-learning-pipeline/vector-ingest-queue.md` (Concurrent, lock-free ring buffer: 200k vector capacity)
-3. `active-learning-pipeline/uncertainty-sampling-rules.md` (Ingesting vectors within the $[0.40, 0.60]$ entropy window)
-4. `active-learning-pipeline/dataset-curator-engine.md` (Packaging binary batches into `forge_dataset_*.csv` files)
-5. `active-learning-pipeline/forge-trigger-automation.md` (Detecting batch quotas and firing background retraining)
-6. `active-learning-pipeline/closed-loop-flywheel-testing.md` (Verifying autonomous retraining without human labeling)
-
-Confirm when you are ready to proceed with Part 4.
