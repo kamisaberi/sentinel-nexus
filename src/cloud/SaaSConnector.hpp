@@ -23,6 +23,13 @@ struct SaaSConfig {
     bool pull_ota_models{true};
 };
 
+struct CloudCommand {
+    std::string command_id;
+    std::string action; // "EMERGENCY_DROP", "STAGE_MODEL", "ADVANCE_MODEL", "PURGE_IP"
+    std::string target_payload;
+};
+
+
 class SaaSConnector {
 public:
     static SaaSConnector& instance() {
