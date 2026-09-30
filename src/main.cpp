@@ -152,6 +152,10 @@ int main(int argc, char** argv) {
     sentinel::nexus::api::HttpServer::instance().stop();
     server->Shutdown();
     
+
+    sentinel::nexus::cloud::SaaSConnector::instance().stop();
+
+
     // Final persistent flush
     auto final_nodes = sentinel::nexus::fleet::NodeRegistry::instance().get_all_nodes();
     sentinel::nexus::storage::StateDatabase::instance().save_fleet_state(final_nodes);
