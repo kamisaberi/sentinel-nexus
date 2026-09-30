@@ -24,6 +24,9 @@
 #include "ota/RollbackGuard.hpp"
 #include "telemetry/DatasetCurator.hpp"
 
+#include "cloud/SaaSConnector.hpp"
+
+
 static std::atomic<bool> g_running{true};
 
 void signal_handler(int sig) {
