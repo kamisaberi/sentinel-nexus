@@ -25,3 +25,14 @@ forge_bridge:
 intelligence:
   ioc_propagation_enabled: true
   default_block_ttl_seconds: 86400 # 24 Hours
+
+
+# Cloud SaaS Uplink (Default false for 100% air-gapped sovereign operations)
+saas:
+  enabled: false
+  cloud_endpoint: "https://api.aryorithm.com/api/v1"
+  tenant_id: "eurogrid-nl-production"
+  api_key: "ary_live_9a8f4c2e7b1a0d3f"
+  sync_interval_sec: 15
+  push_telemetry: true
+  pull_global_threats: true
