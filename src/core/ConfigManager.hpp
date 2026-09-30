@@ -13,14 +13,16 @@ struct NexusConfig {
     uint32_t heartbeat_timeout_sec = 15;
 
 
-// SaaS Cloud Sync & JWT Authentication
+     // SaaS Cloud Sync configuration
     bool saas_enabled = true;
     std::string saas_endpoint = "http://127.0.0.1:8000/api/v1";
     std::string saas_tenant_id = "tenant-dev-local";
+    std::string saas_api_key = "ary_dev_secret_key_8000";
+    uint32_t saas_sync_interval = 5;
     std::string saas_auth_email = "kamisaberi@gmail.com";
     std::string saas_auth_password = "12345678";
     std::string saas_token_path = "data/cloud_session.json";
-    uint32_t saas_sync_interval = 5;
+
 
     bool forge_enabled = true;
     std::string forge_buffer_path = "/tmp/sentinel_nexus_forge/";

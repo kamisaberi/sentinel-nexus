@@ -54,6 +54,20 @@ namespace sentinel::nexus::core
                         config_.saas_sync_interval = std::stoi(value);
                     else if (key == "enabled" && value == "true")
                         config_.saas_enabled = true;
+                    else if (key == "cloud_endpoint")
+                        config_.saas_endpoint = value;
+                    else if (key == "tenant_id")
+                        config_.saas_tenant_id = value;
+                    else if (key == "auth_email")
+                        config_.saas_auth_email = value;
+                    else if (key == "auth_password")
+                        config_.saas_auth_password = value;
+                    else if (key == "token_storage_path")
+                        config_.saas_token_path = value;
+                    else if (key == "sync_interval_sec")
+                        config_.saas_sync_interval = std::stoi(value);
+                    else if (key == "enabled" && value == "true")
+                        config_.saas_enabled = true;
                 }
             }
         }
