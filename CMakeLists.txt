@@ -92,6 +92,7 @@ set(NEXUS_SOURCES
     src/storage/TimeSeriesEngine.cpp
     src/api/HttpServer.cpp
     src/api/TelemetryStreamer.cpp
+    src/cloud/SaaSConnector.cpp          # <--- NEW
     src/rpc/FleetServiceImpl.cpp
     src/rpc/TelemetryServiceImpl.cpp
     src/rpc/IntelligenceServiceImpl.cpp
