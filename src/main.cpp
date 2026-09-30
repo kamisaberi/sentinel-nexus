@@ -75,6 +75,16 @@ int main(int argc, char** argv) {
     // 3. Launch HTTP REST & Web Command Server (Port 9443)
     sentinel::nexus::api::HttpServer::instance().start(config.bind_address, config.rest_port, "web");
 
+    // 3.1. Cloud SaaS Sync Agent (Outbound to aryorithm.com if enabled)
+    sentinel::nexus::cloud::SaaSConfig saas_cfg{
+        .enabled = false, // Set to true when customer configures cloud sync
+        .cloud_endpoint = "https://api.aryorithm.com/api/v1",
+        .tenant_id = "tenant-prod-01",
+        .api_key = "ary_live_key"
+    };
+    sentinel::nexus::cloud::SaaSConnector::instance().start(saas_cfg);
+
+
     // 4. Instantiate gRPC Services
     sentinel::nexus::rpc::FleetServiceImpl fleet_service;
     sentinel::nexus::rpc::TelemetryServiceImpl telemetry_service;
