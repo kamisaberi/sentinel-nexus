@@ -79,16 +79,18 @@ int main(int argc, char** argv) {
     sentinel::nexus::api::HttpServer::instance().start(config.bind_address, config.rest_port, "web");
 
     // 3_1. Start Cloud SaaS Sync Agent targeting your local FastAPI backend
-    sentinel::nexus::cloud::SaaSConfig saas_cfg{
+sentinel::nexus::cloud::SaaSConfig saas_cfg{
         .enabled = config.saas_enabled,
         .cloud_endpoint = config.saas_endpoint,
         .tenant_id = config.saas_tenant_id,
-        .api_key = config.saas_api_key,
+        .auth_email = config.saas_auth_email,
+        .auth_password = config.saas_auth_password,
+        .token_storage_path = config.saas_token_path,
         .sync_interval_sec = config.saas_sync_interval,
         .push_telemetry = true,
         .pull_global_threats = true
     };
-
+    sentinel::nexus::cloud::SaaSConnector::instance().start(saas_cfg);
     sentinel::nexus::cloud::SaaSConnector::instance().start(saas_cfg);
 
 
