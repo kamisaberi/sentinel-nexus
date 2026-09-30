@@ -78,7 +78,7 @@ int main(int argc, char** argv) {
     // 3. Launch HTTP REST & Web Command Server (Port 9443)
     sentinel::nexus::api::HttpServer::instance().start(config.bind_address, config.rest_port, "web");
 
-    // 3.1. Start Cloud SaaS Sync Agent targeting your local FastAPI backend
+    // 3_1. Start Cloud SaaS Sync Agent targeting your local FastAPI backend
     sentinel::nexus::cloud::SaaSConfig saas_cfg{
         .enabled = config.saas_enabled,
         .cloud_endpoint = config.saas_endpoint,
@@ -89,8 +89,6 @@ int main(int argc, char** argv) {
         .pull_global_threats = true
     };
 
-
-    
     sentinel::nexus::cloud::SaaSConnector::instance().start(saas_cfg);
 
 
