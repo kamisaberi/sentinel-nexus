@@ -223,26 +223,3 @@ $$H_t = \operatorname{SHA-256}\left(H_{t-1} \parallel \text{Timestamp} \parallel
   2. The hash value stored inside hardware **TPM PCR 12** will not match the recalculated file digest, providing proof of database tampering to forensic investigators.
 ```
 
----
-
-### Complete in Part 12
-- `sentinel-nexus/docs/compliance-engines/cmmc-2.0-audit-engine.md`
-- `sentinel-nexus/docs/compliance-engines/iec-62443-audit-engine.md`
-- `sentinel-nexus/docs/compliance-engines/latency-sla-percentile-proofs.md`
-- `sentinel-nexus/docs/compliance-engines/tamper-evident-audit-logging.md`
-
-All 4 Compliance Engines & Regulatory GRC files for `sentinel-nexus` are now generated.
-
----
-
-### Files to be Generated in Part 13
-
-The next phase covers **Practical Administrative Tutorials** (`tutorials/` - 5 files):
-
-1. `tutorials/scaling-to-5000-appliances.md` (Tuning Linux TCP buffers, worker threads, and file descriptors)
-2. `tutorials/setting-up-mtls-pki.md` (Generating CA, server, and appliance certificates with `gen_certs.sh`)
-3. `tutorials/handling-zero-day-incident-in-seconds.md` (Walkthrough of a coordinated multi-site attack containment)
-4. `tutorials/integrating-fastapi-cloud-backend.md` (Connecting local Nexus instances to `app.aryorithm.com`)
-5. `tutorials/air-gapped-sneakernet-sync.md` (Using `export_telemetry_bundle.py` & `import_signed_model.py`)
-
-Confirm when you are ready to proceed with Part 13.
