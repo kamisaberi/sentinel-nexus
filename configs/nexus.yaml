@@ -6,7 +6,7 @@ server:
   worker_threads: 16
 
 tls:
-  enabled: false # Set true when mTLS certs are deployed
+  enabled: false 
   ca_cert: "configs/certs/ca.crt"
   server_cert: "configs/certs/server.crt"
   server_key: "configs/certs/server.key"
@@ -24,17 +24,17 @@ forge_bridge:
 
 intelligence:
   ioc_propagation_enabled: true
-  default_block_ttl_seconds: 86400 # 24 Hours
+  default_block_ttl_seconds: 86400 
 
 
 saas:
-  enabled: true                                       # Turn ON outbound cloud sync
-  cloud_endpoint: "http://127.0.0.1:8000/api/v1"      # Local FastAPI server
-  tenant_id: "tenant-dev-local"                       # Test tenant UUID / identifier
-  api_key: "ary_dev_secret_key_8000"                  # Test X-API-Key header
-  sync_interval_sec: 5                                # Fast sync interval for development
-  push_telemetry: true                                # POST /fleet/sync to FastAPI
-  pull_global_threats: true                           # GET /threats/global-feed from FastAPI
+  enabled: true                                       
+  cloud_endpoint: "http://127.0.0.1:8000/api/v1"      
+  tenant_id: "tenant-dev-local"                       
+  api_key: "ary_dev_secret_key_8000"                  
+  sync_interval_sec: 5                                
+  push_telemetry: true                                
+  pull_global_threats: true                           
   auth_email: "kamisaberi@gmail.com"
   auth_password: "12345678"
   token_storage_path: "data/cloud_session.json"
