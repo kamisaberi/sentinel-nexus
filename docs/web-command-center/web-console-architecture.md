@@ -385,30 +385,3 @@ The **Model Rollout Panel** allows operators to stage, evaluate, advance, and ro
 * **Health Safeguard:** If Canary nodes report latency exceeding $1{,}000\,\mu\text{s}$, the UI displays an alert banner, disables manual promotion buttons, and initiates an automatic rollback.
 ```
 
----
-
-### Complete in Part 8
-- `sentinel-nexus/docs/web-command-center/web-console-architecture.md`
-- `sentinel-nexus/docs/web-command-center/radial-topology-canvas.md`
-- `sentinel-nexus/docs/web-command-center/mitre-attack-heatmap.md`
-- `sentinel-nexus/docs/web-command-center/real-time-sse-stream.md`
-- `sentinel-nexus/docs/web-command-center/active-kpi-telemetry-cards.md`
-- `sentinel-nexus/docs/web-command-center/collective-defense-injector-ui.md`
-- `sentinel-nexus/docs/web-command-center/ota-canary-management-ui.md`
-
-All 7 Web Command Center documentation files for `sentinel-nexus` are now generated.
-
----
-
-### Files to be Generated in Part 9
-
-The next phase covers the **Operations CLI (`nexus-ctl`)** (`operations-cli-nexus-ctl/` - 6 files):
-
-1. `operations-cli-nexus-ctl/nexus-ctl-overview.md` (C++20 terminal admin tool syntax and flags)
-2. `operations-cli-nexus-ctl/command-fleet-list.md` (`nexus-ctl fleet list`: Node health, CPU, drops, latency SLA)
-3. `operations-cli-nexus-ctl/command-threat-drop.md` (`nexus-ctl threat drop <IP>`: Manual fleet-wide kernel drop)
-4. `operations-cli-nexus-ctl/command-ota-management.md` (`nexus-ctl ota [status|stage|advance|rollback]`)
-5. `operations-cli-nexus-ctl/command-compliance-reports.md` (`nexus-ctl report [cmmc|scada]`: Audit evaluation checks)
-6. `operations-cli-nexus-ctl/command-auth-login.md` (`nexus-ctl auth login [email] [pass]`: Cloud JWT acquisition)
-
-Confirm when you are ready to proceed with Part 9.
