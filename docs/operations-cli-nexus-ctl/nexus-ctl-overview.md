@@ -393,30 +393,3 @@ Nexus Management URL: https://127.0.0.1:9443
 Token Status: ACTIVE (4 hours, 12 minutes remaining)
 ```
 ```
-
----
-
-### Complete in Part 9
-- `sentinel-nexus/docs/operations-cli-nexus-ctl/nexus-ctl-overview.md`
-- `sentinel-nexus/docs/operations-cli-nexus-ctl/command-fleet-list.md`
-- `sentinel-nexus/docs/operations-cli-nexus-ctl/command-threat-drop.md`
-- `sentinel-nexus/docs/operations-cli-nexus-ctl/command-ota-management.md`
-- `sentinel-nexus/docs/operations-cli-nexus-ctl/command-compliance-reports.md`
-- `sentinel-nexus/docs/operations-cli-nexus-ctl/command-auth-login.md`
-
-All 6 Operations CLI (`nexus-ctl`) documentation files for `sentinel-nexus` are now generated.
-
----
-
-### Files to be Generated in Part 10
-
-The next phase covers the **Complete REST API Reference (`/api/v1/*`)** (`rest-api-reference/` - 6 files):
-
-1. `rest-api-reference/api-overview.md` (Base URLs, headers `X-Tenant-ID`, `Authorization`, and error codes)
-2. `rest-api-reference/endpoints-fleet.md` (`/api/v1/fleet/nodes` and `/api/v1/fleet/groups`)
-3. `rest-api-reference/endpoints-threats.md` (`/api/v1/threats/broadcast`, `/threats/mitre`, `/threats/xai`)
-4. `rest-api-reference/endpoints-ota-models.md` (`/api/v1/ota/*`, `/api/v1/models`, and `/models/{file}`)
-5. `rest-api-reference/endpoints-compliance.md` (`/api/v1/reports/compliance`, `/reports/cmmc`, `/reports/scada`)
-6. `rest-api-reference/endpoints-sse-stream.md` (`/api/v1/telemetry/stream` persistent EventStream)
-
-Confirm when you are ready to proceed with Part 10.
