@@ -343,30 +343,3 @@ Every 5 seconds, the `SaaSConnector` subsystem on `sentinel-nexus` serializes th
 * **Non-Blocking Egress:** The sync payload is generated from read-only `NodeRegistry` snapshots, ensuring edge packet drops and local telemetry processing continue uninterrupted.
 ```
 
----
-
-### Complete in Part 7
-- `sentinel-nexus/docs/hierarchical-asset-topology/four-tier-hierarchy-model.md`
-- `sentinel-nexus/docs/hierarchical-asset-topology/deterministic-sensor-identifiers.md`
-- `sentinel-nexus/docs/hierarchical-asset-topology/cascading-health-engine.md`
-- `sentinel-nexus/docs/hierarchical-asset-topology/liveness-heartbeat-tracking.md`
-- `sentinel-nexus/docs/hierarchical-asset-topology/instant-0ms-graceful-disconnect.md`
-- `sentinel-nexus/docs/hierarchical-asset-topology/fleet-sync-payload-schema.md`
-
-All 6 Hierarchical Asset Topology files for `sentinel-nexus` are now generated.
-
----
-
-### Files to be Generated in Part 8
-
-The next phase covers the **Air-Gapped Web Command Center (Ports 9443 & 9444)** (`web-command-center/` - 7 files):
-
-1. `web-command-center/web-console-architecture.md` (Zero-dependency, zero-CDN Single-Page Application)
-2. `web-command-center/radial-topology-canvas.md` (HTML5 Canvas real-time radial node visualizer, `fleet_topology.js`)
-3. `web-command-center/mitre-attack-heatmap.md` (Dynamic MITRE ATT&CK tactical matrix, `threat_matrix.js`)
-4. `web-command-center/real-time-sse-stream.md` (Sub-10ms Server-Sent Events push engine, `ws_client.js`)
-5. `web-command-center/active-kpi-telemetry-cards.md` (Live display: Online nodes, eBPF drops, SLA, active model)
-6. `web-command-center/collective-defense-injector-ui.md` (Manual 1-click IP broadcast tool from web browser)
-7. `web-command-center/ota-canary-management-ui.md` (Interactive staging, advancing, and rollback controls)
-
-Confirm when you are ready to proceed with Part 8.
