@@ -308,26 +308,3 @@ To prevent rogue server takeovers from compromising edge plants:
 * `sentinel-nexus` validates the command signature against pre-enrolled public keys in `/etc/sentinel-nexus/certs/admin_authority.crt` before executing rollbacks or policy changes.
 ```
 
----
-
-### Complete in Part 11
-- `sentinel-nexus/docs/cloud-saas-uplink/saas-connector-architecture.md`
-- `sentinel-nexus/docs/cloud-saas-uplink/jwt-authentication-and-renewal.md`
-- `sentinel-nexus/docs/cloud-saas-uplink/cloud-fleet-sync.md`
-- `sentinel-nexus/docs/cloud-saas-uplink/inbound-global-threat-feed.md`
-- `sentinel-nexus/docs/cloud-saas-uplink/remote-ciso-commands.md`
-
-All 5 Hybrid Cloud SaaS Uplink documentation files for `sentinel-nexus` are now generated.
-
----
-
-### Files to be Generated in Part 12
-
-The next phase covers **Compliance Engines & Regulatory GRC** (`compliance-engines/` - 4 files):
-
-1. `compliance-engines/cmmc-2.0-audit-engine.md` (Verifying AC.L2-3.1.1, IA.L2-3.5.1, and SI.L2-3.14.1)
-2. `compliance-engines/iec-62443-audit-engine.md` (Verifying FR 3 System Integrity & FR 5 Zone Segmentation)
-3. `compliance-engines/latency-sla-percentile-proofs.md` (Microsecond percentile proofs: p50 0.84µs to p99.9 1.04µs)
-4. `compliance-engines/tamper-evident-audit-logging.md` (Cryptographic state journaling in `data/nexus_state.json`)
-
-Confirm when you are ready to proceed with Part 12.
