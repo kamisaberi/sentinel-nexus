@@ -105,58 +105,30 @@ void SaaSConnector::stop() {
 bool SaaSConnector::authenticate() {
     std::lock_guard<std::mutex> lock(auth_mutex_);
 
-    NEXUS_LOG_INFO("Authenticating Nexus with cloud backend (" + config_.auth_email + ")...");
+    std::cout << "\n\033[35m[SaaSConnector:AUTH] >>> Initiating Cloud Authentication...\033[0m" << std::endl;
 
     ParsedUrl purl = parse_url(config_.cloud_endpoint);
     std::string auth_path = purl.path + "/auth/login";
 
-    // Build payload: compatible with both custom JSON and FastAPI OAuth2
+    // JSON payload
     std::string json_body = "{\"email\":\"" + config_.auth_email + "\",\"password\":\"" + config_.auth_password + "\",\"username\":\"" + config_.auth_email + "\"}";
 
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) return false;
-
-    struct hostent* server = gethostbyname(purl.host.c_str());
-    if (!server) {
-        close(sock);
-        return false;
-    }
-
-    sockaddr_in serv_addr{};
-    serv_addr.sin_family = AF_INET;
-    memcpy(&serv_addr.sin_addr.s_addr, server->h_addr, server->h_length);
-    serv_addr.sin_port = htons(purl.port);
-
-    if (connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
-        close(sock);
-        return false;
-    }
-
-    std::ostringstream req;
-    req << "POST " << auth_path << " HTTP/1.1\r\n"
-        << "Host: " << purl.host << ":" << purl.port << "\r\n"
-        << "Content-Type: application/json\r\n"
-        << "Content-Length: " << json_body.size() << "\r\n"
-        << "Connection: close\r\n\r\n"
-        << json_body;
-
-    std::string req_str = req.str();
-    send(sock, req_str.data(), req_str.size(), 0);
-
-    char buffer[4096];
     std::string resp;
-    ssize_t bytes;
-    while ((bytes = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
-        buffer[bytes] = '\0';
-        resp.append(buffer, bytes);
-    }
-    close(sock);
+    bool ok = http_post_json("/auth/login", json_body, resp, false);
 
-    // If FastAPI expects form-encoded (OAuth2PasswordRequestForm standard), retry if 422
-    if (resp.find("422 Unprocessable") != std::string::npos) {
-        std::string form_body = "username=" + config_.auth_email + "&password=" + config_.auth_password;
-        sock = socket(AF_INET, SOCK_STREAM, 0);
+    // If FastAPI expects form-encoded (OAuth2PasswordRequestForm standard), retry with form data if 422
+    if (!ok && resp.find("422") != std::string::npos) {
+        std::cout << "\033[33m[SaaSConnector:AUTH] Retrying authentication with form-urlencoded...\033[0m" << std::endl;
+        
+        int sock = socket(AF_INET, SOCK_STREAM, 0);
+        struct hostent* server = gethostbyname(purl.host.c_str());
+        sockaddr_in serv_addr{};
+        serv_addr.sin_family = AF_INET;
+        memcpy(&serv_addr.sin_addr.s_addr, server->h_addr, server->h_length);
+        serv_addr.sin_port = htons(purl.port);
+
         if (sock >= 0 && connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == 0) {
+            std::string form_body = "username=" + config_.auth_email + "&password=" + config_.auth_password;
             std::ostringstream form_req;
             form_req << "POST " << auth_path << " HTTP/1.1\r\n"
                      << "Host: " << purl.host << ":" << purl.port << "\r\n"
@@ -167,6 +139,8 @@ bool SaaSConnector::authenticate() {
             std::string f_str = form_req.str();
             send(sock, f_str.data(), f_str.size(), 0);
             resp.clear();
+            char buffer[4096];
+            ssize_t bytes;
             while ((bytes = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
                 buffer[bytes] = '\0';
                 resp.append(buffer, bytes);
@@ -175,7 +149,6 @@ bool SaaSConnector::authenticate() {
         }
     }
 
-    // Extract access_token
     std::string token = extract_json_field(resp, "access_token");
     if (token.empty()) token = extract_json_field(resp, "token");
 
@@ -183,11 +156,12 @@ bool SaaSConnector::authenticate() {
         jwt_token_ = token;
         cloud_connected_.store(true);
         save_token_to_disk(jwt_token_);
-        NEXUS_LOG_INFO("\033[32m[+] Authentication SUCCESS! Acquired JWT Bearer token (" + token.substr(0, 16) + "...)\033[0m");
+        std::cout << "\033[32m[SaaSConnector:AUTH] [+] Authentication SUCCESS! JWT Acquired: " 
+                  << token.substr(0, 20) << "...\033[0m\n" << std::endl;
         return true;
     }
 
-    NEXUS_LOG_ERROR("[-] Authentication FAILED. Response from backend: " + resp.substr(0, 120));
+    std::cout << "\033[31m[SaaSConnector:AUTH] [-] Authentication FAILED! Check backend response above.\033[0m\n" << std::endl;
     return false;
 }
 
@@ -350,6 +324,9 @@ void SaaSConnector::remote_command_worker(std::stop_token st) {
     }
 }
 
+// -----------------------------------------------------------------------------
+// HTTP Client Engine with Full Terminal Wire Logging
+// -----------------------------------------------------------------------------
 bool SaaSConnector::http_post_json(const std::string& url_path, const std::string& json_body, std::string& out_response, bool retry_on_401) {
     ParsedUrl purl = parse_url(config_.cloud_endpoint);
     std::string full_path = purl.path + url_path;
@@ -390,6 +367,16 @@ bool SaaSConnector::http_post_json(const std::string& url_path, const std::strin
         << json_body;
 
     std::string req_str = req.str();
+
+    // =========================================================================
+    // TERMINAL PRINT: EXACT OUTBOUND WIRE REQUEST
+    // =========================================================================
+    std::cout << "\n\033[36m==================================================================" << std::endl;
+    std::cout << "[SaaSConnector:OUTBOUND-POST] >>> " << config_.cloud_endpoint << url_path << std::endl;
+    std::cout << "------------------------------------------------------------------" << std::endl;
+    std::cout << req_str << std::endl;
+    std::cout << "==================================================================\033[0m" << std::endl;
+
     send(sock, req_str.data(), req_str.size(), 0);
 
     char buffer[4096];
@@ -401,7 +388,12 @@ bool SaaSConnector::http_post_json(const std::string& url_path, const std::strin
     }
     close(sock);
 
-    // If token expired (401 Unauthorized), auto-reauthenticate and retry once
+    // =========================================================================
+    // TERMINAL PRINT: EXACT BACKEND WIRE RESPONSE
+    // =========================================================================
+    std::cout << "\033[33m[SaaSConnector:INBOUND-RESP] <<< Response from FastAPI backend:" << std::endl;
+    std::cout << out_response << "\033[0m\n" << std::endl;
+
     if (retry_on_401 && out_response.find("401 Unauthorized") != std::string::npos) {
         NEXUS_LOG_WARN("JWT Token expired (401 Unauthorized). Re-authenticating with backend...");
         if (authenticate()) {
@@ -449,6 +441,10 @@ bool SaaSConnector::http_get_json(const std::string& url_path, std::string& out_
         << "Connection: close\r\n\r\n";
 
     std::string req_str = req.str();
+
+    // Print outbound GET request
+    std::cout << "\033[36m[SaaSConnector:OUTBOUND-GET] >>> " << config_.cloud_endpoint << url_path << "\033[0m" << std::endl;
+
     send(sock, req_str.data(), req_str.size(), 0);
 
     char buffer[4096];
