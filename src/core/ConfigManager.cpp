@@ -54,6 +54,30 @@ namespace sentinel::nexus::core
                         value = "";
                     }
 
+                    // if (key == "bind_address")
+                    //     config_.bind_address = value;
+                    // else if (key == "grpc_port")
+                    //     config_.grpc_port = std::stoi(value);
+                    // else if (key == "rest_api_port")
+                    //     config_.rest_port = std::stoi(value);
+                    // else if (key == "ws_stream_port")
+                    //     config_.ws_port = std::stoi(value);
+                    // else if (key == "worker_threads")
+                    //     config_.worker_threads = std::stoi(value);
+                    // else if (key == "cloud_endpoint")
+                    //     config_.saas_endpoint = value;
+                    // else if (key == "tenant_id")
+                    //     config_.saas_tenant_id = value;
+                    // else if (key == "auth_email")
+                    //     config_.saas_auth_email = value;
+                    // else if (key == "auth_password")
+                    //     config_.saas_auth_password = value;
+                    // else if (key == "token_storage_path")
+                    //     config_.saas_token_path = value;
+                    // else if (key == "sync_interval_sec")
+                    //     config_.saas_sync_interval = std::stoi(value);
+                    // else if (key == "enabled" && value == "true")
+                    //     config_.saas_enabled = true;
                     if (key == "bind_address")
                         config_.bind_address = value;
                     else if (key == "grpc_port")
@@ -64,6 +88,16 @@ namespace sentinel::nexus::core
                         config_.ws_port = std::stoi(value);
                     else if (key == "worker_threads")
                         config_.worker_threads = std::stoi(value);
+                    else if (key == "cloud_endpoint")
+                        config_.saas_endpoint = value;
+                    else if (key == "tenant_id")
+                        config_.saas_tenant_id = value;
+                    else if (key == "api_key")
+                        config_.saas_api_key = value;
+                    else if (key == "sync_interval_sec")
+                        config_.saas_sync_interval = std::stoi(value);
+                    else if (key == "enabled" && value == "true")
+                        config_.saas_enabled = true;
                     else if (key == "cloud_endpoint")
                         config_.saas_endpoint = value;
                     else if (key == "tenant_id")
