@@ -370,29 +370,3 @@ sudo python3 /opt/sentinel-nexus/scripts/import_signed_model.py \
 ```
 ```
 
----
-
-### Complete in Part 13
-- `sentinel-nexus/docs/tutorials/scaling-to-5000-appliances.md`
-- `sentinel-nexus/docs/tutorials/setting-up-mtls-pki.md`
-- `sentinel-nexus/docs/tutorials/handling-zero-day-incident-in-seconds.md`
-- `sentinel-nexus/docs/tutorials/integrating-fastapi-cloud-backend.md`
-- `sentinel-nexus/docs/tutorials/air-gapped-sneakernet-sync.md`
-
-All 5 Practical Administrative Tutorials for `sentinel-nexus` are now generated.
-
----
-
-### Files to be Generated in Part 14 (Final Phase for Project 6)
-
-The final phase covers **Troubleshooting & Help Desk Diagnostics** (`troubleshooting/` - 7 files), completing the entire documentation tree for `sentinel-nexus`:
-
-1. `troubleshooting/port-binding-and-socket-errors.md` (Fixing "Address already in use" on 50051, 9443, and 9444)
-2. `troubleshooting/appliance-registration-rejections.md` (Debugging rejected hardware identities and revoked UUIDs)
-3. `troubleshooting/jwt-auth-401-failures.md` (Resolving cloud backend authentication and token expiry issues)
-4. `troubleshooting/sse-stream-disconnects.md` (Fixing browser stream drops and proxy buffer timeouts)
-5. `troubleshooting/config-file-parsing-errors.md` (Resolving inline YAML comment stripping in `ConfigManager.cpp`)
-6. `troubleshooting/faq.md` (Technical Frequently Asked Questions)
-7. `troubleshooting/support.md` (Issue tracker, security disclosures, and enterprise support SLAs)
-
-Confirm when you are ready to proceed with Part 14.
