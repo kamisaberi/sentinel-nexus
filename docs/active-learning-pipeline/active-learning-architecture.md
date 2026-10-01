@@ -391,29 +391,3 @@ if __name__ == "__main__":
 * **Safety Gate Preserved:** The candidate model must pass the 52 golden attack checks before appearing in `/api/v1/models`.
 ```
 
----
-
-### Complete in Part 4
-- `sentinel-nexus/docs/active-learning-pipeline/active-learning-architecture.md`
-- `sentinel-nexus/docs/active-learning-pipeline/vector-ingest-queue.md`
-- `sentinel-nexus/docs/active-learning-pipeline/uncertainty-sampling-rules.md`
-- `sentinel-nexus/docs/active-learning-pipeline/dataset-curator-engine.md`
-- `sentinel-nexus/docs/active-learning-pipeline/forge-trigger-automation.md`
-- `sentinel-nexus/docs/active-learning-pipeline/closed-loop-flywheel-testing.md`
-
-All 6 Active Learning Pipeline files for `sentinel-nexus` are now generated.
-
----
-
-### Files to be Generated in Part 5
-
-The next phase covers **Canary OTA Staged Rollouts & SLA Watchdog** (`canary-ota-rollout/` - 6 files):
-
-1. `canary-ota-rollout/staged-rollout-lifecycle.md` (State machine: `SHADOW_MODE` $\to$ `CANARY_5_PCT` $\to$ `FLEET_WIDE`)
-2. `canary-ota-rollout/canary-orchestrator-engine.md` (Hash-based 5% cohort selection and version management)
-3. `canary-ota-rollout/rollback-guard-sla-watchdog.md` (Automated emergency rollback on $> 1000\,\mu\text{s}$ SLA latency breach)
-4. `canary-ota-rollout/false-positive-surge-protection.md` (Auto-aborting candidate models on abnormal drop bursts)
-5. `canary-ota-rollout/model-repository-and-hashing.md` (Local ONNX storage, HTTP streaming, and SHA-256 validation)
-6. `canary-ota-rollout/zero-downtime-hot-reload-flow.md` (Triggering edge reloads without packet loss)
-
-Confirm when you are ready to proceed with Part 5.
