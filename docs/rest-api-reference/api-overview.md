@@ -404,28 +404,3 @@ for event in client.events():
 ```
 ```
 
----
-
-### Complete in Part 10
-- `sentinel-nexus/docs/rest-api-reference/api-overview.md`
-- `sentinel-nexus/docs/rest-api-reference/endpoints-fleet.md`
-- `sentinel-nexus/docs/rest-api-reference/endpoints-threats.md`
-- `sentinel-nexus/docs/rest-api-reference/endpoints-ota-models.md`
-- `sentinel-nexus/docs/rest-api-reference/endpoints-compliance.md`
-- `sentinel-nexus/docs/rest-api-reference/endpoints-sse-stream.md`
-
-All 6 REST API Reference documentation files for `sentinel-nexus` are now generated.
-
----
-
-### Files to be Generated in Part 11
-
-The next phase covers the **Hybrid Cloud SaaS Uplink** (`cloud-saas-uplink/` - 5 files):
-
-1. `cloud-saas-uplink/saas-connector-architecture.md` (Decoupled C++ outbound HTTPS client, `SaaSConnector.cpp`)
-2. `cloud-saas-uplink/jwt-authentication-and-renewal.md` (Initial login, JWT caching `cloud_session.json`, and 401 retry)
-3. `cloud-saas-uplink/cloud-fleet-sync.md` (`POST /fleet/sync` nested 4-tier tree transmission every 5 seconds)
-4. `cloud-saas-uplink/inbound-global-threat-feed.md` (Polling `/threats/global-feed` and injecting into local eBPF)
-5. `cloud-saas-uplink/remote-ciso-commands.md` (Polling `/commands/pending` for cloud-initiated emergency rollbacks)
-
-Confirm when you are ready to proceed with Part 11.
