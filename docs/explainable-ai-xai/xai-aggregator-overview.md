@@ -433,29 +433,3 @@ In air-gapped server environments without desktop web browsers, system operators
 ```
 ```
 
----
-
-### Complete in Part 6
-- `sentinel-nexus/docs/explainable-ai-xai/xai-aggregator-overview.md`
-- `sentinel-nexus/docs/explainable-ai-xai/top-3-feature-attribution-schema.md`
-- `sentinel-nexus/docs/explainable-ai-xai/semantic-dictionary-mapping.md`
-- `sentinel-nexus/docs/explainable-ai-xai/global-threat-cache-indexing.md`
-- `sentinel-nexus/docs/explainable-ai-xai/xai-api-endpoints.md`
-- `sentinel-nexus/docs/explainable-ai-xai/rendering-xai-in-web-and-tui.md`
-
-All 6 Explainable AI files for `sentinel-nexus` are now generated.
-
----
-
-### Files to be Generated in Part 7
-
-The next phase covers the **Hierarchical Asset Topology** (`hierarchical-asset-topology/` - 6 files):
-
-1. `hierarchical-asset-topology/four-tier-hierarchy-model.md` (Tenant $\to$ Nexus Hub $\to$ Sentinel Node $\to$ Sensor/PLC)
-2. `hierarchical-asset-topology/deterministic-sensor-identifiers.md` (Deriving IDs for Modbus PLCs, Coils, DICOM, and Cameras)
-3. `hierarchical-asset-topology/cascading-health-engine.md` (Health states: `ONLINE`, `DEGRADED`, `OFFLINE`, `UNREACHABLE`)
-4. `hierarchical-asset-topology/liveness-heartbeat-tracking.md` (15-second grace window and timeout transitions)
-5. `hierarchical-asset-topology/instant-0ms-graceful-disconnect.md` (Handling `DeregistrationRequest` on SIGINT/Ctrl+C)
-6. `hierarchical-asset-topology/fleet-sync-payload-schema.md` (Nested JSON structure for `POST /api/v1/fleet/sync`)
-
-Confirm when you are ready to proceed with Part 7.
