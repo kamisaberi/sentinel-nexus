@@ -28,11 +28,31 @@ namespace sentinel::nexus::core
                 std::string value;
                 if (std::getline(is_line, value))
                 {
-                    // Trim leading/trailing whitespace
-                    key.erase(0, key.find_first_not_of(" \t"));
-                    key.erase(key.find_last_not_of(" \t") + 1);
-                    value.erase(0, value.find_first_not_of(" \t\""));
-                    value.erase(value.find_last_not_of(" \t\"") + 1);
+                    // 1. Strip any inline comment starting with '#'
+                    size_t comment_pos = value.find('#');
+                    if (comment_pos != std::string::npos)
+                    {
+                        value = value.substr(0, comment_pos);
+                    }
+
+                    // 2. Trim whitespace and quotation marks
+                    size_t k_start = key.find_first_not_of(" \t");
+                    size_t k_end = key.find_last_not_of(" \t");
+                    if (k_start != std::string::npos && k_end != std::string::npos)
+                    {
+                        key = key.substr(k_start, k_end - k_start + 1);
+                    }
+
+                    size_t v_start = value.find_first_not_of(" \t\"");
+                    size_t v_end = value.find_last_not_of(" \t\"");
+                    if (v_start != std::string::npos && v_end != std::string::npos)
+                    {
+                        value = value.substr(v_start, v_end - v_start + 1);
+                    }
+                    else
+                    {
+                        value = "";
+                    }
 
                     if (key == "bind_address")
                         config_.bind_address = value;
@@ -44,16 +64,6 @@ namespace sentinel::nexus::core
                         config_.ws_port = std::stoi(value);
                     else if (key == "worker_threads")
                         config_.worker_threads = std::stoi(value);
-                    else if (key == "cloud_endpoint")
-                        config_.saas_endpoint = value;
-                    else if (key == "tenant_id")
-                        config_.saas_tenant_id = value;
-                    else if (key == "api_key")
-                        config_.saas_api_key = value;
-                    else if (key == "sync_interval_sec")
-                        config_.saas_sync_interval = std::stoi(value);
-                    else if (key == "enabled" && value == "true")
-                        config_.saas_enabled = true;
                     else if (key == "cloud_endpoint")
                         config_.saas_endpoint = value;
                     else if (key == "tenant_id")
