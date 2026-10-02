@@ -352,7 +352,3 @@ make -j$(nproc)
 +------------------------------------------------------------------------------------------------------+
 ```
 
----
-
-### End of Project 5 Document
-*Ready to proceed to **Project 6: `sentinel-nexus` (Tier 6 Central Fleet Command Plane & Collective Defense Grid)** upon your confirmation.*
