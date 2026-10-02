@@ -81,6 +81,7 @@ int main(int argc, char** argv) {
     // 3_1. Start Cloud SaaS Sync Agent targeting your local FastAPI backend
 sentinel::nexus::cloud::SaaSConfig saas_cfg{
         .enabled = config.saas_enabled,
+        .nexus_id = config.saas_nexus_id,
         .cloud_endpoint = config.saas_endpoint,
         .tenant_id = config.saas_tenant_id,
         .auth_email = config.saas_auth_email,
