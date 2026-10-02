@@ -13,6 +13,7 @@ namespace sentinel::nexus::cloud
     struct SaaSConfig
     {
         bool enabled{false};
+        std::string nexus_id{"NEXUS-AMSTERDAM-01"};
         std::string cloud_endpoint{"http://127.0.0.1:8000/api/v1"};
         std::string tenant_id{"tenant-dev-local"};
         std::string auth_email{"kamisaberi@gmail.com"};
