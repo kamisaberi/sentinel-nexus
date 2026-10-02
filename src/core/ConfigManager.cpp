@@ -112,6 +112,8 @@ namespace sentinel::nexus::core
                         config_.saas_sync_interval = std::stoi(value);
                     else if (key == "enabled" && value == "true")
                         config_.saas_enabled = true;
+                    else if (key == "nexus_id")
+                        config_.saas_nexus_id = value;
                 }
             }
         }
