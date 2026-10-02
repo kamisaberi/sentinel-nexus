@@ -390,7 +390,3 @@ Evaluated on an industrial bare-metal chassis (Intel Core i9-14900K, 24 cores / 
 +------------------------------------------------------------------------------------------------------+
 ```
 
----
-
-### End of Project 1 Document
-*Ready to proceed to **Project 2: `blackbox-essential` (`libblackbox.so`)** upon your confirmation.*
