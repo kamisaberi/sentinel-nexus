@@ -28,7 +28,8 @@ intelligence:
 
 
 saas:
-  enabled: true                                       
+  enabled: true                                   
+  nexus_id: "NEXUS-AMSTERDAM-01"                     
   cloud_endpoint: "http://127.0.0.1:8000/api/v1"      
   tenant_id: "tenant-dev-local"                       
   api_key: "ary_dev_secret_key_8000"                  
