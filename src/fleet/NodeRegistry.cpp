@@ -43,7 +43,9 @@ namespace sentinel::nexus::fleet
         return node_id;
     }
 
-    bool NodeRegistry::update_heartbeat(const std::string &node_id, const DeviceMetrics &metrics)
+    bool NodeRegistry::update_heartbeat(const std::string &node_id,
+                                        const DeviceMetrics &metrics,
+                                        const google::protobuf::RepeatedPtrField<::sentinel::nexus::SensorInfo> &sensors)
     {
         std::unique_lock lock(mutex_);
         auto it = nodes_.find(node_id);
@@ -55,9 +57,16 @@ namespace sentinel::nexus::fleet
         it->second.latest_metrics = metrics;
         it->second.last_heartbeat = std::chrono::system_clock::now();
         it->second.status = NodeHealthStatus::ONLINE;
+
+        // Update monitored sensors inventory
+        it->second.sensors.clear();
+        for (const auto &s : sensors)
+        {
+            it->second.sensors.push_back(s);
+        }
+
         return true;
     }
-
     bool NodeRegistry::mark_node_offline(const std::string &node_id, const std::string &reason)
     {
         std::unique_lock lock(mutex_);
