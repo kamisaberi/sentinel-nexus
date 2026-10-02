@@ -15,6 +15,7 @@ struct NexusConfig {
 
      // SaaS Cloud Sync configuration
     bool saas_enabled = true;
+    std::string saas_nexus_id = "NEXUS-AMSTERDAM-01";
     std::string saas_endpoint = "http://127.0.0.1:8000/api/v1";
     std::string saas_tenant_id = "tenant-dev-local";
     std::string saas_api_key = "ary_dev_secret_key_8000";
