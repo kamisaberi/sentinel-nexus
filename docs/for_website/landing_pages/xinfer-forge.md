@@ -364,7 +364,3 @@ Evaluated over a simulated 6-month continuous operational timeline under realist
 +------------------------------------------------------------------------------------------------------+
 ```
 
----
-
-### End of Project 4 Document
-*Ready to proceed to **Project 5: `sentinel-lab` (Tier 5 Academic Research Platform & Preprint Testbed)** upon your confirmation.*
