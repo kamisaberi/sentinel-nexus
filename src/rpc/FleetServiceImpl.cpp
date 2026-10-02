@@ -42,7 +42,7 @@ namespace sentinel::nexus::rpc
         (void)context;
 
         bool updated = fleet::NodeRegistry::instance().update_heartbeat(
-            request->node_id(), request->metrics());
+            request->node_id(), request->metrics(), request->sensors());
 
         if (!updated)
         {
@@ -57,7 +57,6 @@ namespace sentinel::nexus::rpc
 
         return grpc::Status::OK;
     }
-
     grpc::Status FleetServiceImpl::DeregisterAppliance(grpc::ServerContext *context,
                                                        const ::sentinel::nexus::DeregistrationRequest *request,
                                                        ::sentinel::nexus::ResponseStatus *response)
