@@ -358,15 +358,3 @@ The installer automatically recompiles the eBPF kernel filter (`xdp_filter.o`) a
 +------------------------------------------------------------------------------------------------------+
 ```
 
----
-
-### Master Documentation Series Complete (8 of 8 Projects)
-
-1. **`xinfer-essential` (`libxinfer.so` - Tier 1):** Universal Heterogeneous AI Runtime (15 Silicon Backends).
-2. **`blackbox-essential` (`libblackbox.so` - Tier 2):** In-Kernel eBPF/XDP Mitigation Core & TPM 2.0 Attestation.
-3. **`blackbox-sentinel` (`sentinel` - Tier 3):** Commercial Cyber-Physical Edge XDR/SIEM Appliance.
-4. **`xinfer-forge` (`forge-cli` - Tier 4):** Continual Active Learning Daemon & Safety Regression Gate.
-5. **`sentinel-lab` (`sentinel_lab` - Tier 5):** Academic Research Testbed, SLAB Wire Protocol & LaTeX Preprint.
-6. **`sentinel-nexus` (`sentinel-nexus` - Tier 6):** Central Fleet Command Plane & Collective Defense Grid.
-7. **`sentinel-matrix` (`sentinel-matrix` - Tier 7):** Autonomous Cyber-Range, Multi-Modal OmniFlow & Digital Twin.
-8. **`sentinel-stack` (`sentinel-stack` - Master Installer):** Unified 6-Tier Topological Meta-Installer & Orchestrator.
