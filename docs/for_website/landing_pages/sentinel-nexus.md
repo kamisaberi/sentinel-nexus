@@ -462,7 +462,3 @@ $ nexus-ctl ota rollback    # Trigger immediate emergency rollback
 +------------------------------------------------------------------------------------------------------+
 ```
 
----
-
-### End of Project 6 Document
-*Ready to proceed to **Project 7: `sentinel-matrix` (Tier 7 Autonomous Cyber-Range & Simulation Mesh)** upon your confirmation.*
