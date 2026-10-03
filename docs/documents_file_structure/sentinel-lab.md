@@ -87,7 +87,3 @@ sentinel-lab/docs/
     └── support.md                             # Academic issue tracker, contributing guide, and research contacts
 ```
 
----
-
-*This concludes the complete documentation system structure for **Project 5: `sentinel-lab`**.*  
-*Ready to proceed to **Project 6: `sentinel-nexus` (`sentinel-nexus` central command plane & collective defense grid)** upon your confirmation.*
