@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/getting-started/systemd-deployment.md`
-
-```markdown
 # Hardened Systemd Service Deployment
 
 In production environments, `sentinel-nexus` runs as an automated, hardened systemd service configured for maximum file descriptors and process resilience.
@@ -56,6 +51,5 @@ sudo systemctl daemon-reload
 sudo systemctl enable sentinel-nexus
 sudo systemctl start sentinel-nexus
 sudo systemctl status sentinel-nexus
-```
 ```
 

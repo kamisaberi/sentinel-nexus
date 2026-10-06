@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/getting-started/docker-deployment.md`
-
-```markdown
 # Containerized Deployment & Docker Compose
 
 For containerized environments and digital-twin cyber ranges (`sentinel-matrix`), `sentinel-nexus` can be deployed via Docker.
@@ -49,6 +44,5 @@ docker compose up -d
 
 # Check live logs
 docker compose logs -f nexus
-```
 ```
 

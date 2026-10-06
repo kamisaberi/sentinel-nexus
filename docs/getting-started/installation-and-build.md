@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/getting-started/installation-and-build.md`
-
-```markdown
 # Building & Installing Sentinel-Nexus
 
 This guide covers building the core `sentinel-nexus` daemon, the `nexus-ctl` operations CLI, and unit benchmarks from source.
@@ -77,6 +72,5 @@ sudo mkdir -p /etc/sentinel-nexus/certs
 sudo mkdir -p /var/lib/sentinel-nexus/data
 sudo mkdir -p /var/lib/sentinel-nexus/models
 sudo mkdir -p /var/lib/sentinel-nexus/forge_datasets
-```
 ```
 

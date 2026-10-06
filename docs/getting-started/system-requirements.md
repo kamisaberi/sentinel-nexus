@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/getting-started/system-requirements.md`
-
-```markdown
 # System Requirements & Prerequisites
 
 Review the toolchain, network configuration, and hardware requirements before building and running `sentinel-nexus`.
@@ -40,5 +35,4 @@ Ensure the following ports are open on the host:
 | **`9443`** | TCP / HTTPS | Inbound | Air-gapped Web Command Center and administrative REST API. |
 | **`9444`** | TCP / HTTP | Inbound | Real-time Server-Sent Events (SSE) streaming endpoint. |
 | **`443`** | TCP / HTTPS | Outbound | Optional outbound link to Aryorithm SaaS (`app.aryorithm.com`). |
-```
 

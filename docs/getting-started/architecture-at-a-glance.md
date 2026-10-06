@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/getting-started/architecture-at-a-glance.md`
-
-```markdown
 # Architecture at a Glance
 
 The diagram below maps the interaction between edge defense appliances (`blackbox-sentinel`), the central command hub (`sentinel-nexus`), continual AI retraining (`xinfer-forge`), and cloud visibility (`app.aryorithm.com`).
@@ -45,6 +40,5 @@ The diagram below maps the interaction between edge defense appliances (`blackbo
  │ Appliance 1  │   │ Appliance 2  │   │ Appliance N  │
  │ (Substation) │   │ (Water Plant)│   │ (Hospital)   │
  └──────────────┘   └──────────────┘   └──────────────┘
-```
 ```
 

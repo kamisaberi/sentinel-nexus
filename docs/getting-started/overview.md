@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/getting-started/overview.md`
-
-```markdown
 # Central Fleet Command Plane & Collective Defense Architecture
 
 Managing cybersecurity across distributed critical infrastructure—such as dozens of regional water treatment plants, hundreds of electrical substations, or thousands of maritime vessels—presents operational challenges:
@@ -43,5 +38,4 @@ Managing cybersecurity across distributed critical infrastructure—such as doze
 * **Dataset Curator for Active Learning:** Filters ambiguous flow records ($0.40 \le f(x) \le 0.60$) and packages them into training batches for `xinfer-forge`.
 * **Canary OTA Staging & RollbackGuard:** Manages staged rollouts (`Shadow Mode` $\to$ `5% Canary` $\to$ `Fleet-Wide`), monitoring edge latency and executing emergency rollbacks if performance degrades.
 * **Air-Gapped Web Command Center:** Serves an administrative dashboard on port **9443** (HTML5 Canvas radial topology, MITRE ATT&CK matrix) with a real-time Server-Sent Events (SSE) telemetry stream on port **9444**.
-```
 

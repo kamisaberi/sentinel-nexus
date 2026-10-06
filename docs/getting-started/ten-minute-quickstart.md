@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/getting-started/ten-minute-quickstart.md`
-
-```markdown
 # 10-Minute Quickstart: Booting Nexus & Connecting Your First Node
 
 This walkthrough guides you through generating local mTLS certificates, booting `sentinel-nexus`, and verifying communication with a test appliance.
@@ -86,6 +81,5 @@ nexus-ctl fleet list
 ```text
 UUID                       HOSTNAME                 STATUS    VERSION   DROPS    SLA (LATENCY)
 edge-substation-alpha      substation-01.internal   ONLINE    2.4.0     1,420    0.82 µs
-```
 ```
 
