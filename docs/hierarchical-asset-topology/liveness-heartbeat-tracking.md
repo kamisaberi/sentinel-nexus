@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/hierarchical-asset-topology/liveness-heartbeat-tracking.md`
-
-```markdown
 # Liveness Heartbeat Tracking & Timeout Engine
 
 `sentinel-nexus` tracks appliance liveness using non-blocking monotonic timestamp comparisons across the in-memory `NodeRegistry`.
@@ -51,6 +46,5 @@ void sweep_appliance_liveness(NodeRegistry& registry) {
 }
 
 } // namespace sentinel::nexus
-```
 ```
 

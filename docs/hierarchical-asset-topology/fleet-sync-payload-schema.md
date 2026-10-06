@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/hierarchical-asset-topology/fleet-sync-payload-schema.md`
-
-```markdown
 # Fleet Sync Payload Schema (`POST /api/v1/fleet/sync`)
 
 Every 5 seconds, the `SaaSConnector` subsystem on `sentinel-nexus` serializes the active 4-tier asset tree into a nested JSON structure and transmits it to the central cloud platform (`app.aryorithm.com`).
@@ -57,5 +52,4 @@ Every 5 seconds, the `SaaSConnector` subsystem on `sentinel-nexus` serializes th
 
 * **Compression:** Large fleet sync payloads ($> 500\text{ nodes}$) are compressed with `gzip` on transmission (`Content-Encoding: gzip`).
 * **Non-Blocking Egress:** The sync payload is generated from read-only `NodeRegistry` snapshots, ensuring edge packet drops and local telemetry processing continue uninterrupted.
-```
 

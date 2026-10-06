@@ -1,12 +1,3 @@
-### Part 7: Hierarchical Asset Topology (`hierarchical-asset-topology/*`)
-
-This section contains 6 technical specifications and C++20 implementations detailing the 4-tier enterprise asset model of `sentinel-nexus`: the hierarchical asset topology, deterministic sensor identification, cascading health state transitions, liveness heartbeat tracking, 0ms instant graceful disconnect processing, and the nested cloud sync payload schema.
-
----
-
-### File: `sentinel-nexus/docs/hierarchical-asset-topology/four-tier-hierarchy-model.md`
-
-```markdown
 # The 4-Tier Hierarchical Enterprise Asset Model
 
 Enterprise security visibility requires structured representation of physical and logical infrastructure. Flattened asset lists fail in multi-facility deployments with thousands of field sensors.
@@ -47,5 +38,4 @@ Enterprise security visibility requires structured representation of physical an
 1. **Deterministic Relational Binding:** Every field sensor (Tier 4) belongs to exactly one edge appliance (Tier 3), which reports to a specific Nexus hub (Tier 2) under an enterprise tenant (Tier 1).
 2. **Cascading Rollups:** If an edge appliance loses connection, all connected Tier 4 sensors automatically transition their operational state to match the parent node without requiring individual device ping probes.
 3. **Multi-Tenant Isolation:** Policy rules, Canary OTA rollouts, and telemetry streams are partitioned strictly by `tenant_id`.
-```
 

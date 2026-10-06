@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/hierarchical-asset-topology/cascading-health-engine.md`
-
-```markdown
 # Cascading Health Engine & State Machine
 
 `sentinel-nexus` maintains active operational health states for all entities across the 4-tier asset tree. Health state transitions propagate hierarchically to reflect operational disruptions accurately.
@@ -39,5 +34,4 @@
 * **Parent Degradation:** If an edge appliance node enters `DEGRADED`, all attached Tier 4 sensors are marked with a warning badge on the Web Command Center.
 * **Parent Unreachability:** If an appliance transitions to `UNREACHABLE` or `OFFLINE`, all subordinate sensors transition to `INHERITED_OFFLINE` automatically.
 * **Automatic Recovery:** When the appliance resumes valid mTLS heartbeats on port 50051, the entire sub-tree transitions back to `ONLINE` within a single polling interval ($5.0\text{ seconds}$).
-```
 

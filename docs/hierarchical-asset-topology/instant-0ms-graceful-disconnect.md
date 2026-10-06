@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/hierarchical-asset-topology/instant-0ms-graceful-disconnect.md`
-
-```markdown
 # Instant 0ms Graceful Disconnect Handling
 
 When an edge appliance shuts down normally (via `systemctl stop sentinel`, system reboot, or `SIGINT`), waiting for the 15-second heartbeat timeout generates false "Node Lost" alarms in enterprise SOCs.
@@ -58,6 +53,5 @@ grpc::Status FleetServiceImpl::DeregisterAppliance(
     response->set_success(true);
     return grpc::Status::OK;
 }
-```
 ```
 

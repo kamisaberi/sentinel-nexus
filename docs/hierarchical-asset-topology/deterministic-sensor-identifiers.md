@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/hierarchical-asset-topology/deterministic-sensor-identifiers.md`
-
-```markdown
 # Deterministic Sensor & Industrial Asset Identification
 
 Industrial automation networks often feature unmanaged legacy devices lacking hostname registration, DHCP leases, or SNMP agents. 
@@ -66,6 +61,5 @@ public:
 };
 
 } // namespace sentinel::nexus
-```
 ```
 
