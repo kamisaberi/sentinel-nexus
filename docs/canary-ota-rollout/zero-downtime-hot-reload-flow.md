@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/canary-ota-rollout/zero-downtime-hot-reload-flow.md`
-
-```markdown
 # Zero-Downtime Atomic Model Hot-Reload Flow
 
 In high-concurrency packet filtering, stopping the daemon or flushing in-kernel filter maps to update AI weights creates operational vulnerabilities.
@@ -53,6 +48,5 @@ Query the edge node health status:
 ```bash
 curl -k -s https://edge-substation-alpha:8443/api/v1/health | jq .active_model_sha256
 # Expected Output: "e9a2c31e847b2c94b13a7b41e2d90100..."
-```
 ```
 

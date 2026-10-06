@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/canary-ota-rollout/false-positive-surge-protection.md`
-
-```markdown
 # False-Positive Surge Protection & Drop Burst Aborts
 
 A candidate model that passes the Golden Attacks Safety Gate may still trigger false positives on unexpected ambient traffic, leading to unauthorized drops on legitimate plant communication flows.
@@ -37,5 +32,4 @@ If the active drop rate on Canary appliances spikes by more than **$5\times$ ($5
 1. `sentinel-nexus` aborts the Canary rollout immediately.
 2. An automated instruction reverts Canary nodes to the previous baseline model within $50\,\text{ms}$.
 3. The offending candidate weights are quarantined for active learning investigation.
-```
 

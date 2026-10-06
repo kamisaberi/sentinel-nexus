@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/canary-ota-rollout/canary-orchestrator-engine.md`
-
-```markdown
 # Canary Orchestrator Engine & Hash Cohort Selection
 
 The `CanaryOrchestrator` (`src/nexus/CanaryOrchestrator.cpp`) partitions managed appliances into deterministic deployment cohorts using **consistent cryptographic hashing** over appliance hardware UUIDs.
@@ -66,6 +61,5 @@ public:
 };
 
 } // namespace sentinel::nexus
-```
 ```
 

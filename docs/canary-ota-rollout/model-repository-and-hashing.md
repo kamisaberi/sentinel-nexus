@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/canary-ota-rollout/model-repository-and-hashing.md`
-
-```markdown
 # Local Model Repository & Cryptographic Hashing
 
 `sentinel-nexus` maintains a local, on-premises model repository in `/var/lib/sentinel-nexus/models/`. It serves verified ONNX models to edge appliances over authenticated HTTP streaming connections.
@@ -40,5 +35,4 @@ Edge Appliance (blackbox-sentinel)                   Sentinel-Nexus Hub
 ```
 
 Before passing the model to `libxinfer.so`, the edge node computes the streaming SHA-256 hash. If the checksum does not match the `X-Checksum-SHA256` header, the file is deleted immediately.
-```
 

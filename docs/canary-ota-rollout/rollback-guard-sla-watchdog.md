@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/canary-ota-rollout/rollback-guard-sla-watchdog.md`
-
-```markdown
 # `RollbackGuard`: Automated SLA Latency Watchdog
 
 Edge cyber-physical security requires deterministic execution. If an updated candidate model introduces complex operator paths that push inference latency beyond **$1{,}000\,\mu\text{s}$ ($1.0\,\text{ms}$)**, it breaches line-rate mitigation SLAs.
@@ -70,6 +65,5 @@ void RollbackGuard::execute_emergency_rollback(std::string_view reason) {
 }
 
 } // namespace sentinel::nexus
-```
 ```
 

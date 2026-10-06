@@ -1,12 +1,3 @@
-### Part 5: Canary OTA Staged Rollouts & SLA Watchdog (`canary-ota-rollout/*`)
-
-This section contains 6 technical specifications and C++20 implementations detailing the staged model rollout engine of `sentinel-nexus`: the three-stage lifecycle state machine, consistent-hash cohort selection, the `RollbackGuard` SLA watchdog, false-positive surge protection, local repository storage with SHA-256 manifests, and zero-downtime atomic hot-reloads.
-
----
-
-### File: `sentinel-nexus/docs/canary-ota-rollout/staged-rollout-lifecycle.md`
-
-```markdown
 # Staged Rollout Lifecycle: Shadow Mode to Fleet-Wide Promotion
 
 Deploying deep neural network weights directly to 5,000 active edge defense appliances presents operational risks. An unexpected regression can induce false-positive drops on critical control flows or increase inference latency beyond the sub-microsecond line-rate budget.
@@ -56,5 +47,4 @@ Deploying deep neural network weights directly to 5,000 active edge defense appl
 | **`SHADOW_MODE`** | 100% of Fleet | **Passive (0% Drops)** | Runtime divergence $\le 2.5\%$ for 48 hours. | Model crash or NPU driver fault. |
 | **`CANARY_5_PCT`** | 5% of Fleet ($250$ Nodes) | **Active ($< 0.84\,\mu\text{s}$ Drops)**| Zero false-positive surges for 24 hours. | Mitigation latency $> 1{,}000\,\mu\text{s}$ or drops spike $> 5\times$. |
 | **`FLEET_WIDE`** | 100% of Fleet ($5{,}000$ Nodes)| **Active ($< 0.84\,\mu\text{s}$ Drops)**| Full deployment across all operational clusters. | Collective Defense SLA breach. |
-```
 
