@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/cloud-saas-uplink/cloud-fleet-sync.md`
-
-```markdown
 # High-Frequency Fleet Synchronization (`POST /api/v1/fleet/sync`)
 
 Every **5.0 seconds**, `SaaSConnector` serializes the active 4-tier asset hierarchy and telemetry summary, transmitting the nested payload to the cloud backend over a single non-blocking HTTP/2 request.
@@ -67,6 +62,5 @@ void SaaSConnector::run_sync_loop() {
         }
     }
 }
-```
 ```
 

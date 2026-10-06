@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/cloud-saas-uplink/jwt-authentication-and-renewal.md`
-
-```markdown
 # JWT Authentication, Session Caching & Token Renewal
 
 `SaaSConnector` authenticates with the cloud control plane using scoped JSON Web Tokens (JWT). It caches session state locally in `data/cloud_session.json` and implements automatic renewal upon token expiration or HTTP `401 Unauthorized` responses.
@@ -79,6 +74,5 @@ bool SaaSConnector::authenticate() {
 }
 
 } // namespace sentinel::nexus
-```
 ```
 

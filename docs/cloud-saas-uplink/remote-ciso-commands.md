@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/cloud-saas-uplink/remote-ciso-commands.md`
-
-```markdown
 # Remote CISO Administrative Commands (`GET /api/v1/commands/pending`)
 
 For enterprise CISOs managing hundreds of remote facilities, the cloud portal (`app.aryorithm.com`) allows authorized administrators to issue high-priority operational commands that local Nexus instances retrieve during polling sweeps.
@@ -39,5 +34,4 @@ For enterprise CISOs managing hundreds of remote facilities, the cloud portal (`
 To prevent rogue server takeovers from compromising edge plants:
 * All administrative commands dispatched by the cloud portal are **digitally signed with the corporate CISO’s offline administrative key**.
 * `sentinel-nexus` validates the command signature against pre-enrolled public keys in `/etc/sentinel-nexus/certs/admin_authority.crt` before executing rollbacks or policy changes.
-```
 

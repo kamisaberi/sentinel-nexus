@@ -1,12 +1,3 @@
-### Part 11: Hybrid Cloud SaaS Uplink (`cloud-saas-uplink/*`)
-
-This section contains 5 technical implementation guides detailing the outbound cloud integration engine of `sentinel-nexus`: the decoupled C++ `SaaSConnector` client, JWT token cycling and mutex deadlock prevention, the 5-second 4-tier fleet synchronization transmission, inbound global consortium threat feed polling, and remote CISO emergency command execution.
-
----
-
-### File: `sentinel-nexus/docs/cloud-saas-uplink/saas-connector-architecture.md`
-
-```markdown
 # SaaS Connector Architecture (`SaaSConnector.cpp`)
 
 The `SaaSConnector` subsystem is an optional, outbound-only C++20 HTTPS client that connects on-premises `sentinel-nexus` hubs to the **Aryorithm Cloud SaaS Platform (`app.aryorithm.com`)**. It maintains high-level executive visibility across distributed multi-region facilities while preserving the **zero-ingress, air-gapped operational independence** of local hubs.
@@ -51,5 +42,4 @@ During high-concurrency production runs, socket communication is protected by th
 1. **`std::recursive_mutex` Re-entrancy:** Prevents thread self-deadlocks where `authenticate()` and `http_post_json()` attempt to acquire the authentication lock on the same thread.
 2. **Explicit Socket Timeouts:** All TCP sockets enforce a **3-second timeout** (`SO_RCVTIMEO` and `SO_SNDTIMEO`), preventing daemon hangs during network degradation.
 3. **HTTP `Content-Length` Parsing:** The socket reader parses `Content-Length` headers directly rather than waiting for EOF, preventing connection stalls.
-```
 

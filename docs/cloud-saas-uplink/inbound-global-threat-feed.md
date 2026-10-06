@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/cloud-saas-uplink/inbound-global-threat-feed.md`
-
-```markdown
 # Inbound Global Consortium Threat Feed
 
 Subscribers to the Aryorithm Global Defense Consortium opt-in to receive anonymized zero-day threat indicators discovered across other enterprise tenant enclaves.
@@ -51,6 +46,5 @@ Subscribers to the Aryorithm Global Defense Consortium opt-in to receive anonymi
     }
   ]
 }
-```
 ```
 
