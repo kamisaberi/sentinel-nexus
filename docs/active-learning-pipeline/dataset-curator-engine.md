@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/active-learning-pipeline/dataset-curator-engine.md`
-
-```markdown
 # Dataset Curator Engine (`DatasetCurator.cpp`)
 
 `DatasetCurator` drains the `VectorIngestQueue`, validates dimensional constraints, and packages batches into structured CSV datasets paired with cryptographic manifest descriptors.
@@ -63,5 +58,4 @@ void DatasetCurator::curate_batch_to_disk(size_t quota) {
 
 * **Fixed Batch Size:** Standard batches contain exactly $5{,}000$ continuous flow instances.
 * **Atomic Visibility:** The CSV file is written to `.tmp` storage first and renamed to `forge_dataset_<uuid>.csv` only after the accompanying `.manifest.json` is synced to disk, preventing race conditions with inotify watchers.
-```
 

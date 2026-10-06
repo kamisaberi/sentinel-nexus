@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/active-learning-pipeline/uncertainty-sampling-rules.md`
-
-```markdown
 # Active Learning: Uncertainty Sampling ($0.40 - 0.60$)
 
 In cyber-physical networks, training on redundant telemetry consumes compute resources without improving model accuracy. The `DatasetCurator` enforces **Uncertainty Sampling** to select the highest-entropy feature vectors.
@@ -40,5 +35,4 @@ $$\mathcal{H}(x) = -f(x)\log_2 f(x) - (1 - f(x))\log_2(1 - f(x))$$
 | **$[0.00, 0.40)$** | Confident Benign | **Discard** | Redundant normal baseline; adds no informational value. |
 | **$[0.40, 0.60]$** | **Uncertain Boundary** | **Curate into Queue** | Model decision boundary is ambiguous; high information gain. |
 | **$(0.60, 1.00]$** | Confident Anomaly | **Discard from Training** | Already detected and dropped by in-kernel eBPF filter. |
-```
 

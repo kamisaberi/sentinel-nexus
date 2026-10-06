@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/active-learning-pipeline/closed-loop-flywheel-testing.md`
-
-```markdown
 # Closed-Loop Verification: Testing the Active Learning Flywheel
 
 This testing guide verifies that the entire closed-loop active learning cycle functions autonomously from edge detection through curation, retraining, safety validation, and canary hot-reloading.
@@ -61,5 +56,4 @@ if __name__ == "__main__":
 
 * **Zero Human Intervention:** The test transitions from vector injection to candidate model staging without operator input.
 * **Safety Gate Preserved:** The candidate model must pass the 52 golden attack checks before appearing in `/api/v1/models`.
-```
 

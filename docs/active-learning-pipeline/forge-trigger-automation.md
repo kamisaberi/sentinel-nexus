@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/active-learning-pipeline/forge-trigger-automation.md`
-
-```markdown
 # Forge Trigger Automation & Subprocess Handshake
 
 Once `DatasetCurator` writes a completed batch to `/var/lib/sentinel-nexus/forge_datasets/`, `sentinel-nexus` automatically alerts the `xinfer-forge` continual adaptation daemon.
@@ -38,5 +33,4 @@ The integration runs without IPC overhead:
 1. `DatasetCurator` closes the file descriptor after writing `forge_dataset_<uuid>.csv`.
 2. The Linux kernel emits an `IN_CLOSE_WRITE` inotify notification.
 3. `xinfer-forge` receives the notification, verifies that `.manifest.json` exists, and locks the batch for training.
-```
 

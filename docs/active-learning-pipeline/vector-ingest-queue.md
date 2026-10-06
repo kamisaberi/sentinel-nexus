@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/active-learning-pipeline/vector-ingest-queue.md`
-
-```markdown
 # Concurrent Lock-Free Vector Ingest Queue (200k Capacity)
 
 To ingest high-frequency telemetry streams from up to 5,000 concurrent appliances without lock contention, `sentinel-nexus` utilizes a **Multi-Producer Single-Consumer (MPSC) lock-free ring buffer** with a capacity of **200,000 vectors**.
@@ -110,6 +105,5 @@ private:
 };
 
 } // namespace sentinel::nexus
-```
 ```
 
