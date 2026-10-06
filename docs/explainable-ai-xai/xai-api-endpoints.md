@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/explainable-ai-xai/xai-api-endpoints.md`
-
-```markdown
 # Auditor REST Endpoints: Querying Explainable Telemetry
 
 Compliance officers and security analysts query physical feature deviations via the `sentinel-nexus` REST API on port **9443**.
@@ -73,5 +68,4 @@ curl -k -H "Authorization: Bearer $JWT" \
 ## 2. Endpoint: `GET /api/v1/threats/xai/{incident_id}`
 
 Retrieves the raw high-resolution residual vector for a single incident.
-```
 

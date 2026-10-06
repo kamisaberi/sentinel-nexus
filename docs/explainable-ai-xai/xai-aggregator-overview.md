@@ -1,12 +1,3 @@
-### Part 6: Explainable AI (XAI) Attribution Aggregator (`explainable-ai-xai/*`)
-
-This section contains 6 technical specifications and C++20 implementations detailing the Explainable AI (XAI) engine of `sentinel-nexus`: ingesting Microsecond Residual Decomposition (MRD) vectors from edge nodes, the top-3 feature attribution schema, semantic dictionary translation, MITRE ATT&CK threat indexing, the auditor REST API endpoints, and live UI/TUI rendering.
-
----
-
-### File: `sentinel-nexus/docs/explainable-ai-xai/xai-aggregator-overview.md`
-
-```markdown
 # Edge Explainable AI (XAI) Attribution Aggregator Overview
 
 In high-concurrency packet filtering, traditional post-hoc explainability techniques (such as kernel SHAP or LIME) are computationally prohibitive: evaluating thousands of model permutations introduces seconds of calculation delay, making real-time attribution impossible at line rate.
@@ -49,5 +40,4 @@ In high-concurrency packet filtering, traditional post-hoc explainability techni
 * **Zero Inference Stall:** Edge appliances compute feature attributions directly from the forward-pass output tensor without re-evaluating the neural network.
 * **Semantic Normalization:** Converts abstract continuous values ($[-1.0, 1.0]$) back into physical units (e.g., $9{,}850\,\text{PSI}$, $3{,}600\,\text{RPM}$, $75{,}000\,\text{pps}$).
 * **Centralized Correlation:** Correlates simultaneous attributions across multiple substations to identify coordinated campaign signatures.
-```
 

@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/explainable-ai-xai/global-threat-cache-indexing.md`
-
-```markdown
 # Global Threat Cache Indexing & MITRE ATT&CK Taxonomy
 
 `sentinel-nexus` indexes incoming XAI feature attributions alongside the **MITRE ATT&CK for Enterprise and ICS** taxonomies, correlating raw network deviations with adversarial tactics, techniques, and procedures (TTPs).
@@ -82,6 +77,5 @@ private:
 };
 
 } // namespace sentinel::nexus
-```
 ```
 

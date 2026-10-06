@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/explainable-ai-xai/top-3-feature-attribution-schema.md`
-
-```markdown
 # Top-3 Feature Attribution Schema Specification
 
 Every mitigation event reported to `sentinel-nexus` contains a structured **Top-3 Feature Attribution** payload describing the primary mathematical drivers of the anomaly.
@@ -66,5 +61,4 @@ Every mitigation event reported to `sentinel-nexus` contains a structured **Top-
 | `observed_value` | `double` | Unscaled physical value observed on the wire. |
 | `baseline_value` | `double` | Unscaled value predicted by the autoencoder baseline. |
 | `residual_delta` | `string` | Formatted physical delta with dimensional engineering units. |
-```
 

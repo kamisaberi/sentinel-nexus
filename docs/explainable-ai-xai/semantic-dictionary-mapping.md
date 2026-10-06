@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/explainable-ai-xai/semantic-dictionary-mapping.md`
-
-```markdown
 # Semantic Dictionary Mapping: Tensor Coordinates to Physical Units
 
 In raw neural tensor processing, an anomaly is represented as a deviation on abstract index `j`. The **Semantic Dictionary** (`src/xai/SemanticDictionary.hpp`) translates continuous tensor indices into human-readable physical parameters.
@@ -91,6 +86,5 @@ private:
 };
 
 } // namespace sentinel::nexus
-```
 ```
 

@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/explainable-ai-xai/rendering-xai-in-web-and-tui.md`
-
-```markdown
 # Live XAI Visualization: Web Command Center & Terminal TUI
 
 `sentinel-nexus` renders Microsecond Residual Decomposition (MRD) attributions live across both the **Web Command Center (Port 9443)** and the **Terminal TUI (`nexus-tui`)**.
@@ -47,6 +42,5 @@ In air-gapped server environments without desktop web browsers, system operators
  │ edge-substation-03   ONLINE      12   0.84 µs  │  Delta: +81,850 pps (24%) │
  │ > edge-water-plant   ONLINE   4,129   0.82 µs  │ Rank 3: IAT_MEAN          │
  └────────────────────────────────────────────────┴───────────────────────────┘
-```
 ```
 
