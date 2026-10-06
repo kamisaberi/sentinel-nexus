@@ -1,12 +1,3 @@
-### Part 14: Troubleshooting & Help Desk Diagnostics (`troubleshooting/*`)
-
-This final section covers troubleshooting socket collisions across ports 50051, 9443, and 9444, debugging edge appliance enrollment rejections, resolving cloud JWT authentication failures, stabilizing Server-Sent Events (SSE) telemetry streams, diagnosing YAML parser comment stripping errors, technical FAQs, and enterprise support SLAs for `sentinel-nexus`.
-
----
-
-### File: `sentinel-nexus/docs/troubleshooting/port-binding-and-socket-errors.md`
-
-```markdown
 # Resolving Port Collisions & Socket Binding Failures
 
 `sentinel-nexus` exposes three network listener interfaces: **Port 50051** (gRPC), **Port 9443** (HTTPS REST & Web UI), and **Port 9444** (SSE Stream). If another background process or an improperly terminated instance holds these ports, startup will fail.
@@ -65,5 +56,4 @@ int opt = 1;
 ```
 
 In systemd deployments, ensure `RestartSec=3s` is configured to allow kernel descriptor recycling before relaunch.
-```
 

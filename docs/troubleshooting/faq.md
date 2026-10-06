@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/troubleshooting/faq.md`
-
-```markdown
 # Technical Frequently Asked Questions (FAQ)
 
 ---
@@ -32,5 +27,4 @@ During the Canary phase (where 5% of the fleet runs the candidate model in activ
 
 ### Q5: Can I manage multiple distinct organizations on a single Nexus instance?
 **Yes.** `sentinel-nexus` enforces a multi-tenant hierarchy (`Tenant` $\to$ `Nexus` $\to$ `Sentinel` $\to$ `Sensor`). All database records, telemetry queues, and API queries are partitioned strictly by `tenant_id`.
-```
 

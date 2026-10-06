@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/troubleshooting/config-file-parsing-errors.md`
-
-```markdown
 # Resolving YAML Parser Inline Comment Stripping Bugs
 
 A critical parsing bug can occur when editing `/etc/sentinel-nexus/nexus.yaml`: if values contain inline comments, naive string readers may append the comment text to URLs, ports, or API endpoints.
@@ -53,5 +48,4 @@ std::string sanitize_yaml_value(std::string raw_val) {
 ```
 
 Always run `sentinel-nexus --validate-config` to verify that values parse cleanly before starting services.
-```
 

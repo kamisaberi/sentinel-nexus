@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/troubleshooting/sse-stream-disconnects.md`
-
-```markdown
 # Troubleshooting Real-Time SSE Stream Disconnects (Port 9444)
 
 The Server-Sent Events (SSE) telemetry pipeline pushes updates at up to $100\text{ Hz}$ to the Web Command Center. If intermediary reverse proxies (such as Nginx, HAProxy, or Envoy) or browser timeouts interrupt the stream, the UI topology will freeze.
@@ -57,6 +52,5 @@ Verify the raw stream output from the command line:
 
 ```bash
 curl -N -v http://localhost:9444/stream
-```
 ```
 

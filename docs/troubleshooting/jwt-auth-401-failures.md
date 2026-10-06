@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/troubleshooting/jwt-auth-401-failures.md`
-
-```markdown
 # Resolving JWT Authentication & 401 Unauthorized Failures
 
 Authentication failures manifest in two distinct vectors:
@@ -50,5 +45,4 @@ std::recursive_mutex auth_mutex_;
 ```
 
 This permits re-entrant calls within the same thread while keeping token acquisition safe across asynchronous workers.
-```
 

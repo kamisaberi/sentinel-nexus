@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/troubleshooting/appliance-registration-rejections.md`
-
-```markdown
 # Debugging Appliance Registration & Enrollment Rejections
 
 When an edge appliance (`blackbox-sentinel`) fails to register with `sentinel-nexus`, the enrollment handshake is rejected at either the TLS connection level or the cryptographic TPM quote verification stage.
@@ -61,5 +56,4 @@ enrollment:
 ```
 
 Reload Nexus configuration with `sudo systemctl reload sentinel-nexus`.
-```
 
