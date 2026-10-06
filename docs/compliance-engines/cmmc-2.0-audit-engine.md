@@ -1,12 +1,3 @@
-### Part 12: Compliance Engines & Regulatory GRC (`compliance-engines/*`)
-
-This section contains 4 compliance audit guides and technical verification frameworks for `sentinel-nexus`: automating CMMC 2.0 / NIST SP 800-171 control proofs, proving IEC 62443-3-3 industrial conduit compliance across 5,000 edge nodes, extracting mathematical latency percentile proofs, and maintaining tamper-evident audit state journaling.
-
----
-
-### File: `sentinel-nexus/docs/compliance-engines/cmmc-2.0-audit-engine.md`
-
-```markdown
 # CMMC 2.0 & NIST SP 800-171 Fleet Audit Engine
 
 For defense prime contractors and defense industrial base (DIB) suppliers, `sentinel-nexus` includes an automated **Governance, Risk, and Compliance (GRC) Audit Engine** (`src/compliance/CmmcAuditEngine.cpp`). It collects hardware attestation quotes, mTLS session parameters, and kernel mitigation records across all 5,000 edge appliances to generate evidentiary audit packs for C3PAO assessors.
@@ -53,6 +44,5 @@ nexus-ctl report cmmc --output /var/lib/sentinel-nexus/data/cmmc_audit_evidence.
     }
   }
 }
-```
 ```
 

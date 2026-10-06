@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/compliance-engines/latency-sla-percentile-proofs.md`
-
-```markdown
 # Mathematical Latency SLA Percentile Proofs ($p50 - p99.9$)
 
 Regulatory auditors require empirical mathematical proof that the edge defense fleet executes packet mitigation within sub-microsecond and sub-millisecond bounds.
@@ -51,5 +46,4 @@ $$P\left(\text{Mitigation Latency} \le 0.84\,\mu\text{s}\right) \ge 0.990$$
 $$P\left(\text{Mitigation Latency} \le 1.04\,\mu\text{s}\right) \ge 0.999$$
 
 This demonstrates that $99.9\%$ of all adversarial packet drops execute within **$1.04\,\mu\text{s}$**, satisfying CMMC SI.L2-3.14.1 and IEC 62443 FR 7 requirements.
-```
 

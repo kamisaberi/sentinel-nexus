@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/compliance-engines/iec-62443-audit-engine.md`
-
-```markdown
 # IEC 62443-3-3 Industrial Automation Compliance Engine
 
 The **IEC 62443** standard establishes cybersecurity requirements for Industrial Automation and Control Systems (IACS). `sentinel-nexus` validates fleet compliance against **Security Level 3 (SL 3)** and **Security Level 4 (SL 4)** requirements defined in IEC 62443-3-3.
@@ -64,6 +59,5 @@ IecAuditResult Iec62443AuditEngine::evaluate_fleet_compliance() {
 }
 
 } // namespace sentinel::nexus
-```
 ```
 

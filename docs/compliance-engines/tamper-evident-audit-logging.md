@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/compliance-engines/tamper-evident-audit-logging.md`
-
-```markdown
 # Cryptographic State Journaling in `data/nexus_state.json`
 
 To satisfy legal chain-of-custody requirements, `sentinel-nexus` records all fleet state mutations, administrative actions, and policy changes into an append-only cryptographic journal anchored to **TPM 2.0 Platform Configuration Register 12 (PCR 12)**.
@@ -39,5 +34,4 @@ $$H_t = \operatorname{SHA-256}\left(H_{t-1} \parallel \text{Timestamp} \parallel
 * If an attacker gains root access to the Nexus server and edits `nexus_state.json` to erase an incident or drop record:
   1. The recalculation of the forward hash chain diverges immediately ($H_t' \ne H_t$).
   2. The hash value stored inside hardware **TPM PCR 12** will not match the recalculated file digest, providing proof of database tampering to forensic investigators.
-```
 
