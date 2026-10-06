@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/architecture/high-availability-clustering.md`
-
-```markdown
 # High-Availability Clustering & Failover Topology
 
 In mission-critical infrastructure, a single point of failure in the fleet command plane is unacceptable. `sentinel-nexus` supports **Active-Standby High-Availability (HA) Clustering** managed via a Virtual IP (VIP) and state replication.
@@ -35,5 +30,4 @@ In mission-critical infrastructure, a single point of failure in the fleet comma
    * The secondary instance promotes itself to **`LEADER`**.
    * The secondary instance issues an **Arp Gratuitous** broadcast claiming the Virtual IP (`10.240.0.10`).
 3. **Seamless Appliance Reconnection:** All 5,000 edge appliances (`blackbox-sentinel`) reconnect to the VIP within $2.0\text{ seconds}$ without configuration changes.
-```
 

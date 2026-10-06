@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/architecture/in-memory-state-engine.md`
-
-```markdown
 # In-Memory State Engine: `NodeRegistry` & Synchronization
 
 Managing the operational states, heartbeat counters, active IP block tables, and sensor inventories of 5,000 edge appliances requires microsecond state access. `sentinel-nexus` maintains all fleet state in a centralized, in-memory **`NodeRegistry`**.
@@ -102,5 +97,4 @@ private:
 
 * **Lookup Latency:** $< 120\,\text{ns}$ per node lookup across a 5,000-node registry.
 * **Memory Overhead:** $< 25\,\text{MB}$ total RAM required to hold full metadata and sensor inventories for 5,000 appliances.
-```
 

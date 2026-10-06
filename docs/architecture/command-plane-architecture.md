@@ -1,12 +1,3 @@
-### Part 2: Deep Systems Design (`architecture/*`)
-
-This section contains 6 architectural specifications detailing the internal systems design of `sentinel-nexus`: the multi-threaded core engine, the ports and protocols routing matrix, the read-heavy in-memory state engine (`NodeRegistry`), the state persistence and time-series model, the air-gapped sovereignty model, and the multi-hub high-availability clustering topology.
-
----
-
-### File: `sentinel-nexus/docs/architecture/command-plane-architecture.md`
-
-```markdown
 # Multi-Threaded Core Engine & Thread Pool Architecture
 
 `sentinel-nexus` is implemented in native ISO C++20 and designed to manage up to **5,000 concurrent edge appliances** without thread contention or dynamic runtime allocations in the routing fast path.
@@ -95,5 +86,4 @@ private:
 
 * **Affinity Pinning:** The gRPC fleet completion workers are pinned to specific CPU sockets to optimize L3 cache hit ratios when processing high-frequency heartbeats.
 * **Separation of Concerns:** Heavy active learning tasks (e.g., parsing large CSV batches in `DatasetCurator.cpp`) execute on lower-priority background threads, preventing event-loop delays in the sub-50ms Collective Defense Bus.
-```
 

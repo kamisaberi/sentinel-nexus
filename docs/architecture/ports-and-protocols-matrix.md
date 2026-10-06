@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/architecture/ports-and-protocols-matrix.md`
-
-```markdown
 # Network Ports, Protocols & Transport Routing Matrix
 
 `sentinel-nexus` separates machine-to-machine fleet orchestration, administrative web interfaces, and real-time telemetry streaming onto discrete network ports to enforce access control boundaries.
@@ -40,5 +35,4 @@
 * **Port 50051 (Fleet RPC):** Rejects any connection that fails client certificate verification. Unauthenticated probes or HTTP/1.1 requests are terminated at the TLS handshake.
 * **Port 9443 (Management Console):** Serves the embedded web application and REST endpoints. Strict Cross-Origin Resource Sharing (CORS) rules prevent cross-site scripting vulnerabilities.
 * **Port 9444 (Telemetry Stream):** Maintains open, long-lived HTTP/1.1 connections streaming `text/event-stream` payloads without proxy buffering headers (`X-Accel-Buffering: no`).
-```
 

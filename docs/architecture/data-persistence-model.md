@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/architecture/data-persistence-model.md`
-
-```markdown
 # Data Persistence Model: `StateDatabase` & `TimeSeriesEngine`
 
 While `sentinel-nexus` executes primarily out of RAM, it maintains continuous state persistence across process restarts using an append-only JSON journal (`StateDatabase`) and an in-memory ring-buffer time-series database (`TimeSeriesEngine`).
@@ -66,6 +61,5 @@ private:
 };
 
 } // namespace sentinel::nexus
-```
 ```
 
