@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/tutorials/setting-up-mtls-pki.md`
-
-```markdown
 # Setting Up Mutual TLS (mTLS) PKI Infrastructure
 
 Every edge appliance authenticates to `sentinel-nexus` using **Mutual TLS 1.3**. This tutorial demonstrates how to generate an offline Certificate Authority (CA), issue the Nexus server certificate, and sign edge appliance client keys using `gen_certs.sh`.
@@ -82,6 +77,5 @@ grpcurl -cacert /etc/sentinel-nexus/certs/ca.crt \
 ```text
 grpc.health.v1.Health
 sentinel.nexus.FleetOrchestrator
-```
 ```
 

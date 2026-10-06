@@ -1,12 +1,3 @@
-### Part 13: Practical Administrative Tutorials (`tutorials/*`)
-
-This section contains 5 hands-on operational tutorials for `sentinel-nexus`: tuning Linux operating system parameters to scale to 5,000 appliances, establishing the mutual TLS (mTLS) Public Key Infrastructure, containing a multi-site zero-day attack in seconds, integrating with the cloud SaaS backend (`app.aryorithm.com`), and executing offline sneakernet model and telemetry synchronizations.
-
----
-
-### File: `sentinel-nexus/docs/tutorials/scaling-to-5000-appliances.md`
-
-```markdown
 # Scaling to 5,000 Edge Appliances: Linux OS & gRPC Tuning
 
 Managing up to 5,000 concurrent edge appliances over bidirectional HTTP/2 gRPC streaming connections requires tuning the Linux kernel networking stack, TCP buffer pools, and process file descriptor limits.
@@ -75,6 +66,5 @@ builder.AddChannelArgument(GRPC_ARG_MAX_CONCURRENT_STREAMS, 5000);
 builder.AddChannelArgument(GRPC_ARG_KEEPALIVE_TIME_MS, 10000);        // 10s ping
 builder.AddChannelArgument(GRPC_ARG_KEEPALIVE_TIMEOUT_MS, 5000);      // 5s timeout
 builder.AddChannelArgument(GRPC_ARG_HTTP2_MIN_SENT_PING_INTERVAL_WITHOUT_DATA_MS, 5000);
-```
 ```
 

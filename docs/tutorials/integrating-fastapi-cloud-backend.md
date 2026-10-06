@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/tutorials/integrating-fastapi-cloud-backend.md`
-
-```markdown
 # Connecting Sentinel-Nexus to the Cloud SaaS Backend (`app.aryorithm.com`)
 
 For enterprises using hybrid cloud management, this tutorial covers connecting an on-premises `sentinel-nexus` hub to the **Aryorithm Multi-Tenant Cloud Portal (`app.aryorithm.com`)** via the decoupled `SaaSConnector` client.
@@ -57,4 +52,3 @@ sudo journalctl -u sentinel-nexus -f | grep SaaSConnector
 ```
 
 Log back into `app.aryorithm.com` to confirm that the full asset hierarchy and live telemetry are updating on your multi-tenant executive dashboard.
-```

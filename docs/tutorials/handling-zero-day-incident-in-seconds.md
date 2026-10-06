@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/tutorials/handling-zero-day-incident-in-seconds.md`
-
-```markdown
 # Walkthrough: Coordinated Multi-Site Zero-Day Attack Containment
 
 This tutorial walks through an operational scenario: an adversary launches a coordinated Modbus register override attack targeting water treatment facilities across multiple regions, demonstrating how `sentinel-nexus` neutralizes the threat fleet-wide in **$< 50\,\text{milliseconds}$**.
@@ -65,5 +60,4 @@ At $t = 02:14:00.160$, the adversary's automated scanner begins probing Facility
 Open **`https://10.240.0.10:9443`** and navigate to **Threat Management $\to$ Incident History**:
 * The incident timeline illustrates the single origin point and subsequent pre-emptive drops across the fleet.
 * The XAI viewer provides the root-cause register deviation evidence ready for regulatory submission.
-```
 

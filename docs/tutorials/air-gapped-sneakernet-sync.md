@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/tutorials/air-gapped-sneakernet-sync.md`
-
-```markdown
 # Air-Gapped Sneakernet Telemetry & Model Synchronization
 
 In classified defense installations and strictly segregated air-gapped facilities, network connections to outside networks are prohibited. 
@@ -70,6 +65,5 @@ sudo python3 /opt/sentinel-nexus/scripts/import_signed_model.py \
 [+] Digital Signature  : VALID (Signed by Aryorithm Master Signing CA)
 [+] Safety Gate Proof  : VERIFIED (100% Detection across Golden Attacks)
 [+] Model imported to fleet repository. Initiating STAGE_SHADOW_MODE rollout!
-```
 ```
 
