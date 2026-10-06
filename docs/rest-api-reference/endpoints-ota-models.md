@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/rest-api-reference/endpoints-ota-models.md`
-
-```markdown
 # OTA Model Management Endpoints (`/api/v1/ota/*` & `/api/v1/models/*`)
 
 These endpoints govern Canary model staging, artifact streaming, rollout state advancement, and emergency rollbacks.
@@ -58,5 +53,4 @@ Forces an immediate abort of active Canary models, reverting all edge appliances
 ## 4. Download Model Binary: `GET /api/v1/models/{filename}`
 
 Streams the raw binary ONNX model to edge appliances during hot-reloads. Returns `Content-Type: application/octet-stream` and `X-Checksum-SHA256`.
-```
 

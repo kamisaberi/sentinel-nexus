@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/rest-api-reference/endpoints-compliance.md`
-
-```markdown
 # Compliance & Audit Endpoints (`/api/v1/reports/*`)
 
 These endpoints generate on-demand compliance audit records and regulatory scorecards for industrial and defense audits.
@@ -56,5 +51,4 @@ curl -k -H "Authorization: Bearer $TOKEN" \
 
 * `GET /api/v1/reports/cmmc`: Detailed NIST SP 800-171 control proofs.
 * `GET /api/v1/reports/scada`: IEC 62443-3-3 industrial conduit proofs.
-```
 

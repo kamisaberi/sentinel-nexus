@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/rest-api-reference/endpoints-sse-stream.md`
-
-```markdown
 # Persistent Real-Time Telemetry Stream (`GET /api/v1/telemetry/stream`)
 
 `sentinel-nexus` exposes a persistent **Server-Sent Events (SSE)** endpoint on port **9444** (and proxied via port 9443). It streams fleet telemetry, threat mitigations, and Canary health events at up to $100\text{ Hz}$.
@@ -64,6 +59,5 @@ client = sseclient.SSEClient(response)
 
 for event in client.events():
     print(f"[{event.event}] -> {event.data}")
-```
 ```
 

@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/rest-api-reference/endpoints-fleet.md`
-
-```markdown
 # Fleet Management Endpoints (`/api/v1/fleet/*`)
 
 These endpoints provide real-time inspection, health monitoring, and grouping across all managed edge appliances (`blackbox-sentinel`).
@@ -85,5 +80,4 @@ Returns detailed telemetry and the attached sensor inventory for a specific appl
 ## 3. Query Node Groups: `GET /api/v1/fleet/groups`
 
 Returns fleet groupings categorized by geographical location, facility type, or tenant.
-```
 

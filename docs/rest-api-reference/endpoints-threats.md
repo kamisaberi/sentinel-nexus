@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/rest-api-reference/endpoints-threats.md`
-
-```markdown
 # Threat Mitigation & XAI Endpoints (`/api/v1/threats/*`)
 
 These endpoints provide programmatic access to the **Sub-50ms Collective Defense Bus**, active in-kernel drop tables, MITRE ATT&CK correlation heatmaps, and Explainable AI (XAI) feature attributions.
@@ -65,5 +60,4 @@ Returns aggregated tactical incident counts categorized by MITRE ATT&CK Enterpri
 ## 3. Query Top-3 Feature Attributions: `GET /api/v1/threats/xai`
 
 Retrieves Microsecond Residual Decomposition (MRD) root-cause feature attributions for historical threat mitigations.
-```
 

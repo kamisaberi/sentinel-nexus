@@ -1,12 +1,3 @@
-### Part 10: Complete REST API Reference (`rest-api-reference/*`)
-
-This section contains 6 technical specifications and reference manuals detailing the RESTful management interface of `sentinel-nexus`: base URLs, request/response headers, status codes, fleet node endpoints, threat broadcasting and XAI endpoints, OTA Canary lifecycle routes, compliance export endpoints, and the persistent Server-Sent Events (SSE) telemetry stream.
-
----
-
-### File: `sentinel-nexus/docs/rest-api-reference/api-overview.md`
-
-```markdown
 # REST API Overview & Request Specifications
 
 The `sentinel-nexus` REST API operates over **HTTPS TLS 1.3 on port 9443**. It provides administrative and programmatic control for external security orchestration (SOAR), operations dashboards, and continuous integration pipelines.
@@ -53,5 +44,4 @@ All error responses return structured JSON compliant with the standard error sch
 | **`404 Not Found`** | Resource Missing | Node UUID or model artifact not found on disk. |
 | **`422 Unprocessable`** | Validation Failure | SHA-256 digest does not match uploaded binary. |
 | **`500 Internal Error`** | Server Fault | Internal database or gRPC dispatch failure. |
-```
 
