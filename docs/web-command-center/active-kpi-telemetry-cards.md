@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/web-command-center/active-kpi-telemetry-cards.md`
-
-```markdown
 # Executive KPI Telemetry Cards & Live Metrics
 
 The top navigation of the Web Command Center renders active Key Performance Indicator (KPI) telemetry cards, refreshed at 10 Hz from the SSE stream.
@@ -27,5 +22,4 @@ The top navigation of the Web Command Center renders active Key Performance Indi
 * **In-Kernel Drops:** Aggregates cumulative packets purged by Tier 2 `xdp_filter.o` across all edge nodes.
 * **Mitigation SLA:** Displays median ($p50$) and 99th-percentile ($p99$) response times. Turns red if the fleet SLA exceeds $1.0\,\mu\text{s}$.
 * **Active Model:** Displays the currently enforced ONNX model version, SHA-256 fingerprint, and rollout state (`SHADOW`, `CANARY`, `FLEET_WIDE`).
-```
 

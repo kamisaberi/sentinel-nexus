@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/web-command-center/mitre-attack-heatmap.md`
-
-```markdown
 # Dynamic MITRE ATT&CK Matrix Heatmap (`threat_matrix.js`)
 
 The Web Command Center provides a dynamic **MITRE ATT&CK for Enterprise and ICS** tactical matrix. Cells update in real time as attack vectors are intercepted across the fleet.
@@ -39,5 +34,4 @@ $$\text{Shade Intensity} = \min\left(1.0,\, \frac{N_{\text{incidents}}}{50}\righ
 * **High Activity ($> 50$ events):** Saturated Red Alert (`#FF1744`).
 
 Clicking any cell opens the **XAI Root-Cause Drawer**, displaying the top-3 feature attributions for that specific MITRE technique.
-```
 

@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/web-command-center/ota-canary-management-ui.md`
-
-```markdown
 # Interactive OTA Canary Management & Staging UI
 
 The **Model Rollout Panel** allows operators to stage, evaluate, advance, and roll back neural network weights across the fleet.
@@ -33,5 +28,4 @@ The **Model Rollout Panel** allows operators to stage, evaluate, advance, and ro
 
 * **1-Click Rollback:** Clicking **`[EMERGENCY ABORT & ROLLBACK]`** instantly triggers `RollbackGuard`, sending a rollback instruction across all active Canary appliances in $< 50\,\text{ms}$.
 * **Health Safeguard:** If Canary nodes report latency exceeding $1{,}000\,\mu\text{s}$, the UI displays an alert banner, disables manual promotion buttons, and initiates an automatic rollback.
-```
 

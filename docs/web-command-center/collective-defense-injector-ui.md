@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/web-command-center/collective-defense-injector-ui.md`
-
-```markdown
 # Collective Defense Manual Injector UI
 
 The Web Command Center includes a manual **Collective Defense Injector**, allowing security operators to broadcast emergency IP block rules to all 5,000 edge appliances with a single click.
@@ -55,6 +50,5 @@ async function broadcastManualThreat() {
         showToast(`Broadcast failed: ${result.error}`, 'error');
     }
 }
-```
 ```
 

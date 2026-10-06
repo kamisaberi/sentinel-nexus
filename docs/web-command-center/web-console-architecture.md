@@ -1,12 +1,3 @@
-### Part 8: Air-Gapped Web Command Center (Ports 9443 & 9444) (`web-command-center/*`)
-
-This section contains 7 technical implementation guides detailing the air-gapped web management interface in `sentinel-nexus`: the zero-CDN Single-Page Application (SPA) architecture, the HTML5 Canvas radial topology visualizer, the dynamic MITRE ATT&CK heatmap, the sub-10ms Server-Sent Events (SSE) telemetry stream, active KPI summary cards, the manual collective defense broadcast UI, and interactive Canary OTA rollout controls.
-
----
-
-### File: `sentinel-nexus/docs/web-command-center/web-console-architecture.md`
-
-```markdown
 # Air-Gapped Web Console Architecture (Port 9443 HTTPS)
 
 The `sentinel-nexus` Web Command Center provides security operations centers (SOCs) and industrial plant managers with centralized visibility over 5,000 edge appliances. Built as an embedded Single-Page Application (SPA), it operates with **zero external CDN dependencies**, eliminating external data leakage and loading delays in air-gapped environments.
@@ -45,5 +36,4 @@ In compliance with sovereign defense and critical infrastructure standards:
 * **No External Scripts:** All client scripts (`app.js`, `fleet_topology.js`, `threat_matrix.js`) are compiled directly into the C++ binary as gzip-compressed byte arrays.
 * **No Remote Fonts or Stylesheets:** Typography relies on system font stacks (`system-ui`, `-apple-system`, `Segoe UI`, `Roboto`), avoiding requests to Google Fonts or Typekit.
 * **Vector Graphics:** Icons and device markers use inline SVG vectors, requiring no font-based icon CDNs (e.g., FontAwesome).
-```
 

@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/web-command-center/radial-topology-canvas.md`
-
-```markdown
 # Real-Time Radial Topology Canvas (`fleet_topology.js`)
 
 The fleet topology is rendered on an HTML5 Canvas using a **multi-ring radial layout**. This visualization maps the 4-tier asset hierarchy, rendering up to 5,000 appliances and 25,000 industrial sensors at 60 FPS without DOM overhead.
@@ -88,6 +83,5 @@ class FleetRadialCanvas {
         });
     }
 }
-```
 ```
 

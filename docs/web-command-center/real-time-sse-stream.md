@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/web-command-center/real-time-sse-stream.md`
-
-```markdown
 # Real-Time Telemetry Push Engine (Port 9444 SSE)
 
 Instead of using resource-intensive client polling, `sentinel-nexus` streams real-time updates over **Server-Sent Events (SSE)** on port **9444**.
@@ -69,6 +64,5 @@ private:
 };
 
 } // namespace sentinel::nexus
-```
 ```
 
