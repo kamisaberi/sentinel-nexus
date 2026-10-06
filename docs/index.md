@@ -1,7 +1,3 @@
-
-### File: `sentinel-nexus/docs/index.md`
-
-```markdown
 # Sentinel-Nexus (`sentinel-nexus`)
 
 **Central Fleet Command Plane, Collective Defense Grid & Continual AI Orchestrator**  
@@ -61,5 +57,4 @@ At the core of `sentinel-nexus` is the **Sub-50ms Collective Defense Bus**: when
 3. **RollbackGuard SLA Enforcement:** Protects edge nodes during Canary rollouts; an operational latency spike exceeding $1{,}000\,\mu\text{s}$ triggers an automated, immediate rollback.
 4. **Data Sovereignty ($0.00 Cloud Egress):** Operates on-premises within air-gapped enclaves. The embedded web management console (port 9443) enforces a **Zero-CDN guarantee**.
 5. **Decoupled Outbound SaaS Connector:** Maintains a 4-tier asset tree (`Tenant` $\to$ `Nexus` $\to$ `Sentinel` $\to$ `Sensor`), transmitting health states to `app.aryorithm.com` over a decoupled, non-blocking outbound HTTPS client.
-```
 
