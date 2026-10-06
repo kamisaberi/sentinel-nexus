@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/collective-defense/originator-loop-suppression.md`
-
-```markdown
 # Originator Loopback Suppression & Broadcast Deduplication
 
 When Appliance $A$ detects and mitigates an attack locally, sending the resulting `FleetDefenseRule` back to Appliance $A$ wastes bandwidth and risks resetting local drop counter statistics in its BPF map.
@@ -62,6 +57,5 @@ private:
     std::shared_mutex mutex_;
     std::unordered_map<uint32_t, uint64_t> seen_iocs_;
 };
-```
 ```
 

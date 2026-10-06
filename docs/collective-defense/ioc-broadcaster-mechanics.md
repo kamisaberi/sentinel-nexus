@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/collective-defense/ioc-broadcaster-mechanics.md`
-
-```markdown
 # Asynchronous Parallel gRPC Distribution Engine
 
 The `IocBroadcaster` (`src/nexus/IocBroadcaster.cpp`) manages active streaming RPC connections (`StreamFleetRules`) to all connected appliances, fanning out rules asynchronously using thread pools.
@@ -73,5 +68,4 @@ private:
 
 * If an edge appliance drops connection mid-stream, `session.stream->Write()` returns `false`.
 * The broken stream is marked for reclamation without delaying rule delivery to the remaining 4,999 appliances.
-```
 

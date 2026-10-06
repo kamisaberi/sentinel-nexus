@@ -1,12 +1,3 @@
-### Part 3: Collective Defense Subsystem (`collective-defense/*`)
-
-This section contains 6 technical specifications and C++20 implementations detailing the collective immunity engine in `sentinel-nexus`: the sub-50ms distribution paradigm, the asynchronous parallel gRPC broadcaster, the detailed fanout timeline, originator loopback suppression, the `FleetDefenseRule` schema, and emergency global IP unblocking.
-
----
-
-### File: `sentinel-nexus/docs/collective-defense/collective-defense-overview.md`
-
-```markdown
 # Collective Defense: The Sub-50ms Immunity Paradigm
 
 In distributed cyber-physical environments, adversaries automate multi-site attacks using rapid port sweeps, automated worm exploitation, and coordinated botnets. If threat mitigation remains localized to individual appliances, an attacker can compromise hundreds of facilities sequentially.
@@ -46,5 +37,4 @@ In distributed cyber-physical environments, adversaries automate multi-site atta
 1. **Deterministic Latency Budget:** From edge detection to fleet-wide in-kernel programming, the complete cycle executes in **under $50\,\text{milliseconds}$**.
 2. **Asynchronous Parallel Fanout:** Broadcasting to 5,000 nodes uses non-blocking gRPC streaming calls without serial head-of-line blocking.
 3. **Driver-Level Edge Enforcement:** Ingested fleet rules bypass user-space routing queues, writing directly into the Linux kernel `blocked_ip_map` in under $200\,\text{ns}$ per edge node.
-```
 

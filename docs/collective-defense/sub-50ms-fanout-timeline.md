@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/collective-defense/sub-50ms-fanout-timeline.md`
-
-```markdown
 # Detailed Latency Budget: The Sub-50ms Fanout Timeline
 
 The table below breaks down the microsecond and millisecond timing budget of a real-world collective defense propagation across Europe:
@@ -39,6 +34,5 @@ $$\text{Total Fleet Synchronization Time} = 33.54\,\text{milliseconds} \quad (\l
                                                              [Kernel Injection: 0.18µs]
                                                              ▲
                                                  TOTAL: 33.54 ms
-```
 ```
 

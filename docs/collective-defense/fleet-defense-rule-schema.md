@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/collective-defense/fleet-defense-rule-schema.md`
-
-```markdown
 # Fleet Defense Rule Protobuf Specification & Ephemeral TTLs
 
 Fleet defense rules are serialized using Protocol Buffers v3 and streamed over HTTP/2 connections.
@@ -52,5 +47,4 @@ Every rule includes an explicit `ttl_seconds` field:
 * **Persistent Exploits:** $\text{TTL} = 86{,}400\,\text{seconds}$ ($24\,\text{hours}$).
 
 Edge appliances ingest this duration directly into their in-kernel monotonic timers, allowing stale block rules to expire automatically without requiring deletion broadcasts.
-```
 
