@@ -1,12 +1,3 @@
-### Part 4: Active Learning Pipeline (`active-learning-pipeline/*`)
-
-This section contains 6 technical specifications and C++20 implementations detailing the continuous active learning curation engine in `sentinel-nexus`: edge-to-curator vector streaming, the 200,000-vector lock-free ingestion queue, uncertainty sampling mechanics, dataset curation and packaging, automated retraining triggers, and closed-loop verification.
-
----
-
-### File: `sentinel-nexus/docs/active-learning-pipeline/active-learning-architecture.md`
-
-```markdown
 # Active Learning Architecture: Edge Vector Ingestion to Forge Staging
 
 `sentinel-nexus` functions as the central telemetry curator in the Aryorithm active learning flywheel. Instead of collecting millions of redundant benign flows, it ingests ambiguous network vectors identified by edge appliances, packages them into balanced training datasets, and coordinates continual retraining with `xinfer-forge`.
@@ -56,5 +47,4 @@ This section contains 6 technical specifications and C++20 implementations detai
 1. **Information Density Invariant:** Only vectors lying on the model's decision boundary ($0.40 \le f(x) \le 0.60$) are curated. Redundant baseline flows ($f(x) < 0.10$) and clear exploits ($f(x) > 0.85$) are excluded.
 2. **Zero-PII Assurance:** Ingested vectors contain only normalized floating-point statistics (durations, packet counts, byte ratios); payload text and credentials are completely excluded.
 3. **Decoupled Processing:** Ingesting vectors into the ring queue consumes $< 25\,\text{ns}$ per vector, ensuring the gRPC communication threads are never stalled by disk I/O.
-```
 
