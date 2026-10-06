@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/operations-cli-nexus-ctl/command-ota-management.md`
-
-```markdown
 # Command: `nexus-ctl ota`
 
 Manages the staged model rollout lifecycle, inspects Canary cohort performance, advances deployment stages, and triggers emergency rollbacks.
@@ -74,6 +69,5 @@ Forces an immediate emergency rollback:
 
 ```bash
 nexus-ctl ota rollback --reason "Operator manual abort: Latency jitter observed"
-```
 ```
 

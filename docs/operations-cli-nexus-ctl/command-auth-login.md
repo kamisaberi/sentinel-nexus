@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/operations-cli-nexus-ctl/command-auth-login.md`
-
-```markdown
 # Command: `nexus-ctl auth login`
 
 Authenticates an administrative operator or automation service account against `sentinel-nexus` or the cloud SaaS portal (`app.aryorithm.com`), acquiring and caching a cryptographically signed Bearer JWT token.
@@ -60,5 +55,4 @@ nexus-ctl auth whoami
 Authenticated as: admin@substation.internal [Role: FLEET_SECURITY_ADMIN]
 Nexus Management URL: https://127.0.0.1:9443
 Token Status: ACTIVE (4 hours, 12 minutes remaining)
-```
 ```

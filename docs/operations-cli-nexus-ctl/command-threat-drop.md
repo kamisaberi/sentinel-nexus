@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/operations-cli-nexus-ctl/command-threat-drop.md`
-
-```markdown
 # Command: `nexus-ctl threat drop`
 
 Manually broadcasts an emergency IP drop rule across the entire fleet via the **Sub-50ms Collective Defense Bus**, programming the target address directly into all 5,000 edge kernel `blocked_ip_map` tables.
@@ -60,6 +55,5 @@ To remove a false-positive block fleet-wide:
 
 ```bash
 nexus-ctl threat unblock 198.51.100.42 --reason "Authorized testing completed"
-```
 ```
 

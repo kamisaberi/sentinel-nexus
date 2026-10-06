@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/operations-cli-nexus-ctl/command-fleet-list.md`
-
-```markdown
 # Command: `nexus-ctl fleet list`
 
 Queries the centralized `NodeRegistry` on `sentinel-nexus`, displaying real-time operational status, CPU utilization, drop counters, and sub-microsecond mitigation SLAs across all managed edge appliances.
@@ -62,6 +57,5 @@ nexus-ctl fleet list --json | jq '.[0] | {uuid: .node_uuid, ip: .ip_address, lat
   "ip": "10.240.0.101",
   "latency": 0.82
 }
-```
 ```
 

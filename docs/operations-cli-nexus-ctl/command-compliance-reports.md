@@ -1,8 +1,3 @@
----
-
-### File: `sentinel-nexus/docs/operations-cli-nexus-ctl/command-compliance-reports.md`
-
-```markdown
 # Command: `nexus-ctl report`
 
 Compiles automated regulatory compliance audit scorecards across all connected fleet assets, evaluating configurations and telemetry against **CMMC 2.0 Level 2**, **IEC 62443**, and **EU NIS 2**.
@@ -56,6 +51,5 @@ Foundational Requirements Evaluation:
 --------------------------------------------------------------------------------
 COMPLIANCE STATUS: 100% CONFORMANT (SL 3 / SL 4 CERTIFIED)
 ================================================================================
-```
 ```
 

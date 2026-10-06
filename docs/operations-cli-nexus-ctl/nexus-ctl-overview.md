@@ -1,12 +1,3 @@
-### Part 9: Operations CLI (`nexus-ctl`) (`operations-cli-nexus-ctl/*`)
-
-This section contains 6 technical reference guides and usage manuals for the **`nexus-ctl`** standalone administrative CLI: global command syntax and authentication flags, fleet listing, manual threat broadcasting, Canary OTA lifecycle management, compliance report generation, and cloud/local authentication token acquisition.
-
----
-
-### File: `sentinel-nexus/docs/operations-cli-nexus-ctl/nexus-ctl-overview.md`
-
-```markdown
 # `nexus-ctl` Terminal Administration Tool Overview
 
 `nexus-ctl` is a native ISO C++20 command-line administration utility installed alongside `sentinel-nexus`. It provides systems engineers, SOC analysts, and automation pipelines with programmatic control over the fleet orchestrator, collective defense rules, model staging, and compliance reporting.
@@ -54,6 +45,5 @@ When an administrator logs in via `nexus-ctl auth login`, the resulting Bearer J
   "operator_email": "admin@substation.internal",
   "role": "FLEET_SECURITY_ADMIN"
 }
-```
 ```
 
