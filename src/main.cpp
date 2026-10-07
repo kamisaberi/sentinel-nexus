@@ -28,20 +28,22 @@
 #include "cloud/CloudDatasetUploader.hpp"
 #include "cloud/EvidenceUploader.hpp"
 
-
 static std::atomic<bool> g_running{true};
 
-void signal_handler(int sig) {
+void signal_handler(int sig)
+{
     (void)sig;
     g_running = false;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
     std::signal(SIGINT, signal_handler);
     std::signal(SIGTERM, signal_handler);
 
     std::string config_path = "configs/nexus.yaml";
-    if (argc > 1) {
+    if (argc > 1)
+    {
         config_path = argv[1];
     }
 
@@ -54,16 +56,18 @@ int main(int argc, char** argv) {
                    Collective Fleet Defense Command Plane (Tier 6)
     )" << std::endl;
 
-    auto& cfg_mgr = sentinel::nexus::core::ConfigManager::instance();
+    auto &cfg_mgr = sentinel::nexus::core::ConfigManager::instance();
     cfg_mgr.load_config(config_path);
-    const auto& config = cfg_mgr.get();
+    const auto &config = cfg_mgr.get();
 
     // 1. Initialize State Storage & Restore Previous Fleet
-    auto& db = sentinel::nexus::storage::StateDatabase::instance();
+    auto &db = sentinel::nexus::storage::StateDatabase::instance();
     db.initialize("data/nexus_state.json");
     std::vector<sentinel::nexus::fleet::RegisteredNode> restored_nodes;
-    if (db.load_fleet_state(restored_nodes)) {
-        for (const auto& node : restored_nodes) {
+    if (db.load_fleet_state(restored_nodes))
+    {
+        for (const auto &node : restored_nodes)
+        {
             ::sentinel::nexus::RegistrationRequest req;
             req.set_site_identifier(node.site_identifier);
             req.set_software_version(node.software_version);
@@ -81,7 +85,7 @@ int main(int argc, char** argv) {
     sentinel::nexus::api::HttpServer::instance().start(config.bind_address, config.rest_port, "web");
 
     // 3_1. Start Cloud SaaS Sync Agent targeting your local FastAPI backend
-sentinel::nexus::cloud::SaaSConfig saas_cfg{
+    sentinel::nexus::cloud::SaaSConfig saas_cfg{
         .enabled = config.saas_enabled,
         .nexus_id = config.saas_nexus_id,
         .cloud_endpoint = config.saas_endpoint,
@@ -91,11 +95,16 @@ sentinel::nexus::cloud::SaaSConfig saas_cfg{
         .token_storage_path = config.saas_token_path,
         .sync_interval_sec = config.saas_sync_interval,
         .push_telemetry = true,
-        .pull_global_threats = true
-    };
+        .pull_global_threats = true};
     sentinel::nexus::cloud::SaaSConnector::instance().start(saas_cfg);
     sentinel::nexus::cloud::SaaSConnector::instance().start(saas_cfg);
 
+    // Inside main():
+    sentinel::nexus::cloud::CloudDatasetUploader::instance().initialize(
+        config.saas_endpoint, config.saas_api_key, config.saas_tenant_id);
+
+    sentinel::nexus::cloud::EvidenceUploader::instance().initialize(
+        config.saas_endpoint, config.saas_tenant_id);
 
     // 4. Instantiate gRPC Services
     sentinel::nexus::rpc::FleetServiceImpl fleet_service;
@@ -103,10 +112,8 @@ sentinel::nexus::cloud::SaaSConfig saas_cfg{
     sentinel::nexus::rpc::IntelligenceServiceImpl intelligence_service;
     sentinel::nexus::rpc::ModelOtaServiceImpl model_ota_service;
 
-
     sentinel::nexus::ota::RollbackGuard::instance().initialize(1000.0f, 500);
     sentinel::nexus::telemetry::DatasetCurator::instance().initialize(config.forge_buffer_path, "/var/lib/sentinel-nexus/forge_datasets");
-
 
     // 5. Build & Launch Multi-Threaded gRPC Server (Port 50051)
     std::string server_address = config.bind_address + ":" + std::to_string(config.grpc_port);
@@ -124,15 +131,16 @@ sentinel::nexus::cloud::SaaSConfig saas_cfg{
     NEXUS_LOG_INFO("Sentinel-Nexus gRPC server actively listening on " + server_address);
 
     // 6. Background Fleet Health-Monitor Thread
-    std::jthread health_monitor([&config](std::stop_token st) {
+    std::jthread health_monitor([&config](std::stop_token st)
+                                {
         while (!st.stop_requested() && g_running) {
             std::this_thread::sleep_for(std::chrono::seconds(5));
             sentinel::nexus::fleet::NodeRegistry::instance().evaluate_node_health(config.heartbeat_timeout_sec);
-        }
-    });
+        } });
 
     // 7. Periodic State Sync & Forge Batch Flusher Thread
-    std::jthread state_sync_thread([](std::stop_token st) {
+    std::jthread state_sync_thread([](std::stop_token st)
+                                   {
         while (!st.stop_requested() && g_running) {
             std::this_thread::sleep_for(std::chrono::seconds(20));
             auto nodes = sentinel::nexus::fleet::NodeRegistry::instance().get_all_nodes();
@@ -141,29 +149,27 @@ sentinel::nexus::cloud::SaaSConfig saas_cfg{
 
             sentinel::nexus::telemetry::CuratedDatasetInfo info;
             sentinel::nexus::telemetry::DatasetCurator::instance().curate_training_dataset(info);
-        }
-    });
+        } });
 
     // 8. Periodic Audit Report Logger (Every 60s)
-    std::jthread report_printer([](std::stop_token st) {
+    std::jthread report_printer([](std::stop_token st)
+                                {
         while (!st.stop_requested() && g_running) {
             std::this_thread::sleep_for(std::chrono::seconds(60));
             std::string report = sentinel::nexus::reporting::ReportGenerator::instance().generate_text_audit_report();
             std::cout << "\n" << report << std::endl;
-        }
-    });
+        } });
 
-    while (g_running) {
+    while (g_running)
+    {
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
     }
 
     NEXUS_LOG_INFO("Shutdown initiated: flushing state to disk and halting services...");
     sentinel::nexus::api::HttpServer::instance().stop();
     server->Shutdown();
-    
 
     sentinel::nexus::cloud::SaaSConnector::instance().stop();
-
 
     // Final persistent flush
     auto final_nodes = sentinel::nexus::fleet::NodeRegistry::instance().get_all_nodes();
