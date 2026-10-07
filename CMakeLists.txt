@@ -68,6 +68,8 @@ include_directories(
 
 set(NEXUS_SOURCES
     src/main.cpp
+    src/cloud/CloudDatasetUploader.cpp
+    src/cloud/EvidenceUploader.cpp
     src/core/ConfigManager.cpp
     src/fleet/NodeRegistry.cpp
     src/fleet/AttestationValidator.cpp
