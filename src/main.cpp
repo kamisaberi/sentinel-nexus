@@ -25,6 +25,8 @@
 #include "telemetry/DatasetCurator.hpp"
 
 #include "cloud/SaaSConnector.hpp"
+#include "cloud/CloudDatasetUploader.hpp"
+#include "cloud/EvidenceUploader.hpp"
 
 
 static std::atomic<bool> g_running{true};
