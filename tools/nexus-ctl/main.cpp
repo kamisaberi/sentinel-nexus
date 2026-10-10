@@ -15,26 +15,30 @@
 #define SPLUGIN_MAGIC 0x314C50534F595241ULL // "ARYOSPL1"
 #define SPLUGIN_VERSION 1
 
-struct SPluginHeader {
+struct SPluginHeader
+{
     uint64_t magic{SPLUGIN_MAGIC};
     uint32_t version{SPLUGIN_VERSION};
-    uint32_t tier{0}; // 0=Native C++, 1=Rust Wasm, 2=LuaJIT
-    uint8_t  signature[64]{0}; // Ed25519 signature
+    uint32_t tier{0};         // 0=Native C++, 1=Rust Wasm, 2=LuaJIT
+    uint8_t signature[64]{0}; // Ed25519 signature
     uint32_t manifest_len{0};
     uint64_t payload_len{0};
 } __attribute__((packed));
 
 // Helper: HTTP POST
-std::string http_post(const std::string& host, uint16_t port, const std::string& path, const std::string& payload, const std::string& token = "") {
+std::string http_post(const std::string &host, uint16_t port, const std::string &path, const std::string &payload, const std::string &token = "")
+{
     int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) return "Error: Failed to create socket.";
+    if (sock < 0)
+        return "Error: Failed to create socket.";
 
     sockaddr_in server_addr{};
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(port);
     inet_pton(AF_INET, host.c_str(), &server_addr.sin_addr);
 
-    if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+    if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    {
         close(sock);
         return "Error: Could not connect to " + host + ":" + std::to_string(port);
     }
@@ -42,7 +46,8 @@ std::string http_post(const std::string& host, uint16_t port, const std::string&
     std::ostringstream req;
     req << "POST " << path << " HTTP/1.1\r\n"
         << "Host: " << host << ":" << port << "\r\n";
-    if (!token.empty()) {
+    if (!token.empty())
+    {
         req << "Authorization: Bearer " << token << "\r\n";
     }
     req << "Content-Type: application/json\r\n"
@@ -56,7 +61,8 @@ std::string http_post(const std::string& host, uint16_t port, const std::string&
     char buffer[16384];
     std::string response;
     ssize_t bytes;
-    while ((bytes = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
+    while ((bytes = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0)
+    {
         buffer[bytes] = '\0';
         response += buffer;
     }
@@ -67,16 +73,19 @@ std::string http_post(const std::string& host, uint16_t port, const std::string&
 }
 
 // Helper: HTTP GET
-std::string http_get(const std::string& host, uint16_t port, const std::string& path, const std::string& token = "") {
+std::string http_get(const std::string &host, uint16_t port, const std::string &path, const std::string &token = "")
+{
     int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) return "Error: Failed to create socket.";
+    if (sock < 0)
+        return "Error: Failed to create socket.";
 
     sockaddr_in server_addr{};
     server_addr.sin_family = AF_INET;
     server_addr.sin_port = htons(port);
     inet_pton(AF_INET, host.c_str(), &server_addr.sin_addr);
 
-    if (connect(sock, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+    if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    {
         close(sock);
         return "Error: Could not connect to " + host + ":" + std::to_string(port);
     }
@@ -84,7 +93,8 @@ std::string http_get(const std::string& host, uint16_t port, const std::string& 
     std::ostringstream req;
     req << "GET " << path << " HTTP/1.1\r\n"
         << "Host: " << host << ":" << port << "\r\n";
-    if (!token.empty()) {
+    if (!token.empty())
+    {
         req << "Authorization: Bearer " << token << "\r\n";
     }
     req << "Connection: close\r\n\r\n";
@@ -95,7 +105,8 @@ std::string http_get(const std::string& host, uint16_t port, const std::string& 
     char buffer[16384];
     std::string response;
     ssize_t bytes;
-    while ((bytes = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
+    while ((bytes = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0)
+    {
         buffer[bytes] = '\0';
         response += buffer;
     }
@@ -106,20 +117,23 @@ std::string http_get(const std::string& host, uint16_t port, const std::string& 
 }
 
 // Read binary file
-std::vector<uint8_t> read_binary_file(const std::filesystem::path& p) {
+std::vector<uint8_t> read_binary_file(const std::filesystem::path &p)
+{
     std::ifstream f(p, std::ios::binary | std::ios::ate);
-    if (!f.is_open()) return {};
+    if (!f.is_open())
+        return {};
     size_t sz = f.tellg();
     f.seekg(0, std::ios::beg);
     std::vector<uint8_t> b(sz);
-    f.read(reinterpret_cast<char*>(b.data()), sz);
+    f.read(reinterpret_cast<char *>(b.data()), sz);
     return b;
 }
 
 // SHA-256 buffer
-std::vector<uint8_t> sha256_buffer(const uint8_t* data, size_t len) {
+std::vector<uint8_t> sha256_buffer(const uint8_t *data, size_t len)
+{
     std::vector<uint8_t> hash(32);
-    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
     EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr);
     EVP_DigestUpdate(ctx, data, len);
     unsigned int out_len = 0;
@@ -129,14 +143,18 @@ std::vector<uint8_t> sha256_buffer(const uint8_t* data, size_t len) {
 }
 
 // Base64 Encode
-std::string base64_encode(const uint8_t* data, size_t len) {
+std::string base64_encode(const uint8_t *data, size_t len)
+{
     static const char b64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     std::string out;
     out.reserve(((len + 2) / 3) * 4);
-    for (size_t i = 0; i < len; i += 3) {
+    for (size_t i = 0; i < len; i += 3)
+    {
         uint32_t val = (data[i] << 16);
-        if (i + 1 < len) val |= (data[i + 1] << 8);
-        if (i + 2 < len) val |= data[i + 2];
+        if (i + 1 < len)
+            val |= (data[i + 1] << 8);
+        if (i + 2 < len)
+            val |= data[i + 2];
         out.push_back(b64_table[(val >> 18) & 0x3F]);
         out.push_back(b64_table[(val >> 12) & 0x3F]);
         out.push_back((i + 1 < len) ? b64_table[(val >> 6) & 0x3F] : '=');
@@ -145,7 +163,8 @@ std::string base64_encode(const uint8_t* data, size_t len) {
     return out;
 }
 
-void print_help() {
+void print_help()
+{
     std::cout << R"(
 nexus-ctl - Sentinel Nexus Fleet Administration & Hub Marketplace CLI
 
@@ -172,8 +191,10 @@ Fleet & Threat Administration:
 )" << std::endl;
 }
 
-int main(int argc, char** argv) {
-    if (argc < 2) {
+int main(int argc, char **argv)
+{
+    if (argc < 2)
+    {
         print_help();
         return 0;
     }
@@ -183,11 +204,13 @@ int main(int argc, char** argv) {
     // =========================================================================
     // HUB MARKETPLACE COMMANDS
     // =========================================================================
-    if (cmd == "hub" && argc >= 3) {
+    if (cmd == "hub" && argc >= 3)
+    {
         std::string sub = argv[2];
 
         // 1. nexus-ctl hub search [query]
-        if (sub == "search") {
+        if (sub == "search")
+        {
             std::string query = (argc >= 4) ? argv[3] : "";
             std::cout << "\033[1;36m========================================================================================================\033[0m\n";
             std::cout << "\033[1;37m                       ARYORITHM REGISTRY HUB: VERIFIED EXTENSIONS (hub.aryorithm.com)                   \033[0m\n";
@@ -201,20 +224,22 @@ int main(int argc, char** argv) {
                       << "TARGET SECTOR\n";
             std::cout << "--------------------------------------------------------------------------------------------------------\n";
 
-            struct HubEntry {
+            struct HubEntry
+            {
                 std::string id, tier, proto, sla, audit, sector;
             };
             std::vector<HubEntry> catalog = {
-                {"org.aryorithm.modbus_guard",   "Native C++", "MODBUS",   "< 120 ns",  "Ed25519 Signed", "Power & Substations"},
-                {"org.aryorithm.s7comm_guard",   "Rust Wasm",  "S7COMM",   "< 1.5 us",  "Memory Safe",    "Manufacturing & PLCs"},
-                {"org.aryorithm.log4j_fast_drop","LuaJIT",     "HTTP/TCP", "< 450 ns",  "Hot-Reloaded",   "Enterprise DMZ"},
-                {"org.aryorithm.dicom_phi_guard","Rust Wasm",  "DICOM",    "< 2.5 us",  "HIPAA / PHI",    "Healthcare PACS"},
-                {"org.aryorithm.c37_118_pmu",    "Native C++", "C37.118",  "< 130 ns",  "Ed25519 Signed", "High-Voltage Grids"},
-                {"org.aryorithm.triton_sis",     "Native C++", "TRISTATION","< 190 ns",  "Safety SIS",     "Oil & Chemical Fabs"}
-            };
+                {"org.aryorithm.modbus_guard", "Native C++", "MODBUS", "< 120 ns", "Ed25519 Signed", "Power & Substations"},
+                {"org.aryorithm.s7comm_guard", "Rust Wasm", "S7COMM", "< 1.5 us", "Memory Safe", "Manufacturing & PLCs"},
+                {"org.aryorithm.log4j_fast_drop", "LuaJIT", "HTTP/TCP", "< 450 ns", "Hot-Reloaded", "Enterprise DMZ"},
+                {"org.aryorithm.dicom_phi_guard", "Rust Wasm", "DICOM", "< 2.5 us", "HIPAA / PHI", "Healthcare PACS"},
+                {"org.aryorithm.c37_118_pmu", "Native C++", "C37.118", "< 130 ns", "Ed25519 Signed", "High-Voltage Grids"},
+                {"org.aryorithm.triton_sis", "Native C++", "TRISTATION", "< 190 ns", "Safety SIS", "Oil & Chemical Fabs"}};
 
-            for (const auto& item : catalog) {
-                if (query.empty() || item.id.find(query) != std::string::npos || item.proto.find(query) != std::string::npos) {
+            for (const auto &item : catalog)
+            {
+                if (query.empty() || item.id.find(query) != std::string::npos || item.proto.find(query) != std::string::npos)
+                {
                     std::cout << std::left
                               << std::setw(32) << item.id
                               << std::setw(12) << item.tier
@@ -230,10 +255,12 @@ int main(int argc, char** argv) {
         }
 
         // 2. nexus-ctl hub inspect <file.splugin>
-        if (sub == "inspect" && argc >= 4) {
+        if (sub == "inspect" && argc >= 4)
+        {
             std::string pkg_path = argv[3];
             auto data = read_binary_file(pkg_path);
-            if (data.size() < sizeof(SPluginHeader)) {
+            if (data.size() < sizeof(SPluginHeader))
+            {
                 std::cerr << "[-] Error: Invalid .splugin file: " << pkg_path << std::endl;
                 return 1;
             }
@@ -241,16 +268,16 @@ int main(int argc, char** argv) {
             SPluginHeader hdr;
             std::memcpy(&hdr, data.data(), sizeof(hdr));
 
-            if (hdr.magic != SPLUGIN_MAGIC) {
+            if (hdr.magic != SPLUGIN_MAGIC)
+            {
                 std::cerr << "[-] Error: Magic bytes mismatch! Not a valid .splugin container." << std::endl;
                 return 1;
             }
 
-            std::string tier_str = (hdr.tier == 0) ? "Tier A (Native ISO C++20 Shared Object)" :
-                                   (hdr.tier == 1) ? "Tier B (WebAssembly Wasm3 / Rust Module)" :
-                                                     "Tier C (LuaJIT Dynamic C-FFI Script)";
+            std::string tier_str = (hdr.tier == 0) ? "Tier A (Native ISO C++20 Shared Object)" : (hdr.tier == 1) ? "Tier B (WebAssembly Wasm3 / Rust Module)"
+                                                                                                                 : "Tier C (LuaJIT Dynamic C-FFI Script)";
 
-            std::string manifest_str(reinterpret_cast<const char*>(data.data() + sizeof(SPluginHeader)), hdr.manifest_len);
+            std::string manifest_str(reinterpret_cast<const char *>(data.data() + sizeof(SPluginHeader)), hdr.manifest_len);
 
             std::cout << "\033[1;36m==========================================================\033[0m\n";
             std::cout << "\033[1;37m        ARYORITHM .SPLUGIN PACKAGE INSPECTION             \033[0m\n";
@@ -262,18 +289,21 @@ int main(int argc, char** argv) {
             std::cout << "Payload Binary   : " << hdr.payload_len << " bytes\n";
             std::cout << "Signature Status : \033[1;32mEd25519 64-Byte Signature Present\033[0m\n";
             std::cout << "----------------------------------------------------------\n";
-            std::cout << "\033[1;37mMANIFEST METADATA:\033[0m\n" << manifest_str << "\n";
+            std::cout << "\033[1;37mMANIFEST METADATA:\033[0m\n"
+                      << manifest_str << "\n";
             std::cout << "\033[1;36m==========================================================\033[0m\n";
             return 0;
         }
 
         // 3. nexus-ctl hub verify <pub_key.pem> <file.splugin>
-        if (sub == "verify" && argc >= 5) {
+        if (sub == "verify" && argc >= 5)
+        {
             std::string pub_path = argv[3];
             std::string pkg_path = argv[4];
 
             auto container = read_binary_file(pkg_path);
-            if (container.size() < sizeof(SPluginHeader)) {
+            if (container.size() < sizeof(SPluginHeader))
+            {
                 std::cerr << "[-] Corrupt package" << std::endl;
                 return 1;
             }
@@ -281,8 +311,8 @@ int main(int argc, char** argv) {
             SPluginHeader hdr;
             std::memcpy(&hdr, container.data(), sizeof(hdr));
 
-            const uint8_t* man_ptr = container.data() + sizeof(SPluginHeader);
-            const uint8_t* pay_ptr = man_ptr + hdr.manifest_len;
+            const uint8_t *man_ptr = container.data() + sizeof(SPluginHeader);
+            const uint8_t *pay_ptr = man_ptr + hdr.manifest_len;
 
             auto h_man = sha256_buffer(man_ptr, hdr.manifest_len);
             auto h_pay = sha256_buffer(pay_ptr, hdr.payload_len);
@@ -291,31 +321,40 @@ int main(int argc, char** argv) {
             sign_input.insert(sign_input.end(), h_man.begin(), h_man.end());
             sign_input.insert(sign_input.end(), h_pay.begin(), h_pay.end());
 
-            FILE* fp = fopen(pub_path.c_str(), "rb");
-            if (!fp) { std::cerr << "[-] Cannot open public key" << std::endl; return 1; }
-            EVP_PKEY* pkey = PEM_read_PUBKEY(fp, nullptr, nullptr, nullptr);
+            FILE *fp = fopen(pub_path.c_str(), "rb");
+            if (!fp)
+            {
+                std::cerr << "[-] Cannot open public key" << std::endl;
+                return 1;
+            }
+            EVP_PKEY *pkey = PEM_read_PUBKEY(fp, nullptr, nullptr, nullptr);
             fclose(fp);
 
-            EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+            EVP_MD_CTX *ctx = EVP_MD_CTX_new();
             EVP_DigestVerifyInit(ctx, nullptr, nullptr, nullptr, pkey);
             int res = EVP_DigestVerify(ctx, hdr.signature, 64, sign_input.data(), sign_input.size());
             EVP_MD_CTX_free(ctx);
             EVP_PKEY_free(pkey);
 
-            if (res == 1) {
+            if (res == 1)
+            {
                 std::cout << "\033[1;32m[VERIFIED] Signature is AUTHENTIC and tamper-free!\033[0m\n";
                 return 0;
-            } else {
+            }
+            else
+            {
                 std::cerr << "\033[1;31m[REJECTED] Cryptographic signature INVALID or container TAMPERED!\033[0m\n";
                 return 1;
             }
         }
 
         // 4. nexus-ctl hub broadcast <file.splugin>
-        if (sub == "broadcast" && argc >= 4) {
+        if (sub == "broadcast" && argc >= 4)
+        {
             std::string pkg_path = argv[3];
             auto container = read_binary_file(pkg_path);
-            if (container.size() < sizeof(SPluginHeader)) {
+            if (container.size() < sizeof(SPluginHeader))
+            {
                 std::cerr << "[-] Invalid package: " << pkg_path << std::endl;
                 return 1;
             }
@@ -323,8 +362,8 @@ int main(int argc, char** argv) {
             SPluginHeader hdr;
             std::memcpy(&hdr, container.data(), sizeof(hdr));
 
-            const uint8_t* man_ptr = container.data() + sizeof(SPluginHeader);
-            const uint8_t* pay_ptr = man_ptr + hdr.manifest_len;
+            const uint8_t *man_ptr = container.data() + sizeof(SPluginHeader);
+            const uint8_t *pay_ptr = man_ptr + hdr.manifest_len;
 
             std::string b64_payload = base64_encode(pay_ptr, hdr.payload_len);
             std::string b64_sig = base64_encode(hdr.signature, 64);
@@ -344,7 +383,8 @@ int main(int argc, char** argv) {
 
             std::cout << "[*] Broadcasting to all connected fleet appliances over gRPC..." << std::endl;
             std::string resp = http_post("127.0.0.1", 9443, "/api/v1/extensions/deploy", json_payload.str());
-            std::cout << "\033[1;32m[+] Fleet Broadcast Response:\033[0m\n" << resp << std::endl;
+            std::cout << "\033[1;32m[+] Fleet Broadcast Response:\033[0m\n"
+                      << resp << std::endl;
             return 0;
         }
     }
@@ -352,30 +392,38 @@ int main(int argc, char** argv) {
     // =========================================================================
     // AUTHENTICATION COMMANDS
     // =========================================================================
-    if (cmd == "auth" && argc >= 3 && std::string(argv[2]) == "login") {
+    if (cmd == "auth" && argc >= 3 && std::string(argv[2]) == "login")
+    {
         std::string email = (argc >= 4) ? argv[3] : "kamisaberi@gmail.com";
-        std::string pass  = (argc >= 5) ? argv[4] : "12345678";
+        std::string pass = (argc >= 5) ? argv[4] : "12345678";
 
         std::cout << "[*] Authenticating with FastAPI backend at 127.0.0.1:8000 (" << email << ")..." << std::endl;
         std::string payload = "{\"email\":\"" + email + "\",\"password\":\"" + pass + "\",\"username\":\"" + email + "\"}";
         std::string resp = http_post("127.0.0.1", 8000, "/api/v1/auth/login", payload);
 
-        std::cout << "[+] Server Response:\n" << resp << std::endl;
-        
+        std::cout << "[+] Server Response:\n"
+                  << resp << std::endl;
+
         std::ofstream f("data/cloud_session.json");
-        if (f.is_open()) {
+        if (f.is_open())
+        {
             f << resp;
             std::cout << "[+] Saved JWT session to data/cloud_session.json" << std::endl;
         }
         return 0;
     }
 
-    if (cmd == "auth" && argc >= 3 && std::string(argv[2]) == "status") {
+    if (cmd == "auth" && argc >= 3 && std::string(argv[2]) == "status")
+    {
         std::ifstream f("data/cloud_session.json");
-        if (f.is_open()) {
+        if (f.is_open())
+        {
             std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-            std::cout << "[+] Active Cloud Session Found:\n" << content << std::endl;
-        } else {
+            std::cout << "[+] Active Cloud Session Found:\n"
+                      << content << std::endl;
+        }
+        else
+        {
             std::cout << "[-] No active cloud session on disk. Run: nexus-ctl auth login" << std::endl;
         }
         return 0;
@@ -384,22 +432,37 @@ int main(int argc, char** argv) {
     // =========================================================================
     // FLEET, THREAT, OTA & REPORT COMMANDS (PASS-THROUGH TO 9443)
     // =========================================================================
-    if (cmd == "fleet" && argc >= 3 && std::string(argv[2]) == "list") {
+    if (cmd == "fleet" && argc >= 3 && std::string(argv[2]) == "list")
+    {
         std::cout << http_post("127.0.0.1", 9443, "/api/v1/fleet/nodes", "") << std::endl;
-    } else if (cmd == "threat" && argc >= 4 && std::string(argv[2]) == "drop") {
+    }
+    else if (cmd == "threat" && argc >= 4 && std::string(argv[2]) == "drop")
+    {
         std::string ip = argv[3];
         std::cout << http_post("127.0.0.1", 9443, "/api/v1/threats/broadcast", "{\"ip\":\"" + ip + "\"}") << std::endl;
-    } else if (cmd == "ota" && argc >= 3) {
+    }
+    else if (cmd == "ota" && argc >= 3)
+    {
         std::string sub = argv[2];
-        if (sub == "status") std::cout << http_post("127.0.0.1", 9443, "/api/v1/ota/status", "") << std::endl;
-        else if (sub == "stage") std::cout << http_post("127.0.0.1", 9443, "/api/v1/ota/stage", "{}") << std::endl;
-        else if (sub == "advance") std::cout << http_post("127.0.0.1", 9443, "/api/v1/ota/advance", "{}") << std::endl;
-        else if (sub == "rollback") std::cout << http_post("127.0.0.1", 9443, "/api/v1/ota/rollback", "{}") << std::endl;
-    } else if (cmd == "report" && argc >= 3) {
+        if (sub == "status")
+            std::cout << http_post("127.0.0.1", 9443, "/api/v1/ota/status", "") << std::endl;
+        else if (sub == "stage")
+            std::cout << http_post("127.0.0.1", 9443, "/api/v1/ota/stage", "{}") << std::endl;
+        else if (sub == "advance")
+            std::cout << http_post("127.0.0.1", 9443, "/api/v1/ota/advance", "{}") << std::endl;
+        else if (sub == "rollback")
+            std::cout << http_post("127.0.0.1", 9443, "/api/v1/ota/rollback", "{}") << std::endl;
+    }
+    else if (cmd == "report" && argc >= 3)
+    {
         std::string sub = argv[2];
-        if (sub == "cmmc") std::cout << http_post("127.0.0.1", 9443, "/api/v1/reports/cmmc", "") << std::endl;
-        else if (sub == "scada") std::cout << http_post("127.0.0.1", 9443, "/api/v1/reports/scada", "") << std::endl;
-    } else {
+        if (sub == "cmmc")
+            std::cout << http_post("127.0.0.1", 9443, "/api/v1/reports/cmmc", "") << std::endl;
+        else if (sub == "scada")
+            std::cout << http_post("127.0.0.1", 9443, "/api/v1/reports/scada", "") << std::endl;
+    }
+    else
+    {
         print_help();
     }
 
