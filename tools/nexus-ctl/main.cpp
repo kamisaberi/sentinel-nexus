@@ -177,6 +177,7 @@ Hub Marketplace & Extensions:
   hub inspect <file.splugin>  Inspect manifest, permissions, and cryptographic status
   hub verify <pub_key> <pkg>  Verify Ed25519 signature and SHA-256 manifest
   hub broadcast <file.splugin> Broadcast verified plugin fleet-wide via gRPC (< 50ms)
+  hub new <name> [tier]       Scaffold a new plugin template (native, wasm, lua)
 
 Fleet & Threat Administration:
   auth login [email] [pass]   Authenticate with FastAPI backend and acquire JWT
