@@ -116,7 +116,10 @@ target_link_libraries(sentinel-nexus
 
 # 2. Operations CLI Target
 add_executable(nexus-ctl tools/nexus-ctl/main.cpp)
-target_link_libraries(nexus-ctl PRIVATE Threads::Threads)
+target_link_libraries(nexus-ctl PRIVATE Threads::Threads OpenSSL::Crypto)
+
+
+
 
 # 3. High-Throughput Ingestion Benchmark Target
 add_executable(benchmark_ingest 
