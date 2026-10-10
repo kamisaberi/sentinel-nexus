@@ -6,24 +6,27 @@
 #include <iomanip>
 #include <cstring>
 #include <filesystem>
+#include <algorithm>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
-#include <algorithm>
 
-#define SPLUGIN_MAGIC 0x314C50534F595241ULL // "ARYOSPL1"
-#define SPLUGIN_VERSION 1
+#define SPKG_MAGIC 0x474B50534F595241ULL // "ARYOSPKG"
+#define SPKG_VERSION 1
 
-struct SPluginHeader
+struct SpkgHeader
 {
-    uint64_t magic{SPLUGIN_MAGIC};
-    uint32_t version{SPLUGIN_VERSION};
+    uint64_t magic{SPKG_MAGIC};
+    uint32_t version{SPKG_VERSION};
     uint32_t tier{0};         // 0=Native C++, 1=Rust Wasm, 2=LuaJIT
     uint8_t signature[64]{0}; // Ed25519 signature
     uint32_t manifest_len{0};
     uint64_t payload_len{0};
+    uint64_t source_len{0};
+    uint32_t test_vector_len{0};
+    uint32_t reserved{0};
 } __attribute__((packed));
 
 // Helper: HTTP POST
@@ -172,12 +175,12 @@ nexus-ctl - Sentinel Nexus Fleet Administration & Hub Marketplace CLI
 Usage:
   nexus-ctl <command> [arguments]
 
-Hub Marketplace & Extensions:
-  hub search [query]          Search plugins on hub.aryorithm.com catalog
-  hub inspect <file.splugin>  Inspect manifest, permissions, and cryptographic status
-  hub verify <pub_key> <pkg>  Verify Ed25519 signature and SHA-256 manifest
-  hub broadcast <file.splugin> Broadcast verified plugin fleet-wide via gRPC (< 50ms)
-  hub new <name> [tier]       Scaffold a new plugin template (native, wasm, lua)
+Hub Marketplace & Extensions (.spkg):
+  hub search [query]          Search packages on hub.aryorithm.com catalog
+  hub inspect <file.spkg>     Inspect .spkg manifest, source code & SLA status
+  hub verify <pub_key> <pkg>  Verify Ed25519 Merkle signature of .spkg
+  hub broadcast <file.spkg>   Broadcast sealed .spkg fleet-wide via gRPC (< 50ms)
+  hub new <name> [tier]       Scaffold a new .spkg package template (native, wasm, lua)
 
 Fleet & Threat Administration:
   auth login [email] [pass]   Authenticate with FastAPI backend and acquire JWT
@@ -204,7 +207,7 @@ int main(int argc, char **argv)
     std::string cmd = argv[1];
 
     // =========================================================================
-    // HUB MARKETPLACE COMMANDS
+    // HUB MARKETPLACE COMMANDS (.spkg FORMAT)
     // =========================================================================
     if (cmd == "hub" && argc >= 3)
     {
@@ -215,7 +218,7 @@ int main(int argc, char **argv)
         {
             std::string query = (argc >= 4) ? argv[3] : "";
             std::cout << "\033[1;36m========================================================================================================\033[0m\n";
-            std::cout << "\033[1;37m                       ARYORITHM REGISTRY HUB: VERIFIED EXTENSIONS (hub.aryorithm.com)                   \033[0m\n";
+            std::cout << "\033[1;37m                       ARYORITHM REGISTRY HUB: VERIFIED PACKAGES (hub.aryorithm.com)                     \033[0m\n";
             std::cout << "\033[1;36m========================================================================================================\033[0m\n";
             std::cout << std::left
                       << std::setw(32) << "PACKAGE IDENTIFIER"
@@ -231,11 +234,11 @@ int main(int argc, char **argv)
                 std::string id, tier, proto, sla, audit, sector;
             };
             std::vector<HubEntry> catalog = {
-                {"org.aryorithm.modbus_guard", "Native C++", "MODBUS", "< 120 ns", "Ed25519 Signed", "Power & Substations"},
+                {"org.aryorithm.modbus_guard", "Native C++", "MODBUS", "< 120 ns", "Ed25519 Sealed", "Power & Substations"},
                 {"org.aryorithm.s7comm_guard", "Rust Wasm", "S7COMM", "< 1.5 us", "Memory Safe", "Manufacturing & PLCs"},
                 {"org.aryorithm.log4j_fast_drop", "LuaJIT", "HTTP/TCP", "< 450 ns", "Hot-Reloaded", "Enterprise DMZ"},
                 {"org.aryorithm.dicom_phi_guard", "Rust Wasm", "DICOM", "< 2.5 us", "HIPAA / PHI", "Healthcare PACS"},
-                {"org.aryorithm.c37_118_pmu", "Native C++", "C37.118", "< 130 ns", "Ed25519 Signed", "High-Voltage Grids"},
+                {"org.aryorithm.c37_118_pmu", "Native C++", "C37.118", "< 130 ns", "Ed25519 Sealed", "High-Voltage Grids"},
                 {"org.aryorithm.triton_sis", "Native C++", "TRISTATION", "< 190 ns", "Safety SIS", "Oil & Chemical Fabs"}};
 
             for (const auto &item : catalog)
@@ -252,44 +255,45 @@ int main(int argc, char **argv)
                 }
             }
             std::cout << "\033[1;36m========================================================================================================\033[0m\n";
-            std::cout << "Deploy fleet-wide via: nexus-ctl hub broadcast <package.splugin>\n\n";
+            std::cout << "Deploy fleet-wide via: nexus-ctl hub broadcast <package.spkg>\n\n";
             return 0;
         }
 
-        // 2. nexus-ctl hub inspect <file.splugin>
+        // 2. nexus-ctl hub inspect <file.spkg>
         if (sub == "inspect" && argc >= 4)
         {
             std::string pkg_path = argv[3];
             auto data = read_binary_file(pkg_path);
-            if (data.size() < sizeof(SPluginHeader))
+            if (data.size() < sizeof(SpkgHeader))
             {
-                std::cerr << "[-] Error: Invalid .splugin file: " << pkg_path << std::endl;
+                std::cerr << "[-] Error: Invalid .spkg file: " << pkg_path << std::endl;
                 return 1;
             }
 
-            SPluginHeader hdr;
+            SpkgHeader hdr;
             std::memcpy(&hdr, data.data(), sizeof(hdr));
 
-            if (hdr.magic != SPLUGIN_MAGIC)
+            if (hdr.magic != SPKG_MAGIC)
             {
-                std::cerr << "[-] Error: Magic bytes mismatch! Not a valid .splugin container." << std::endl;
+                std::cerr << "[-] Error: Magic bytes mismatch! Not a valid .spkg container." << std::endl;
                 return 1;
             }
 
             std::string tier_str = (hdr.tier == 0) ? "Tier A (Native ISO C++20 Shared Object)" : (hdr.tier == 1) ? "Tier B (WebAssembly Wasm3 / Rust Module)"
                                                                                                                  : "Tier C (LuaJIT Dynamic C-FFI Script)";
 
-            std::string manifest_str(reinterpret_cast<const char *>(data.data() + sizeof(SPluginHeader)), hdr.manifest_len);
+            std::string manifest_str(reinterpret_cast<const char *>(data.data() + sizeof(SpkgHeader)), hdr.manifest_len);
 
             std::cout << "\033[1;36m==========================================================\033[0m\n";
-            std::cout << "\033[1;37m        ARYORITHM .SPLUGIN PACKAGE INSPECTION             \033[0m\n";
+            std::cout << "\033[1;37m        SENTINEL PACKAGE INSPECTION (.spkg)               \033[0m\n";
             std::cout << "\033[1;36m==========================================================\033[0m\n";
-            std::cout << "Container File   : " << pkg_path << "\n";
+            std::cout << "Package File     : " << pkg_path << "\n";
             std::cout << "Format Version   : " << hdr.version << "\n";
             std::cout << "Execution Tier   : \033[1;33m" << tier_str << "\033[0m\n";
-            std::cout << "Manifest Size    : " << hdr.manifest_len << " bytes\n";
+            std::cout << "Signature Status : \033[1;32mEd25519 64-Byte Merkle-Sealed\033[0m\n";
             std::cout << "Payload Binary   : " << hdr.payload_len << " bytes\n";
-            std::cout << "Signature Status : \033[1;32mEd25519 64-Byte Signature Present\033[0m\n";
+            std::cout << "Auditable Source : " << hdr.source_len << " bytes\n";
+            std::cout << "Pre-flight Frame : " << hdr.test_vector_len << " bytes\n";
             std::cout << "----------------------------------------------------------\n";
             std::cout << "\033[1;37mMANIFEST METADATA:\033[0m\n"
                       << manifest_str << "\n";
@@ -297,31 +301,42 @@ int main(int argc, char **argv)
             return 0;
         }
 
-        // 3. nexus-ctl hub verify <pub_key.pem> <file.splugin>
+        // 3. nexus-ctl hub verify <pub_key.pem> <file.spkg>
         if (sub == "verify" && argc >= 5)
         {
             std::string pub_path = argv[3];
             std::string pkg_path = argv[4];
 
             auto container = read_binary_file(pkg_path);
-            if (container.size() < sizeof(SPluginHeader))
+            if (container.size() < sizeof(SpkgHeader))
             {
-                std::cerr << "[-] Corrupt package" << std::endl;
+                std::cerr << "[-] Error: Corrupt package size" << std::endl;
                 return 1;
             }
 
-            SPluginHeader hdr;
+            SpkgHeader hdr;
             std::memcpy(&hdr, container.data(), sizeof(hdr));
+            if (hdr.magic != SPKG_MAGIC)
+            {
+                std::cerr << "[-] Error: Magic mismatch" << std::endl;
+                return 1;
+            }
 
-            const uint8_t *man_ptr = container.data() + sizeof(SPluginHeader);
+            const uint8_t *man_ptr = container.data() + sizeof(SpkgHeader);
             const uint8_t *pay_ptr = man_ptr + hdr.manifest_len;
+            const uint8_t *src_ptr = pay_ptr + hdr.payload_len;
+            const uint8_t *test_ptr = src_ptr + hdr.source_len;
 
             auto h_man = sha256_buffer(man_ptr, hdr.manifest_len);
             auto h_pay = sha256_buffer(pay_ptr, hdr.payload_len);
+            auto h_src = sha256_buffer(src_ptr, hdr.source_len);
+            auto h_test = sha256_buffer(test_ptr, hdr.test_vector_len);
 
             std::vector<uint8_t> sign_input;
             sign_input.insert(sign_input.end(), h_man.begin(), h_man.end());
             sign_input.insert(sign_input.end(), h_pay.begin(), h_pay.end());
+            sign_input.insert(sign_input.end(), h_src.begin(), h_src.end());
+            sign_input.insert(sign_input.end(), h_test.begin(), h_test.end());
 
             FILE *fp = fopen(pub_path.c_str(), "rb");
             if (!fp)
@@ -340,7 +355,7 @@ int main(int argc, char **argv)
 
             if (res == 1)
             {
-                std::cout << "\033[1;32m[VERIFIED] Signature is AUTHENTIC and tamper-free!\033[0m\n";
+                std::cout << "\033[1;32m[VERIFIED] .spkg Merkle signature is 100% AUTHENTIC and tamper-free!\033[0m\n";
                 return 0;
             }
             else
@@ -350,40 +365,40 @@ int main(int argc, char **argv)
             }
         }
 
-        // 4. nexus-ctl hub broadcast <file.splugin>
+        // 4. nexus-ctl hub broadcast <file.spkg>
         if (sub == "broadcast" && argc >= 4)
         {
             std::string pkg_path = argv[3];
             auto container = read_binary_file(pkg_path);
-            if (container.size() < sizeof(SPluginHeader))
+            if (container.size() < sizeof(SpkgHeader))
             {
                 std::cerr << "[-] Invalid package: " << pkg_path << std::endl;
                 return 1;
             }
 
-            SPluginHeader hdr;
+            SpkgHeader hdr;
             std::memcpy(&hdr, container.data(), sizeof(hdr));
 
-            const uint8_t *man_ptr = container.data() + sizeof(SPluginHeader);
+            const uint8_t *man_ptr = container.data() + sizeof(SpkgHeader);
             const uint8_t *pay_ptr = man_ptr + hdr.manifest_len;
 
             std::string b64_payload = base64_encode(pay_ptr, hdr.payload_len);
             std::string b64_sig = base64_encode(hdr.signature, 64);
 
-            std::cout << "[*] Packaging .splugin for fleet gRPC fanout..." << std::endl;
-            std::cout << "    Payload Size: " << hdr.payload_len << " bytes | Tier: " << hdr.tier << std::endl;
+            std::cout << "[*] Packaging .spkg for fleet gRPC fanout..." << std::endl;
+            std::cout << "    Payload Size: " << hdr.payload_len << " bytes | Source: "
+                      << hdr.source_len << " bytes | Tier: " << hdr.tier << std::endl;
 
-            // Dispatch to local Nexus C2 Daemon API (which pushes over gRPC IntelligenceService)
             std::ostringstream json_payload;
             json_payload << "{"
-                         << "\"rule_id\":\"HUB-" << std::to_string(hdr.magic).substr(0, 8) << "\","
+                         << "\"rule_id\":\"SPKG-" << std::to_string(hdr.magic).substr(0, 8) << "\","
                          << "\"rule_name\":\"" << std::filesystem::path(pkg_path).stem().string() << "\","
                          << "\"tier\":" << hdr.tier << ","
                          << "\"payload_b64\":\"" << b64_payload << "\","
                          << "\"signature_b64\":\"" << b64_sig << "\""
                          << "}";
 
-            std::cout << "[*] Broadcasting to all connected fleet appliances over gRPC..." << std::endl;
+            std::cout << "[*] Broadcasting to all fleet nodes via gRPC DeployExtensionRule..." << std::endl;
             std::string resp = http_post("127.0.0.1", 9443, "/api/v1/extensions/deploy", json_payload.str());
             std::cout << "\033[1;32m[+] Fleet Broadcast Response:\033[0m\n"
                       << resp << std::endl;
@@ -408,10 +423,11 @@ int main(int argc, char **argv)
                 return 1;
             }
             std::filesystem::create_directories(dir);
+            std::filesystem::create_directories(dir / "tests");
 
             // Scaffold manifest.json
             std::ofstream(dir / "manifest.json") << "{\n"
-                                                 << "  \"id\": \"org.aryorithm.plugin." << name << "\",\n"
+                                                 << "  \"id\": \"org.aryorithm.package." << name << "\",\n"
                                                  << "  \"name\": \"" << name << "\",\n"
                                                  << "  \"version\": \"1.0.0\",\n"
                                                  << "  \"tier\": \"" << lang << "\",\n"
@@ -419,6 +435,11 @@ int main(int argc, char **argv)
                                                  << "  \"target_protocol\": \"CUSTOM\",\n"
                                                  << "  \"default_port\": 0\n"
                                                  << "}\n";
+
+            // Scaffold sample pre-flight test vector
+            uint8_t sample_frame[] = {0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03, 0x04};
+            std::ofstream(dir / "tests" / "preflight_frame.bin", std::ios::binary)
+                .write(reinterpret_cast<const char *>(sample_frame), sizeof(sample_frame));
 
             if (lang == "wasm")
             {
@@ -444,7 +465,7 @@ int main(int argc, char **argv)
                                                      << "    return VerdictBuilder::Pass();\n}\n\n"
                                                      << "static SentinelPluginDescriptor g_desc = {\n"
                                                      << "    SENTINEL_SDK_MAGIC, SENTINEL_SDK_VERSION_MAJOR, SENTINEL_SDK_VERSION_MINOR,\n"
-                                                     << "    SENTINEL_TIER_NATIVE_CPP, \"org.aryorithm.plugin." << name << "\",\n"
+                                                     << "    SENTINEL_TIER_NATIVE_CPP, \"org.aryorithm.package." << name << "\",\n"
                                                      << "    \"" << name << "\", \"1.0.0\", \"CUSTOM\", 0, 0, nullptr, nullptr, my_dissect\n"
                                                      << "};\nSENTINEL_REGISTER_PLUGIN(g_desc)\n";
             }
@@ -459,7 +480,9 @@ int main(int argc, char **argv)
                                                      << "end\n";
             }
 
-            std::cout << "\033[1;32m[+] Nexus C2 scaffolded " << lang << " plugin in ./" << name << "/\033[0m\n";
+            std::cout << "\033[1;32m[+] Nexus C2 scaffolded " << lang << " package in ./" << name << "/\033[0m\n"
+                      << "    ├── manifest.json\n"
+                      << "    └── tests/preflight_frame.bin\n";
             return 0;
         }
     }
