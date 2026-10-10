@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
+#include <algorithm>
 
 #define SPLUGIN_MAGIC 0x314C50534F595241ULL // "ARYOSPL1"
 #define SPLUGIN_VERSION 1
@@ -385,6 +386,79 @@ int main(int argc, char **argv)
             std::string resp = http_post("127.0.0.1", 9443, "/api/v1/extensions/deploy", json_payload.str());
             std::cout << "\033[1;32m[+] Fleet Broadcast Response:\033[0m\n"
                       << resp << std::endl;
+            return 0;
+        }
+
+        // 5. nexus-ctl hub new <name> [native|wasm|lua]
+        if (sub == "new" && argc >= 4)
+        {
+            std::string name = argv[3];
+            std::string lang = (argc >= 5) ? argv[4] : "wasm";
+            std::transform(lang.begin(), lang.end(), lang.begin(), ::tolower);
+            if (lang == "rust")
+                lang = "wasm";
+            if (lang == "cpp")
+                lang = "native";
+
+            std::filesystem::path dir = name;
+            if (std::filesystem::exists(dir))
+            {
+                std::cerr << "[-] Error: Directory '" << name << "' already exists." << std::endl;
+                return 1;
+            }
+            std::filesystem::create_directories(dir);
+
+            // Scaffold manifest.json
+            std::ofstream(dir / "manifest.json") << "{\n"
+                                                 << "  \"id\": \"org.aryorithm.plugin." << name << "\",\n"
+                                                 << "  \"name\": \"" << name << "\",\n"
+                                                 << "  \"version\": \"1.0.0\",\n"
+                                                 << "  \"tier\": \"" << lang << "\",\n"
+                                                 << "  \"author\": \"Nexus Operator\",\n"
+                                                 << "  \"target_protocol\": \"CUSTOM\",\n"
+                                                 << "  \"default_port\": 0\n"
+                                                 << "}\n";
+
+            if (lang == "wasm")
+            {
+                std::filesystem::create_directories(dir / "src");
+                std::ofstream(dir / "Cargo.toml") << "[package]\nname = \"" << name << "\"\nversion = \"1.0.0\"\nedition = \"2021\"\n\n"
+                                                  << "[lib]\ncrate-type = [\"cdylib\"]\n\n"
+                                                  << "[dependencies]\nsentinel-sdk-rs = { path = \"/home/kami/blackbox-sentinel/tools/sdk/rust/sentinel-sdk-rs\" }\n\n"
+                                                  << "[profile.release]\nopt-level = 3\nlto = true\npanic = \"abort\"\nstrip = true\n";
+
+                std::ofstream(dir / "src" / "lib.rs") << "#![no_std]\nuse core::panic::PanicInfo;\nuse sentinel_sdk_rs::{PacketView, Verdict};\n\n"
+                                                      << "#[panic_handler]\nfn panic(_info: &PanicInfo) -> ! { loop {} }\n\n"
+                                                      << "#[no_mangle]\npub extern \"C\" fn sentinel_dissect(pkt_ptr: *const u8, len: u32) -> i32 {\n"
+                                                      << "    let pkt = unsafe { PacketView::from_raw(pkt_ptr, len as usize) };\n"
+                                                      << "    if pkt.is_empty() { return Verdict::Pass as i32; }\n"
+                                                      << "    // Detection logic here\n"
+                                                      << "    Verdict::Pass as i32\n}\n";
+            }
+            else if (lang == "native")
+            {
+                std::ofstream(dir / (name + ".cpp")) << "#include <sentinel/sdk/plugin.hpp>\n\n"
+                                                     << "using namespace sentinel::sdk;\n\n"
+                                                     << "static SentinelDissectorResult my_dissect(const SentinelRawPacket* pkt) {\n"
+                                                     << "    return VerdictBuilder::Pass();\n}\n\n"
+                                                     << "static SentinelPluginDescriptor g_desc = {\n"
+                                                     << "    SENTINEL_SDK_MAGIC, SENTINEL_SDK_VERSION_MAJOR, SENTINEL_SDK_VERSION_MINOR,\n"
+                                                     << "    SENTINEL_TIER_NATIVE_CPP, \"org.aryorithm.plugin." << name << "\",\n"
+                                                     << "    \"" << name << "\", \"1.0.0\", \"CUSTOM\", 0, 0, nullptr, nullptr, my_dissect\n"
+                                                     << "};\nSENTINEL_REGISTER_PLUGIN(g_desc)\n";
+            }
+            else if (lang == "lua")
+            {
+                std::ofstream(dir / (name + ".lua")) << "local ffi = ffi or require(\"ffi\")\n\n"
+                                                     << "Rule = { id = 8001, name = \"" << name << "\", port = 0 }\n\n"
+                                                     << "function Rule.inspect(pkt)\n"
+                                                     << "    local len = tonumber(pkt.length)\n"
+                                                     << "    if not len or len < 4 then return 0 end\n"
+                                                     << "    return 0\n"
+                                                     << "end\n";
+            }
+
+            std::cout << "\033[1;32m[+] Nexus C2 scaffolded " << lang << " plugin in ./" << name << "/\033[0m\n";
             return 0;
         }
     }
