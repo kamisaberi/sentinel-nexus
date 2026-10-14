@@ -280,6 +280,18 @@ namespace sentinel::nexus::api
             content_type = "application/json";
             return reporting::ScadaAuditEngine::instance().generate_iec62443_assessment_json();
         }
+        // --- EXTENSIONS & .SPKG DEPLOYMENT ROUTES ---
+        if (route_path == "/api/v1/extensions/status")
+        {
+            content_type = "application/json";
+            return handle_get_extensions_status();
+        }
+
+        if (route_path == "/api/v1/extensions/deploy" && method == "POST")
+        {
+            content_type = "application/json";
+            return handle_post_extension_deploy(body);
+        }
 
         // Static Web Dashboard Files
         return serve_static_file(route_path, content_type, status_code);
