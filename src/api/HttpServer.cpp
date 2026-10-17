@@ -24,14 +24,108 @@
 #include <fstream>
 #include <filesystem>
 #include <iomanip>
+#include <vector>
 
 namespace sentinel::nexus::api
 {
 
+    bool HttpServer::load_config_file(const std::string &config_path)
+    {
+        std::vector<std::string> search_paths = {
+            config_path,
+            "configs/nexus_server.conf",
+            "../configs/nexus_server.conf",
+            "/etc/sentinel/nexus.conf",
+            "sentinel-nexus/configs/nexus_server.conf"};
+
+        std::ifstream file;
+        std::string resolved_path;
+        for (const auto &p : search_paths)
+        {
+            file.open(p);
+            if (file.is_open())
+            {
+                resolved_path = p;
+                break;
+            }
+        }
+
+        if (!file.is_open())
+        {
+            NEXUS_LOG_WARN("nexus_server.conf not found. Using default ports (HTTP 9443, SSE 9444, gRPC 50051).");
+            return false;
+        }
+
+        std::string line;
+        while (std::getline(file, line))
+        {
+            // Strip inline comments
+            auto comment_pos = line.find('#');
+            if (comment_pos != std::string::npos)
+                line = line.substr(0, comment_pos);
+
+            auto eq = line.find('=');
+            if (eq == std::string::npos)
+                continue;
+
+            std::string key = line.substr(0, eq);
+            std::string val = line.substr(eq + 1);
+
+            // Trim key/val
+            key.erase(0, key.find_first_not_of(" \t\r\n"));
+            key.erase(key.find_last_not_of(" \t\r\n") + 1);
+            val.erase(0, val.find_first_not_of(" \t\r\n\""));
+            val.erase(val.find_last_not_of(" \t\r\n\"") + 1);
+
+            if (key == "bind_address")
+                bind_ip_ = val;
+            else if (key == "http_port")
+            {
+                try
+                {
+                    port_ = static_cast<uint16_t>(std::stoul(val));
+                }
+                catch (...)
+                {
+                }
+            }
+            else if (key == "sse_port")
+            {
+                try
+                {
+                    sse_port_ = static_cast<uint16_t>(std::stoul(val));
+                }
+                catch (...)
+                {
+                }
+            }
+            else if (key == "grpc_port")
+            {
+                try
+                {
+                    grpc_port_ = static_cast<uint16_t>(std::stoul(val));
+                }
+                catch (...)
+                {
+                }
+            }
+        }
+
+        NEXUS_LOG_INFO("Loaded Nexus Server Configuration from " + resolved_path +
+                       " [Bind: " + bind_ip_ + " | HTTP: " + std::to_string(port_) +
+                       " | SSE: " + std::to_string(sse_port_) + " | gRPC: " + std::to_string(grpc_port_) + "]");
+        return true;
+    }
+
     bool HttpServer::start(const std::string &bind_ip, uint16_t port, const std::string &web_root)
     {
-        bind_ip_ = bind_ip;
-        port_ = port;
+        // Try auto-loading configuration file if available
+        load_config_file();
+
+        if (bind_ip != "0.0.0.0")
+            bind_ip_ = bind_ip;
+        if (port != 9443)
+            port_ = port;
         web_root_ = web_root;
 
         server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
@@ -117,7 +211,6 @@ namespace sentinel::nexus::api
         std::string method, path, protocol;
         req_stream >> method >> path >> protocol;
 
-        // 1. Locate HTTP body if this is a POST request
         std::string raw_req(buffer, bytes_read);
         std::string body;
         size_t header_end = raw_req.find("\r\n\r\n");
@@ -126,7 +219,6 @@ namespace sentinel::nexus::api
             body = raw_req.substr(header_end + 4);
         }
 
-        // 2. Strip query parameters for clean path matching (e.g. /api/v1/telemetry/stream?t=123)
         std::string route_path = path;
         size_t qmark = route_path.find('?');
         if (qmark != std::string::npos)
@@ -134,16 +226,12 @@ namespace sentinel::nexus::api
             route_path = route_path.substr(0, qmark);
         }
 
-        // 3. REAL-TIME STREAM INTERCEPTION:
-        // If the browser requests the SSE stream, pass the open socket to TelemetryStreamer.
-        // We RETURN IMMEDIATELY so that close(client_sock) is NEVER called here!
         if (route_path == "/api/v1/telemetry/stream")
         {
             TelemetryStreamer::instance().add_client(client_sock);
-            return; // Socket remains alive and managed by TelemetryStreamer
+            return;
         }
 
-        // 4. Standard Request/Response cycle for REST API and HTML/CSS/JS files
         std::string content_type = "text/plain";
         int status_code = 200;
         std::string response_payload = route_request(method, path, body, content_type, status_code);
@@ -163,7 +251,6 @@ namespace sentinel::nexus::api
         std::string resp_str = resp_stream.str();
         send(client_sock, resp_str.data(), resp_str.size(), 0);
 
-        // Standard HTTP request is finished; close socket
         close(client_sock);
     }
 
@@ -179,15 +266,12 @@ namespace sentinel::nexus::api
             return "";
         }
 
-        // Strip query parameters for routing (e.g. /api/v1/nodes?ts=123)
         std::string route_path = path;
         size_t qmark = route_path.find('?');
         if (qmark != std::string::npos)
         {
             route_path = route_path.substr(0, qmark);
         }
-
-        // REST API Routes
 
         if (route_path == "/api/v1/models")
         {
@@ -237,12 +321,6 @@ namespace sentinel::nexus::api
             return handle_get_ota();
         }
 
-        if (route_path == "/api/v1/models")
-        {
-            content_type = "application/json";
-            return controllers::ModelController::list_models_json();
-        }
-
         if (route_path == "/api/v1/threats/mitre")
         {
             content_type = "application/json";
@@ -280,7 +358,6 @@ namespace sentinel::nexus::api
             content_type = "application/json";
             return reporting::ScadaAuditEngine::instance().generate_iec62443_assessment_json();
         }
-        // --- EXTENSIONS & .SPKG DEPLOYMENT ROUTES ---
         if (route_path == "/api/v1/extensions/status")
         {
             content_type = "application/json";
@@ -293,7 +370,6 @@ namespace sentinel::nexus::api
             return handle_post_extension_deploy(body);
         }
 
-        // Static Web Dashboard Files
         return serve_static_file(route_path, content_type, status_code);
     }
 
@@ -407,10 +483,6 @@ namespace sentinel::nexus::api
             clean_path = clean_path.substr(1);
         }
 
-        // Smart Multi-Path Resolution:
-        // 1. Current working directory (./web/...)
-        // 2. Parent directory (../web/... when running from build/)
-        // 3. Executable's parent directory (/home/kami/sentinel-nexus/web/...)
         std::vector<std::filesystem::path> search_paths = {
             std::filesystem::path(web_root_) / clean_path,
             std::filesystem::path("..") / web_root_ / clean_path};
@@ -465,7 +537,6 @@ namespace sentinel::nexus::api
 
     std::string HttpServer::handle_get_extensions_status()
     {
-        // Aggregate real-time telemetry from active edge nodes
         auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
         uint64_t total_packets = 0;
         uint64_t total_drops = 0;
@@ -475,7 +546,6 @@ namespace sentinel::nexus::api
             total_drops += n.latest_metrics.ebpf_packets_dropped();
         }
 
-        // Base metrics fallback to baseline verified SLA if fleet is idling
         if (total_packets == 0)
             total_packets = 56800;
         if (total_drops == 0)
@@ -528,7 +598,6 @@ namespace sentinel::nexus::api
         std::string rule_name = "custom_package";
         std::string rule_id = "SPKG-FLEET";
 
-        // Simple JSON extractor for rule_name and rule_id
         size_t name_pos = body.find("\"rule_name\"");
         if (name_pos != std::string::npos)
         {
