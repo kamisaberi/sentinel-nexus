@@ -17,8 +17,15 @@ namespace sentinel::nexus::api
             return inst;
         }
 
-        bool start(const std::string &bind_ip, uint16_t port, const std::string &web_root = "web");
+        /// Load dynamic configuration from INI/conf file
+        bool load_config_file(const std::string &config_path = "configs/nexus_server.conf");
+
+        bool start(const std::string &bind_ip = "0.0.0.0", uint16_t port = 9443, const std::string &web_root = "web");
         void stop();
+
+        [[nodiscard]] uint16_t get_port() const { return port_; }
+        [[nodiscard]] uint16_t get_sse_port() const { return sse_port_; }
+        [[nodiscard]] uint16_t get_grpc_port() const { return grpc_port_; }
 
     private:
         HttpServer() = default;
@@ -47,6 +54,8 @@ namespace sentinel::nexus::api
 
         std::string bind_ip_{"0.0.0.0"};
         uint16_t port_{9443};
+        uint16_t sse_port_{9444};
+        uint16_t grpc_port_{50051};
         std::string web_root_{"web"};
 
         std::atomic<bool> running_{false};
