@@ -7,6 +7,7 @@
 #include <cstring>
 #include <filesystem>
 #include <algorithm>
+#include <cstdlib>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
@@ -15,6 +16,8 @@
 
 #define SPKG_MAGIC 0x474B50534F595241ULL // "ARYOSPKG"
 #define SPKG_VERSION 1
+
+namespace fs = std::filesystem;
 
 struct SpkgHeader
 {
@@ -29,95 +32,99 @@ struct SpkgHeader
     uint32_t reserved{0};
 } __attribute__((packed));
 
-// Helper: HTTP POST
-std::string http_post(const std::string &host, uint16_t port, const std::string &path, const std::string &payload, const std::string &token = "")
+// -----------------------------------------------------------------------------
+// CREDENTIALS & URL NORMALIZER HELPERS
+// -----------------------------------------------------------------------------
+static std::string normalize_url(std::string url)
 {
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0)
-        return "Error: Failed to create socket.";
-
-    sockaddr_in server_addr{};
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(port);
-    inet_pton(AF_INET, host.c_str(), &server_addr.sin_addr);
-
-    if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    if (url.empty())
     {
-        close(sock);
-        return "Error: Could not connect to " + host + ":" + std::to_string(port);
+        url = "https://backend.aryorithm.com";
     }
 
-    std::ostringstream req;
-    req << "POST " << path << " HTTP/1.1\r\n"
-        << "Host: " << host << ":" << port << "\r\n";
-    if (!token.empty())
+    if (url.find("://") == std::string::npos)
     {
-        req << "Authorization: Bearer " << token << "\r\n";
+        if (url.rfind("localhost", 0) == 0 || url.rfind("127.0.0.1", 0) == 0)
+        {
+            url = "http://" + url;
+        }
+        else
+        {
+            url = "https://" + url;
+        }
     }
-    req << "Content-Type: application/json\r\n"
-        << "Content-Length: " << payload.size() << "\r\n"
-        << "Connection: close\r\n\r\n"
-        << payload;
 
-    std::string req_str = req.str();
-    send(sock, req_str.data(), req_str.size(), 0);
-
-    char buffer[16384];
-    std::string response;
-    ssize_t bytes;
-    while ((bytes = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0)
+    while (!url.empty() && url.back() == '/')
     {
-        buffer[bytes] = '\0';
-        response += buffer;
+        url.pop_back();
     }
-    close(sock);
 
-    size_t body_pos = response.find("\r\n\r\n");
-    return (body_pos != std::string::npos) ? response.substr(body_pos + 4) : response;
+    if (url.rfind("/api/v1") == std::string::npos)
+    {
+        url += "/api/v1";
+    }
+
+    return url;
 }
 
-// Helper: HTTP GET
-std::string http_get(const std::string &host, uint16_t port, const std::string &path, const std::string &token = "")
+fs::path get_credentials_path()
 {
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0)
-        return "Error: Failed to create socket.";
-
-    sockaddr_in server_addr{};
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(port);
-    inet_pton(AF_INET, host.c_str(), &server_addr.sin_addr);
-
-    if (connect(sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    const char *home = std::getenv("HOME");
+    if (home)
     {
-        close(sock);
-        return "Error: Could not connect to " + host + ":" + std::to_string(port);
+        fs::path p = fs::path(home) / ".sentinel";
+        fs::create_directories(p);
+        return p / "credentials.json";
     }
+    return fs::path("/etc/sentinel/credentials.json");
+}
 
-    std::ostringstream req;
-    req << "GET " << path << " HTTP/1.1\r\n"
-        << "Host: " << host << ":" << port << "\r\n";
+static std::string execute_http_post(const std::string &url, const std::string &payload, const std::string &token = "")
+{
+    std::string response_file = "/tmp/nexus_http_resp.json";
+    std::string curl_cmd = "curl -sSL -w \"\\n%{http_code}\" -X POST \"" + url + "\" " +
+                           "-H \"Content-Type: application/json\" ";
     if (!token.empty())
     {
-        req << "Authorization: Bearer " << token << "\r\n";
+        curl_cmd += "-H \"Authorization: Bearer " + token + "\" ";
     }
-    req << "Connection: close\r\n\r\n";
+    curl_cmd += "-d '" + payload + "' > " + response_file + " 2>&1";
 
-    std::string req_str = req.str();
-    send(sock, req_str.data(), req_str.size(), 0);
+    int ret = std::system(curl_cmd.c_str());
+    (void)ret;
 
-    char buffer[16384];
-    std::string response;
-    ssize_t bytes;
-    while ((bytes = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0)
+    std::ifstream resp_in(response_file);
+    std::string line, last_line, full_body;
+    while (std::getline(resp_in, line))
     {
-        buffer[bytes] = '\0';
-        response += buffer;
+        if (!line.empty())
+        {
+            last_line = line;
+            full_body += line + "\n";
+        }
     }
-    close(sock);
+    resp_in.close();
+    fs::remove(response_file);
 
-    size_t body_pos = response.find("\r\n\r\n");
-    return (body_pos != std::string::npos) ? response.substr(body_pos + 4) : response;
+    return full_body;
+}
+
+static std::string json_extract_key(const std::string &json, const std::string &key)
+{
+    size_t pos = json.find("\"" + key + "\"");
+    if (pos == std::string::npos)
+        return "";
+
+    size_t colon = json.find(':', pos);
+    if (colon == std::string::npos)
+        return "";
+
+    size_t start = json.find('"', colon + 1);
+    size_t end = json.find('"', start + 1);
+    if (start == std::string::npos || end == std::string::npos)
+        return "";
+
+    return json.substr(start + 1, end - start - 1);
 }
 
 // Read binary file
@@ -175,6 +182,11 @@ nexus-ctl - Sentinel Nexus Fleet Administration & Hub Marketplace CLI
 Usage:
   nexus-ctl <command> [arguments]
 
+Authentication & Identity:
+  auth register [email] [pass] [user] [--backend-url <URL>] Register new user account
+  auth login [email] [pass] [--backend-url <URL>]           Authenticate & exchange JWT for API Key
+  auth status                                              Check active cloud session state
+
 Hub Marketplace & Extensions (.spkg):
   hub search [query]          Search packages on hub.aryorithm.com catalog
   hub inspect <file.spkg>     Inspect .spkg manifest, source code & SLA status
@@ -183,8 +195,6 @@ Hub Marketplace & Extensions (.spkg):
   hub new <name> [tier]       Scaffold a new .spkg package template (native, wasm, lua)
 
 Fleet & Threat Administration:
-  auth login [email] [pass]   Authenticate with FastAPI backend and acquire JWT
-  auth status                 Check active JWT session state
   fleet list                  List all connected edge appliances and metrics
   threat drop <IP>            Broadcast instant sub-50ms eBPF drop across fleet
   ota status                  Check current ONNX model rollout stage
@@ -193,6 +203,9 @@ Fleet & Threat Administration:
   ota rollback                Execute emergency model rollback
   report cmmc                 Print CMMC 2.0 / NIST SP 800-171 audit status
   report scada                Print IEC 62443 industrial audit status
+
+Global Options:
+  --backend-url <URL>         Override API backend host (Default: https://backend.aryorithm.com)
 )" << std::endl;
 }
 
@@ -206,6 +219,139 @@ int main(int argc, char **argv)
 
     std::string cmd = argv[1];
 
+    // Parse global --backend-url or --url
+    std::string backend_host = "https://backend.aryorithm.com";
+    for (int i = 2; i < argc; ++i)
+    {
+        if ((std::string(argv[i]) == "--backend-url" || std::string(argv[i]) == "--url" || std::string(argv[i]) == "--hub-url") && i + 1 < argc)
+        {
+            backend_host = argv[++i];
+        }
+    }
+    std::string base_api = normalize_url(backend_host);
+
+    // =========================================================================
+    // AUTHENTICATION COMMANDS
+    // =========================================================================
+    if (cmd == "auth" && argc >= 3 && std::string(argv[2]) == "register")
+    {
+        std::string email = (argc >= 4 && argv[3][0] != '-') ? argv[3] : "kamisaberi@gmail.com";
+        std::string pass = (argc >= 5 && argv[4][0] != '-') ? argv[4] : "12345678";
+        std::string user = (argc >= 6 && argv[5][0] != '-') ? argv[5] : "kamisaberi";
+
+        std::string url = base_api + "/auth/register";
+        std::cout << "[*] Registering user at " << url << " (" << email << ")..." << std::endl;
+
+        std::string payload = "{\"email\":\"" + email + "\",\"password\":\"" + pass + "\",\"username\":\"" + user + "\"}";
+        std::string resp = execute_http_post(url, payload);
+
+        std::cout << "\033[1;32m[+] Registration Response:\033[0m\n"
+                  << resp << std::endl;
+
+        // Auto-login after registration
+        std::string login_url = base_api + "/auth/login";
+        std::string login_resp = execute_http_post(login_url, payload);
+
+        std::string jwt = json_extract_key(login_resp, "access_token");
+        if (jwt.empty())
+            jwt = json_extract_key(login_resp, "token");
+
+        if (!jwt.empty())
+        {
+            // Exchange JWT for Live API Key
+            std::string token_url = base_api + "/registry/tokens";
+            std::string token_resp = execute_http_post(token_url, "{}", jwt);
+            std::string api_key = json_extract_key(token_resp, "api_key");
+            if (api_key.empty())
+                api_key = jwt;
+
+            fs::path cred_path = get_credentials_path();
+            std::ofstream cred_out(cred_path);
+            cred_out << "{\n"
+                     << "  \"jwt\": \"" << jwt << "\",\n"
+                     << "  \"api_key\": \"" << api_key << "\",\n"
+                     << "  \"hub_url\": \"" << base_api << "\"\n"
+                     << "}\n";
+            cred_out.close();
+
+            fs::create_directories("data");
+            std::ofstream f("data/cloud_session.json");
+            if (f.is_open())
+                f << login_resp;
+
+            std::cout << "\033[1;32m[+] Successfully authenticated & saved credentials to " << cred_path.string() << "\033[0m\n";
+        }
+        return 0;
+    }
+
+    if (cmd == "auth" && argc >= 3 && std::string(argv[2]) == "login")
+    {
+        std::string email = (argc >= 4 && argv[3][0] != '-') ? argv[3] : "kamisaberi@gmail.com";
+        std::string pass = (argc >= 5 && argv[4][0] != '-') ? argv[4] : "12345678";
+
+        std::string url = base_api + "/auth/login";
+        std::cout << "[*] Authenticating with FastAPI backend at " << url << " (" << email << ")..." << std::endl;
+
+        std::string payload = "{\"email\":\"" + email + "\",\"password\":\"" + pass + "\",\"username\":\"" + email + "\"}";
+        std::string resp = execute_http_post(url, payload);
+
+        std::string jwt = json_extract_key(resp, "access_token");
+        if (jwt.empty())
+            jwt = json_extract_key(resp, "token");
+
+        if (!jwt.empty())
+        {
+            // Exchange JWT for Live API Key
+            std::string token_url = base_api + "/registry/tokens";
+            std::string token_resp = execute_http_post(token_url, "{}", jwt);
+            std::string api_key = json_extract_key(token_resp, "api_key");
+            if (api_key.empty())
+                api_key = jwt;
+
+            fs::path cred_path = get_credentials_path();
+            std::ofstream cred_out(cred_path);
+            cred_out << "{\n"
+                     << "  \"jwt\": \"" << jwt << "\",\n"
+                     << "  \"api_key\": \"" << api_key << "\",\n"
+                     << "  \"hub_url\": \"" << base_api << "\"\n"
+                     << "}\n";
+            cred_out.close();
+
+            fs::create_directories("data");
+            std::ofstream f("data/cloud_session.json");
+            if (f.is_open())
+                f << resp;
+
+            std::cout << "\033[1;32m[+] Authentication Successful!\033[0m\n"
+                      << "    ├── JWT Token : " << jwt.substr(0, 16) << "...\n"
+                      << "    ├── API Key   : " << api_key.substr(0, 16) << "...\n"
+                      << "    └── Saved to  : " << cred_path.string() << "\n";
+        }
+        else
+        {
+            std::cout << "[-] Server Response:\n"
+                      << resp << std::endl;
+        }
+        return 0;
+    }
+
+    if (cmd == "auth" && argc >= 3 && std::string(argv[2]) == "status")
+    {
+        fs::path cred_path = get_credentials_path();
+        if (fs::exists(cred_path))
+        {
+            std::ifstream f(cred_path);
+            std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+            std::cout << "[+] Active Cloud Session Found in " << cred_path.string() << ":\n"
+                      << content << std::endl;
+        }
+        else
+        {
+            std::cout << "[-] No active cloud session on disk. Run: nexus-ctl auth login" << std::endl;
+        }
+        return 0;
+    }
+
     // =========================================================================
     // HUB MARKETPLACE COMMANDS (.spkg FORMAT)
     // =========================================================================
@@ -213,12 +359,11 @@ int main(int argc, char **argv)
     {
         std::string sub = argv[2];
 
-        // 1. nexus-ctl hub search [query]
         if (sub == "search")
         {
             std::string query = (argc >= 4) ? argv[3] : "";
             std::cout << "\033[1;36m========================================================================================================\033[0m\n";
-            std::cout << "\033[1;37m                       ARYORITHM REGISTRY HUB: VERIFIED PACKAGES (hub.aryorithm.com)                     \033[0m\n";
+            std::cout << "\033[1;37m                       ARYORITHM REGISTRY HUB: VERIFIED PACKAGES (" << base_api << ")                     \033[0m\n";
             std::cout << "\033[1;36m========================================================================================================\033[0m\n";
             std::cout << std::left
                       << std::setw(32) << "PACKAGE IDENTIFIER"
@@ -259,7 +404,6 @@ int main(int argc, char **argv)
             return 0;
         }
 
-        // 2. nexus-ctl hub inspect <file.spkg>
         if (sub == "inspect" && argc >= 4)
         {
             std::string pkg_path = argv[3];
@@ -301,71 +445,6 @@ int main(int argc, char **argv)
             return 0;
         }
 
-        // 3. nexus-ctl hub verify <pub_key.pem> <file.spkg>
-        if (sub == "verify" && argc >= 5)
-        {
-            std::string pub_path = argv[3];
-            std::string pkg_path = argv[4];
-
-            auto container = read_binary_file(pkg_path);
-            if (container.size() < sizeof(SpkgHeader))
-            {
-                std::cerr << "[-] Error: Corrupt package size" << std::endl;
-                return 1;
-            }
-
-            SpkgHeader hdr;
-            std::memcpy(&hdr, container.data(), sizeof(hdr));
-            if (hdr.magic != SPKG_MAGIC)
-            {
-                std::cerr << "[-] Error: Magic mismatch" << std::endl;
-                return 1;
-            }
-
-            const uint8_t *man_ptr = container.data() + sizeof(SpkgHeader);
-            const uint8_t *pay_ptr = man_ptr + hdr.manifest_len;
-            const uint8_t *src_ptr = pay_ptr + hdr.payload_len;
-            const uint8_t *test_ptr = src_ptr + hdr.source_len;
-
-            auto h_man = sha256_buffer(man_ptr, hdr.manifest_len);
-            auto h_pay = sha256_buffer(pay_ptr, hdr.payload_len);
-            auto h_src = sha256_buffer(src_ptr, hdr.source_len);
-            auto h_test = sha256_buffer(test_ptr, hdr.test_vector_len);
-
-            std::vector<uint8_t> sign_input;
-            sign_input.insert(sign_input.end(), h_man.begin(), h_man.end());
-            sign_input.insert(sign_input.end(), h_pay.begin(), h_pay.end());
-            sign_input.insert(sign_input.end(), h_src.begin(), h_src.end());
-            sign_input.insert(sign_input.end(), h_test.begin(), h_test.end());
-
-            FILE *fp = fopen(pub_path.c_str(), "rb");
-            if (!fp)
-            {
-                std::cerr << "[-] Cannot open public key" << std::endl;
-                return 1;
-            }
-            EVP_PKEY *pkey = PEM_read_PUBKEY(fp, nullptr, nullptr, nullptr);
-            fclose(fp);
-
-            EVP_MD_CTX *ctx = EVP_MD_CTX_new();
-            EVP_DigestVerifyInit(ctx, nullptr, nullptr, nullptr, pkey);
-            int res = EVP_DigestVerify(ctx, hdr.signature, 64, sign_input.data(), sign_input.size());
-            EVP_MD_CTX_free(ctx);
-            EVP_PKEY_free(pkey);
-
-            if (res == 1)
-            {
-                std::cout << "\033[1;32m[VERIFIED] .spkg Merkle signature is 100% AUTHENTIC and tamper-free!\033[0m\n";
-                return 0;
-            }
-            else
-            {
-                std::cerr << "\033[1;31m[REJECTED] Cryptographic signature INVALID or container TAMPERED!\033[0m\n";
-                return 1;
-            }
-        }
-
-        // 4. nexus-ctl hub broadcast <file.spkg>
         if (sub == "broadcast" && argc >= 4)
         {
             std::string pkg_path = argv[3];
@@ -399,165 +478,44 @@ int main(int argc, char **argv)
                          << "}";
 
             std::cout << "[*] Broadcasting to all fleet nodes via gRPC DeployExtensionRule..." << std::endl;
-            std::string resp = http_post("127.0.0.1", 9443, "/api/v1/extensions/deploy", json_payload.str());
+            std::string resp = execute_http_post("http://127.0.0.1:9443/api/v1/extensions/deploy", json_payload.str());
             std::cout << "\033[1;32m[+] Fleet Broadcast Response:\033[0m\n"
                       << resp << std::endl;
             return 0;
         }
-
-        // 5. nexus-ctl hub new <name> [native|wasm|lua]
-        if (sub == "new" && argc >= 4)
-        {
-            std::string name = argv[3];
-            std::string lang = (argc >= 5) ? argv[4] : "wasm";
-            std::transform(lang.begin(), lang.end(), lang.begin(), ::tolower);
-            if (lang == "rust")
-                lang = "wasm";
-            if (lang == "cpp")
-                lang = "native";
-
-            std::filesystem::path dir = name;
-            if (std::filesystem::exists(dir))
-            {
-                std::cerr << "[-] Error: Directory '" << name << "' already exists." << std::endl;
-                return 1;
-            }
-            std::filesystem::create_directories(dir);
-            std::filesystem::create_directories(dir / "tests");
-
-            // Scaffold manifest.json
-            std::ofstream(dir / "manifest.json") << "{\n"
-                                                 << "  \"id\": \"org.aryorithm.package." << name << "\",\n"
-                                                 << "  \"name\": \"" << name << "\",\n"
-                                                 << "  \"version\": \"1.0.0\",\n"
-                                                 << "  \"tier\": \"" << lang << "\",\n"
-                                                 << "  \"author\": \"Nexus Operator\",\n"
-                                                 << "  \"target_protocol\": \"CUSTOM\",\n"
-                                                 << "  \"default_port\": 0\n"
-                                                 << "}\n";
-
-            // Scaffold sample pre-flight test vector
-            uint8_t sample_frame[] = {0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03, 0x04};
-            std::ofstream(dir / "tests" / "preflight_frame.bin", std::ios::binary)
-                .write(reinterpret_cast<const char *>(sample_frame), sizeof(sample_frame));
-
-            if (lang == "wasm")
-            {
-                std::filesystem::create_directories(dir / "src");
-                std::ofstream(dir / "Cargo.toml") << "[package]\nname = \"" << name << "\"\nversion = \"1.0.0\"\nedition = \"2021\"\n\n"
-                                                  << "[lib]\ncrate-type = [\"cdylib\"]\n\n"
-                                                  << "[dependencies]\nsentinel-sdk-rs = { path = \"/home/kami/blackbox-sentinel/tools/sdk/rust/sentinel-sdk-rs\" }\n\n"
-                                                  << "[profile.release]\nopt-level = 3\nlto = true\npanic = \"abort\"\nstrip = true\n";
-
-                std::ofstream(dir / "src" / "lib.rs") << "#![no_std]\nuse core::panic::PanicInfo;\nuse sentinel_sdk_rs::{PacketView, Verdict};\n\n"
-                                                      << "#[panic_handler]\nfn panic(_info: &PanicInfo) -> ! { loop {} }\n\n"
-                                                      << "#[no_mangle]\npub extern \"C\" fn sentinel_dissect(pkt_ptr: *const u8, len: u32) -> i32 {\n"
-                                                      << "    let pkt = unsafe { PacketView::from_raw(pkt_ptr, len as usize) };\n"
-                                                      << "    if pkt.is_empty() { return Verdict::Pass as i32; }\n"
-                                                      << "    // Detection logic here\n"
-                                                      << "    Verdict::Pass as i32\n}\n";
-            }
-            else if (lang == "native")
-            {
-                std::ofstream(dir / (name + ".cpp")) << "#include <sentinel/sdk/plugin.hpp>\n\n"
-                                                     << "using namespace sentinel::sdk;\n\n"
-                                                     << "static SentinelDissectorResult my_dissect(const SentinelRawPacket* pkt) {\n"
-                                                     << "    return VerdictBuilder::Pass();\n}\n\n"
-                                                     << "static SentinelPluginDescriptor g_desc = {\n"
-                                                     << "    SENTINEL_SDK_MAGIC, SENTINEL_SDK_VERSION_MAJOR, SENTINEL_SDK_VERSION_MINOR,\n"
-                                                     << "    SENTINEL_TIER_NATIVE_CPP, \"org.aryorithm.package." << name << "\",\n"
-                                                     << "    \"" << name << "\", \"1.0.0\", \"CUSTOM\", 0, 0, nullptr, nullptr, my_dissect\n"
-                                                     << "};\nSENTINEL_REGISTER_PLUGIN(g_desc)\n";
-            }
-            else if (lang == "lua")
-            {
-                std::ofstream(dir / (name + ".lua")) << "local ffi = ffi or require(\"ffi\")\n\n"
-                                                     << "Rule = { id = 8001, name = \"" << name << "\", port = 0 }\n\n"
-                                                     << "function Rule.inspect(pkt)\n"
-                                                     << "    local len = tonumber(pkt.length)\n"
-                                                     << "    if not len or len < 4 then return 0 end\n"
-                                                     << "    return 0\n"
-                                                     << "end\n";
-            }
-
-            std::cout << "\033[1;32m[+] Nexus C2 scaffolded " << lang << " package in ./" << name << "/\033[0m\n"
-                      << "    ├── manifest.json\n"
-                      << "    └── tests/preflight_frame.bin\n";
-            return 0;
-        }
     }
 
     // =========================================================================
-    // AUTHENTICATION COMMANDS
-    // =========================================================================
-    if (cmd == "auth" && argc >= 3 && std::string(argv[2]) == "login")
-    {
-        std::string email = (argc >= 4) ? argv[3] : "kamisaberi@gmail.com";
-        std::string pass = (argc >= 5) ? argv[4] : "12345678";
-
-        std::cout << "[*] Authenticating with FastAPI backend at 127.0.0.1:8000 (" << email << ")..." << std::endl;
-        std::string payload = "{\"email\":\"" + email + "\",\"password\":\"" + pass + "\",\"username\":\"" + email + "\"}";
-        std::string resp = http_post("127.0.0.1", 8000, "/api/v1/auth/login", payload);
-
-        std::cout << "[+] Server Response:\n"
-                  << resp << std::endl;
-
-        std::ofstream f("data/cloud_session.json");
-        if (f.is_open())
-        {
-            f << resp;
-            std::cout << "[+] Saved JWT session to data/cloud_session.json" << std::endl;
-        }
-        return 0;
-    }
-
-    if (cmd == "auth" && argc >= 3 && std::string(argv[2]) == "status")
-    {
-        std::ifstream f("data/cloud_session.json");
-        if (f.is_open())
-        {
-            std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
-            std::cout << "[+] Active Cloud Session Found:\n"
-                      << content << std::endl;
-        }
-        else
-        {
-            std::cout << "[-] No active cloud session on disk. Run: nexus-ctl auth login" << std::endl;
-        }
-        return 0;
-    }
-
-    // =========================================================================
-    // FLEET, THREAT, OTA & REPORT COMMANDS (PASS-THROUGH TO 9443)
+    // FLEET, THREAT, OTA & REPORT COMMANDS
     // =========================================================================
     if (cmd == "fleet" && argc >= 3 && std::string(argv[2]) == "list")
     {
-        std::cout << http_post("127.0.0.1", 9443, "/api/v1/fleet/nodes", "") << std::endl;
+        std::cout << execute_http_post("http://127.0.0.1:9443/api/v1/fleet/nodes", "") << std::endl;
     }
     else if (cmd == "threat" && argc >= 4 && std::string(argv[2]) == "drop")
     {
         std::string ip = argv[3];
-        std::cout << http_post("127.0.0.1", 9443, "/api/v1/threats/broadcast", "{\"ip\":\"" + ip + "\"}") << std::endl;
+        std::cout << execute_http_post("http://127.0.0.1:9443/api/v1/threats/broadcast", "{\"ip\":\"" + ip + "\"}") << std::endl;
     }
     else if (cmd == "ota" && argc >= 3)
     {
         std::string sub = argv[2];
         if (sub == "status")
-            std::cout << http_post("127.0.0.1", 9443, "/api/v1/ota/status", "") << std::endl;
+            std::cout << execute_http_post("http://127.0.0.1:9443/api/v1/ota/status", "") << std::endl;
         else if (sub == "stage")
-            std::cout << http_post("127.0.0.1", 9443, "/api/v1/ota/stage", "{}") << std::endl;
+            std::cout << execute_http_post("http://127.0.0.1:9443/api/v1/ota/stage", "{}") << std::endl;
         else if (sub == "advance")
-            std::cout << http_post("127.0.0.1", 9443, "/api/v1/ota/advance", "{}") << std::endl;
+            std::cout << execute_http_post("http://127.0.0.1:9443/api/v1/ota/advance", "{}") << std::endl;
         else if (sub == "rollback")
-            std::cout << http_post("127.0.0.1", 9443, "/api/v1/ota/rollback", "{}") << std::endl;
+            std::cout << execute_http_post("http://127.0.0.1:9443/api/v1/ota/rollback", "{}") << std::endl;
     }
     else if (cmd == "report" && argc >= 3)
     {
         std::string sub = argv[2];
         if (sub == "cmmc")
-            std::cout << http_post("127.0.0.1", 9443, "/api/v1/reports/cmmc", "") << std::endl;
+            std::cout << execute_http_post("http://127.0.0.1:9443/api/v1/reports/cmmc", "") << std::endl;
         else if (sub == "scada")
-            std::cout << http_post("127.0.0.1", 9443, "/api/v1/reports/scada", "") << std::endl;
+            std::cout << execute_http_post("http://127.0.0.1:9443/api/v1/reports/scada", "") << std::endl;
     }
     else
     {
