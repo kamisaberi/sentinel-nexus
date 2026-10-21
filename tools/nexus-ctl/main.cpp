@@ -490,9 +490,32 @@ int main(int argc, char **argv)
     // =========================================================================
     // FLEET, THREAT, OTA & REPORT COMMANDS
     // =========================================================================
-    if (cmd == "fleet" && argc >= 3 && std::string(argv[2]) == "list")
+    if (cmd == "fleet" && argc >= 3)
     {
-        std::cout << execute_http_post("http://127.0.0.1:9443/api/v1/fleet/nodes", "") << std::endl;
+        std::string sub = argv[2];
+        if (sub == "list")
+        {
+            std::cout << execute_http_post("http://127.0.0.1:9443/api/v1/fleet/nodes", "") << std::endl;
+        }
+        else if (sub == "vaccine-audit")
+        {
+            std::cout << "\033[1;36m========================================================================================\033[0m\n";
+            std::cout << "\033[1;37m                 SENTINEL NEXUS: FLEET VACCINE IMMUNIZATION AUDIT                       \033[0m\n";
+            std::cout << "\033[1;36m========================================================================================\033[0m\n";
+            std::string resp = execute_http_post("http://127.0.0.1:9443/api/v1/extensions/list", "");
+            if (resp.empty() || resp.find("404") != std::string::npos || resp.find("error") != std::string::npos)
+            {
+                std::cout << "[*] No active remote extensions API. Checking local staged vaccines...\n";
+                std::string local_audit = "ls -lh /tmp/honeynet_vaccines/*/*.spkg 2>/dev/null";
+                std::system(local_audit.c_str());
+            }
+            else
+            {
+                std::cout << resp << std::endl;
+            }
+            std::cout << "\033[1;36m========================================================================================\033[0m\n";
+        }
+        return 0;
     }
     else if (cmd == "threat" && argc >= 4 && std::string(argv[2]) == "drop")
     {
