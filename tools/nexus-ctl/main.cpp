@@ -196,6 +196,7 @@ Hub Marketplace & Extensions (.spkg):
 
 Fleet & Threat Administration:
   fleet list                  List all connected edge appliances and metrics
+  fleet vaccine-audit         Audit active honeynet-synthesized vaccines across fleet
   threat drop <IP>            Broadcast instant sub-50ms eBPF drop across fleet
   ota status                  Check current ONNX model rollout stage
   ota stage                   Stage new candidate model into SHADOW_MODE
@@ -203,6 +204,7 @@ Fleet & Threat Administration:
   ota rollback                Execute emergency model rollback
   report cmmc                 Print CMMC 2.0 / NIST SP 800-171 audit status
   report scada                Print IEC 62443 industrial audit status
+
 
 Global Options:
   --backend-url <URL>         Override API backend host (Default: https://backend.aryorithm.com)
