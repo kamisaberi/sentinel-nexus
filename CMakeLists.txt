@@ -94,7 +94,7 @@ set(NEXUS_SOURCES
     src/storage/TimeSeriesEngine.cpp
     src/api/HttpServer.cpp
     src/api/TelemetryStreamer.cpp
-    src/cloud/SaaSConnector.cpp          # <--- NEW
+    src/cloud/SaaSConnector.cpp
     src/rpc/FleetServiceImpl.cpp
     src/rpc/TelemetryServiceImpl.cpp
     src/rpc/IntelligenceServiceImpl.cpp
@@ -102,6 +102,7 @@ set(NEXUS_SOURCES
     ${PROTO_GEN_SRCS}
     ${GRPC_GEN_SRCS}
 )
+
 # 1. Main Daemon Target
 add_executable(sentinel-nexus ${NEXUS_SOURCES})
 target_link_libraries(sentinel-nexus
@@ -114,12 +115,14 @@ target_link_libraries(sentinel-nexus
         gRPC::grpc++_reflection
 )
 
-# 2. Operations CLI Target
-add_executable(nexus-ctl tools/nexus-ctl/main.cpp)
-target_link_libraries(nexus-ctl PRIVATE Threads::Threads OpenSSL::Crypto)
+# 2. Operations CLI Target (Auto-resolves tools/nexus-ctl or tools/nexus_ctl)
+set(NEXUS_CTL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/tools/nexus-ctl/main.cpp")
+if(NOT EXISTS ${NEXUS_CTL_SRC})
+    set(NEXUS_CTL_SRC "${CMAKE_CURRENT_SOURCE_DIR}/tools/nexus_ctl/main.cpp")
+endif()
 
-
-
+add_executable(nexus-ctl ${NEXUS_CTL_SRC})
+target_link_libraries(nexus-ctl PRIVATE Threads::Threads OpenSSL::SSL OpenSSL::Crypto)
 
 # 3. High-Throughput Ingestion Benchmark Target
 add_executable(benchmark_ingest 
