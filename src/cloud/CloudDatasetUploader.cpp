@@ -5,11 +5,7 @@
 #include <fstream>
 #include <sstream>
 #include <chrono>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <unistd.h>
+#include <cstdlib>
 
 namespace sentinel::nexus::cloud {
 
@@ -32,16 +28,16 @@ void CloudDatasetUploader::stop() {
     running_.store(false);
 }
 
-bool CloudDatasetUploader::enqueue_dataset(const std::string& csv_file, 
+bool CloudDatasetUploader::enqueue_dataset(const std::string& dataset_file, 
                                           const std::string& manifest_file, 
                                           bool is_exclusive) {
-    if (!std::filesystem::exists(csv_file)) {
-        NEXUS_LOG_WARN("Cannot enqueue non-existent dataset: " + csv_file);
+    if (!std::filesystem::exists(dataset_file)) {
+        NEXUS_LOG_WARN("Cannot enqueue non-existent dataset: " + dataset_file);
         return false;
     }
 
     UploadTask task{
-        .dataset_csv_path = csv_file,
+        .dataset_file_path = dataset_file,
         .manifest_json_path = manifest_file,
         .is_exclusive_tenant = is_exclusive,
         .tenant_id = default_tenant_id_
@@ -52,7 +48,7 @@ bool CloudDatasetUploader::enqueue_dataset(const std::string& csv_file,
         task_queue_.push(std::move(task));
     }
 
-    NEXUS_LOG_INFO("Queued dataset for Cloud GPU Forge training: " + csv_file);
+    NEXUS_LOG_INFO("Queued dataset for Remote GPU Forge training: " + dataset_file);
     return true;
 }
 
@@ -78,10 +74,10 @@ void CloudDatasetUploader::worker_loop(std::stop_token st) {
         if (has_task) {
             UploadResult res = execute_multipart_upload(current_task);
             if (res.success) {
-                NEXUS_LOG_INFO("Cloud upload complete for: " + current_task.dataset_csv_path + 
+                NEXUS_LOG_INFO("Remote upload complete for: " + current_task.dataset_file_path + 
                                " (" + std::to_string(res.bytes_uploaded) + " bytes)");
             } else {
-                NEXUS_LOG_WARN("Cloud upload failed for: " + current_task.dataset_csv_path + 
+                NEXUS_LOG_WARN("Remote upload failed for: " + current_task.dataset_file_path + 
                                " -> " + res.server_response.substr(0, 100));
             }
         } else {
@@ -93,97 +89,46 @@ void CloudDatasetUploader::worker_loop(std::stop_token st) {
 UploadResult CloudDatasetUploader::execute_multipart_upload(const UploadTask& task) {
     UploadResult result{false, "", 0, ""};
 
-    // Read CSV file contents
-    std::ifstream csv_in(task.dataset_csv_path, std::ios::binary);
-    if (!csv_in.is_open()) {
-        result.server_response = "Cannot open CSV file";
+    if (!std::filesystem::exists(task.dataset_file_path)) {
+        result.server_response = "Dataset file not found";
         return result;
     }
-    std::string csv_content((std::istreambuf_iterator<char>(csv_in)), std::istreambuf_iterator<char>());
-    csv_in.close();
 
-    // Read Manifest if present
-    std::string manifest_content = "{}";
-    if (std::filesystem::exists(task.manifest_json_path)) {
-        std::ifstream mf_in(task.manifest_json_path);
-        if (mf_in.is_open()) {
-            manifest_content.assign((std::istreambuf_iterator<char>(mf_in)), std::istreambuf_iterator<char>());
+    size_t file_size = std::filesystem::file_size(task.dataset_file_path);
+    result.bytes_uploaded = file_size;
+
+    // Use robust curl multipart dispatch supporting both HTTP and HTTPS endpoints
+    std::string resp_file = "/tmp/nexus_uploader_resp.txt";
+    std::string auth_header = !api_key_.empty() ? "-H 'Authorization: Bearer " + api_key_ + "' " : "";
+
+    std::string curl_cmd = "curl -sSL -w '\n%{http_code}' -X POST '" + cloud_endpoint_ + "' " +
+                           auth_header +
+                           "-H 'X-Tenant-ID: " + task.tenant_id + "' " +
+                           "-F 'dataset=@" + task.dataset_file_path + "' " +
+                           "-F 'is_exclusive=" + (task.is_exclusive_tenant ? "true" : "false") + "' " +
+                           "> " + resp_file + " 2>&1";
+
+    int ret = std::system(curl_cmd.c_str());
+    (void)ret;
+
+    std::ifstream in(resp_file);
+    std::string line, last_line, full_body;
+    while (std::getline(in, line)) {
+        if (!line.empty()) {
+            last_line = line;
+            full_body += line + "\n";
         }
     }
+    in.close();
+    std::filesystem::remove(resp_file);
 
-    std::string boundary = "----AryorithmFormBoundary7MA4YWxkTrZu0gW";
-    std::string filename = std::filesystem::path(task.dataset_csv_path).filename().string();
+    int http_code = 0;
+    try {
+        http_code = std::stoi(last_line);
+    } catch (...) {}
 
-    // Build Multipart Body
-    std::ostringstream body;
-    // Field: is_exclusive
-    body << "--" << boundary << "\r\n"
-         << "Content-Disposition: form-data; name=\"is_exclusive\"\r\n\r\n"
-         << (task.is_exclusive_tenant ? "true" : "false") << "\r\n";
-    // Field: manifest
-    body << "--" << boundary << "\r\n"
-         << "Content-Disposition: form-data; name=\"manifest_json\"\r\n\r\n"
-         << manifest_content << "\r\n";
-    // Field: file
-    body << "--" << boundary << "\r\n"
-         << "Content-Disposition: form-data; name=\"dataset_file\"; filename=\"" << filename << "\"\r\n"
-         << "Content-Type: text/csv\r\n\r\n"
-         << csv_content << "\r\n"
-         << "--" << boundary << "--\r\n";
-
-    std::string body_str = body.str();
-    result.bytes_uploaded = body_str.size();
-
-    // Parse endpoint host/port
-    std::string host = "127.0.0.1";
-    uint16_t port = 8000;
-    std::string path = "/api/v1/ai/forge/datasets/upload";
-
-    int sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock < 0) {
-        result.server_response = "Socket creation failed";
-        return result;
-    }
-
-    struct timeval tv{5, 0};
-    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-    setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-
-    sockaddr_in serv_addr{};
-    serv_addr.sin_family = AF_INET;
-    inet_pton(AF_INET, host.c_str(), &serv_addr.sin_addr);
-    serv_addr.sin_port = htons(port);
-
-    if (connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
-        close(sock);
-        result.server_response = "Connection to cloud backend failed";
-        return result;
-    }
-
-    std::ostringstream req;
-    req << "POST " << path << " HTTP/1.1\r\n"
-        << "Host: " << host << ":" << port << "\r\n"
-        << "X-Tenant-ID: " << task.tenant_id << "\r\n"
-        << "Content-Type: multipart/form-data; boundary=" << boundary << "\r\n"
-        << "Content-Length: " << body_str.size() << "\r\n"
-        << "Connection: close\r\n\r\n"
-        << body_str;
-
-    std::string req_str = req.str();
-    send(sock, req_str.data(), req_str.size(), 0);
-
-    char buf[4096];
-    std::string resp;
-    ssize_t bytes;
-    while ((bytes = recv(sock, buf, sizeof(buf) - 1, 0)) > 0) {
-        buf[bytes] = '\0';
-        resp.append(buf, bytes);
-        if (resp.find("\r\n\r\n") != std::string::npos && resp.size() > 500) break;
-    }
-    close(sock);
-
-    result.server_response = resp;
-    result.success = (resp.find("200 OK") != std::string::npos || resp.find("201 Created") != std::string::npos);
+    result.server_response = full_body;
+    result.success = (http_code == 200 || http_code == 201);
     return result;
 }
 
