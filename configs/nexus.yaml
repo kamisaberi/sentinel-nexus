@@ -39,3 +39,10 @@ saas:
   auth_email: "kamisaberi@gmail.com"
   auth_password: "12345678"
   token_storage_path: "data/cloud_session.json"
+
+
+training_engine:
+  mode: "remote" # "local" | "private_forge" | "cloud"
+  remote_endpoint: "https://backend.aryorithm.com/api/v1/forge"
+  gpu_device: "cuda:0"
+  auto_ota_stage: true
