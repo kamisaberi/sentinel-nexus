@@ -10,17 +10,17 @@
 namespace sentinel::nexus::cloud {
 
 struct UploadTask {
-    std::string dataset_csv_path;
+    std::string dataset_file_path;
     std::string manifest_json_path;
-    bool is_exclusive_tenant;
-    std::string tenant_id;
+    bool is_exclusive_tenant{true};
+    std::string tenant_id{"tenant-dev-local"};
 };
 
 struct UploadResult {
-    bool success;
-    std::string task_id;
-    size_t bytes_uploaded;
-    std::string server_response;
+    bool success{false};
+    std::string task_id{""};
+    size_t bytes_uploaded{0};
+    std::string server_response{""};
 };
 
 class CloudDatasetUploader {
@@ -34,9 +34,9 @@ public:
                     const std::string& api_key, 
                     const std::string& tenant_id);
 
-    // Enqueue an active learning dataset for asynchronous cloud upload
-    bool enqueue_dataset(const std::string& csv_file, 
-                         const std::string& manifest_file, 
+    // Enqueue an active learning dataset (.csv or .slab) for asynchronous cloud upload
+    bool enqueue_dataset(const std::string& dataset_file, 
+                         const std::string& manifest_file = "", 
                          bool is_exclusive = true);
 
     size_t pending_queue_size() const;
@@ -47,7 +47,7 @@ private:
     void worker_loop(std::stop_token st);
     UploadResult execute_multipart_upload(const UploadTask& task);
 
-    std::string cloud_endpoint_{"http://127.0.0.1:8000/api/v1"};
+    std::string cloud_endpoint_{"https://backend.aryorithm.com/api/v1/forge/datasets/upload"};
     std::string api_key_{""};
     std::string default_tenant_id_{"tenant-dev-local"};
 
