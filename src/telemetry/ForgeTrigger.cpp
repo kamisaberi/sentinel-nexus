@@ -9,12 +9,19 @@
 
 namespace sentinel::nexus::telemetry {
 
-void ForgeTrigger::initialize(const std::string& forge_cli_path, size_t trigger_quota_samples) {
+void ForgeTrigger::initialize(const std::string& forge_cli_path, 
+                              size_t trigger_quota_samples,
+                              const std::string& training_mode,
+                              const std::string& remote_endpoint) {
     std::lock_guard<std::mutex> lock(mutex_);
-    forge_script_path_ = forge_cli_path;
+    forge_cli_path_ = forge_cli_path;
     trigger_quota_ = trigger_quota_samples;
-    NEXUS_LOG_INFO("ForgeTrigger initialized. Quota: " + std::to_string(trigger_quota_) + 
-                   " samples -> Target script: " + forge_script_path_.string());
+    training_mode_ = training_mode;
+    remote_endpoint_ = remote_endpoint;
+
+    NEXUS_LOG_INFO("ForgeTrigger initialized. Mode: " + training_mode_ + 
+                   " | Quota: " + std::to_string(trigger_quota_) + 
+                   " -> Target CLI: " + forge_cli_path_.string());
 }
 
 void ForgeTrigger::evaluate_retraining_quota(size_t total_buffered_samples) {
@@ -38,18 +45,28 @@ void ForgeTrigger::execute_forge_job() {
         return;
     }
 
-    NEXUS_LOG_INFO("Launching background xinfer-forge job on dataset: " + info.dataset_file);
+    NEXUS_LOG_INFO("Launching xinfer-forge job on dataset: " + info.dataset_file);
 
-    // 2. Invoke adaptation script if present on host
-    if (std::filesystem::exists(forge_script_path_)) {
-        std::string cmd = forge_script_path_.string() + " --dataset " + info.dataset_file + " > /tmp/forge_output.log 2>&1";
-        int ret = std::system(cmd.c_str());
-        NEXUS_LOG_INFO("xinfer-forge execution finished with exit code: " + std::to_string(ret));
-    } else {
-        NEXUS_LOG_WARN("xinfer-forge execution script not found at " + forge_script_path_.string() + 
-                       ", simulating successful training completion.");
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+    // 2. Invoke forge-cli with --remote if configured
+    std::string exec_bin = "/usr/local/bin/forge-cli";
+    if (std::filesystem::exists(forge_cli_path_)) {
+        exec_bin = forge_cli_path_.string();
     }
+
+    std::ostringstream cmd;
+    cmd << exec_bin << " finetune "
+        << "--base-model models/network_threat_detector.onnx "
+        << "--dataset " << info.dataset_file << " "
+        << "--output models/network_threat_v2_adapted.onnx ";
+
+    if (training_mode_ == "remote" || training_mode_ == "cloud" || training_mode_ == "private_forge") {
+        cmd << "--remote --endpoint '" << remote_endpoint_ << "' ";
+    }
+    cmd << "> /tmp/forge_output.log 2>&1";
+
+    NEXUS_LOG_INFO("Executing command: " + cmd.str());
+    int ret = std::system(cmd.str().c_str());
+    NEXUS_LOG_INFO("xinfer-forge execution finished with exit code: " + std::to_string(ret));
 
     // 3. Stage newly adapted candidate weights into Canary Orchestrator
     ota::ModelRepository::instance().scan_repository();
@@ -77,6 +94,8 @@ std::string ForgeTrigger::get_training_status_json() const {
     std::ostringstream ss;
     ss << "{\n"
        << "  \"training_active\": " << (training_active_.load() ? "true" : "false") << ",\n"
+       << "  \"training_mode\": \"" << training_mode_ << "\",\n"
+       << "  \"remote_endpoint\": \"" << remote_endpoint_ << "\",\n"
        << "  \"retraining_cycles_completed\": " << retraining_cycles_completed_ << ",\n"
        << "  \"last_trained\": \"" << last_trained_timestamp_ << "\",\n"
        << "  \"quota_threshold\": " << trigger_quota_ << "\n"
