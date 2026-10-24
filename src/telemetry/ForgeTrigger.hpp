@@ -14,8 +14,10 @@ public:
         return inst;
     }
 
-    void initialize(const std::string& forge_cli_path = "/home/kami/blackbox-sentinel/xinfer-forge/deploy/run_adaptation.sh",
-                    size_t trigger_quota_samples = 5000);
+    void initialize(const std::string& forge_cli_path = "/usr/local/bin/forge-cli",
+                    size_t trigger_quota_samples = 5000,
+                    const std::string& training_mode = "remote",
+                    const std::string& remote_endpoint = "https://backend.aryorithm.com/api/v1/forge");
 
     // Checks candidate sample volume and fires asynchronous retraining
     void evaluate_retraining_quota(size_t total_buffered_samples);
@@ -27,8 +29,10 @@ private:
     ForgeTrigger() = default;
     void execute_forge_job();
 
-    std::filesystem::path forge_script_path_;
+    std::filesystem::path forge_cli_path_{"/usr/local/bin/forge-cli"};
     size_t trigger_quota_{5000};
+    std::string training_mode_{"remote"};
+    std::string remote_endpoint_{"https://backend.aryorithm.com/api/v1/forge"};
     std::atomic<bool> training_active_{false};
     std::string last_trained_timestamp_{"Never"};
     uint32_t retraining_cycles_completed_{0};
