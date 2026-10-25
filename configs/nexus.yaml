@@ -43,6 +43,6 @@ saas:
 
 training_engine:
   mode: "remote" # "local" | "private_forge" | "cloud"
-  remote_endpoint: "https://backend.aryorithm.com/api/v1/forge"
+  remote_endpoint: "https://backend.aryorithm.com/api/v1/forge/train"
   gpu_device: "cuda:0"
   auto_ota_stage: true
