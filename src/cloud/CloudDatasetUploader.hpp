@@ -47,7 +47,7 @@ private:
     void worker_loop(std::stop_token st);
     UploadResult execute_multipart_upload(const UploadTask& task);
 
-    std::string cloud_endpoint_{"https://backend.aryorithm.com/api/v1/forge/datasets/upload"};
+    std::string cloud_endpoint_{"https://backend.aryorithm.com/api/v1/forge/train"};
     std::string api_key_{""};
     std::string default_tenant_id_{"tenant-dev-local"};
 
