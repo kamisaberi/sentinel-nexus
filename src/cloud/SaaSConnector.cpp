@@ -93,21 +93,20 @@ namespace sentinel::nexus::cloud
 
         if (!config_.enabled)
         {
-            NEXUS_LOG_INFO("SaaS Connector disabled. Operating in 100% Sovereign Air-Gapped mode.");
+            NEXUS_LOG_INFO("SaaS Connector disabled in configuration. Operating in 100% Sovereign Air-Gapped mode.");
             return true;
         }
 
         running_.store(true);
-        NEXUS_LOG_INFO("SaaS Connector booting. Cloud endpoint: " + config_.cloud_endpoint);
+        circuit_state_.store(CircuitState::CLOSED);
+        consecutive_failures_.store(0);
+        current_backoff_sec_.store(config_.sync_interval_sec);
+        next_retry_time_ = std::chrono::steady_clock::now();
 
-        // Try loading cached token from disk, otherwise authenticate with credentials
-        if (!load_token_from_disk())
-        {
-            if (!authenticate())
-            {
-                NEXUS_LOG_WARN("Initial authentication failed with " + config_.auth_email + ". Background workers will retry.");
-            }
-        }
+        NEXUS_LOG_INFO("SaaS Connector active. Target endpoint: " + config_.cloud_endpoint);
+
+        // Attempt cached token load
+        load_token_from_disk();
 
         sync_thread_ = std::jthread([this](std::stop_token st)
                                     { outbound_sync_worker(st); });
@@ -125,78 +124,82 @@ namespace sentinel::nexus::cloud
         cloud_connected_.store(false);
     }
 
+    void SaaSConnector::record_failure()
+    {
+        uint32_t fails = ++consecutive_failures_;
+        cloud_connected_.store(false);
+
+        // Step up exponential backoff: 5s -> 15s -> 30s -> 60s -> 300s
+        uint32_t backoff = current_backoff_sec_.load();
+        if (backoff < 15)
+            backoff = 15;
+        else if (backoff < 30)
+            backoff = 30;
+        else if (backoff < 60)
+            backoff = 60;
+        else
+            backoff = config_.max_backoff_sec;
+        current_backoff_sec_.store(backoff);
+
+        next_retry_time_ = std::chrono::steady_clock::now() + std::chrono::seconds(backoff);
+
+        // Trip Circuit Breaker after 3 failures and silence logs
+        if (fails == 3)
+        {
+            circuit_state_.store(CircuitState::OPEN);
+            NEXUS_LOG_WARN("Cloud backend unreachable at " + config_.cloud_endpoint +
+                           " (3 consecutive failures). Entering AUTONOMOUS AIR-GAPPED mode. "
+                           "Log spam suppressed. Next retry in " +
+                           std::to_string(backoff) + "s.");
+        }
+    }
+
+    void SaaSConnector::record_success()
+    {
+        if (circuit_state_.load() != CircuitState::CLOSED)
+        {
+            NEXUS_LOG_INFO("Cloud backend reconnected successfully! Resuming live SaaS synchronization.");
+        }
+        circuit_state_.store(CircuitState::CLOSED);
+        consecutive_failures_.store(0);
+        current_backoff_sec_.store(config_.sync_interval_sec);
+        cloud_connected_.store(true);
+    }
+
     bool SaaSConnector::authenticate()
     {
         std::lock_guard<std::recursive_mutex> lock(auth_mutex_);
 
-        std::cout << "\n\033[35m[SaaSConnector:AUTH] >>> Initiating Cloud Authentication...\033[0m" << std::endl;
+        // Suppress terminal output during circuit open backoff
+        if (circuit_state_.load() == CircuitState::OPEN)
+        {
+            if (std::chrono::steady_clock::now() < next_retry_time_)
+                return false;
+            circuit_state_.store(CircuitState::HALF_OPEN);
+        }
 
         ParsedUrl purl = parse_url(config_.cloud_endpoint);
-        std::string auth_path = purl.path + "/auth/login";
-
-        // JSON payload
-        std::string json_body = "{\"email\":\"" + config_.auth_email + "\",\"password\":\"" + config_.auth_password + "\",\"username\":\"" + config_.auth_email + "\"}";
-
+        std::string json_body = "{\"email\":\"" + config_.auth_email + "\",\"password\":\"" + config_.auth_password + "\"}";
         std::string resp;
+
         bool ok = http_post_json("/auth/login", json_body, resp, false);
 
-        // If FastAPI expects form-encoded, retry if 422
-        if (!ok && resp.find("422") != std::string::npos)
+        if (ok)
         {
-            std::cout << "\033[33m[SaaSConnector:AUTH] Retrying authentication with form-urlencoded...\033[0m" << std::endl;
+            std::string token = extract_json_field(resp, "access_token");
+            if (token.empty())
+                token = extract_json_field(resp, "token");
 
-            int sock = socket(AF_INET, SOCK_STREAM, 0);
-            struct hostent *server = gethostbyname(purl.host.c_str());
-            sockaddr_in serv_addr{};
-            serv_addr.sin_family = AF_INET;
-            memcpy(&serv_addr.sin_addr.s_addr, server->h_addr, server->h_length);
-            serv_addr.sin_port = htons(purl.port);
-
-            struct timeval tv{3, 0};
-            setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-            setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-
-            if (sock >= 0 && connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == 0)
+            if (!token.empty())
             {
-                std::string form_body = "username=" + config_.auth_email + "&password=" + config_.auth_password;
-                std::ostringstream form_req;
-                form_req << "POST " << auth_path << " HTTP/1.1\r\n"
-                         << "Host: " << purl.host << ":" << purl.port << "\r\n"
-                         << "Content-Type: application/x-www-form-urlencoded\r\n"
-                         << "Content-Length: " << form_body.size() << "\r\n"
-                         << "Connection: close\r\n\r\n"
-                         << form_body;
-                std::string f_str = form_req.str();
-                send(sock, f_str.data(), f_str.size(), 0);
-                resp.clear();
-                char buffer[4096];
-                ssize_t bytes;
-                while ((bytes = recv(sock, buffer, sizeof(buffer) - 1, 0)) > 0)
-                {
-                    buffer[bytes] = '\0';
-                    resp.append(buffer, bytes);
-                }
-                close(sock);
+                jwt_token_ = token;
+                save_token_to_disk(jwt_token_);
+                record_success();
+                return true;
             }
         }
 
-        std::string token = extract_json_field(resp, "access_token");
-        if (token.empty())
-            token = extract_json_field(resp, "token");
-
-        if (!token.empty())
-        {
-            jwt_token_ = token;
-            cloud_connected_.store(true);
-            save_token_to_disk(jwt_token_);
-            std::cout << "\033[32m[SaaSConnector:AUTH] [+] Authentication SUCCESS! JWT Acquired: "
-                      << token.substr(0, 20) << "...\033[0m\n"
-                      << std::endl;
-            return true;
-        }
-
-        std::cout << "\033[31m[SaaSConnector:AUTH] [-] Authentication FAILED! Check response above.\033[0m\n"
-                  << std::endl;
+        record_failure();
         return false;
     }
 
@@ -238,7 +241,7 @@ namespace sentinel::nexus::cloud
         {
             std::lock_guard<std::recursive_mutex> lock(auth_mutex_);
             jwt_token_ = token;
-            NEXUS_LOG_INFO("Loaded cached JWT token from " + config_.token_storage_path);
+            cloud_connected_.store(true);
             return true;
         }
         return false;
@@ -255,7 +258,7 @@ namespace sentinel::nexus::cloud
                                              float confidence,
                                              const std::string &xai_summary)
     {
-        if (!running_.load() || !config_.enabled)
+        if (!running_.load() || !config_.enabled || circuit_state_.load() == CircuitState::OPEN)
             return;
 
         std::ostringstream ss;
@@ -275,7 +278,8 @@ namespace sentinel::nexus::cloud
     {
         while (!st.stop_requested() && running_.load())
         {
-            std::this_thread::sleep_for(std::chrono::seconds(config_.sync_interval_sec));
+            uint32_t sleep_sec = (circuit_state_.load() == CircuitState::OPEN) ? current_backoff_sec_.load() : config_.sync_interval_sec;
+            std::this_thread::sleep_for(std::chrono::seconds(sleep_sec));
 
             if (!ensure_authenticated())
                 continue;
@@ -296,7 +300,7 @@ namespace sentinel::nexus::cloud
                 http_post_json("/threats/broadcast", threat_json, resp);
             }
 
-            // 2. Periodic Fleet Telemetry Sync (4-Tier Hierarchical Diagram)
+            // 2. Periodic Fleet Telemetry Sync
             if (config_.push_telemetry)
             {
                 auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
@@ -325,23 +329,7 @@ namespace sentinel::nexus::cloud
                        << "      \"ebpf_drops\": " << n.latest_metrics.ebpf_packets_dropped() << ",\n"
                        << "      \"mitigation_latency_us\": " << n.latest_metrics.avg_mitigation_latency_us() << ",\n"
                        << "      \"sensors_count\": " << n.sensors.size() << ",\n"
-                       << "      \"sensors\": [\n";
-
-                    for (size_t j = 0; j < n.sensors.size(); ++j)
-                    {
-                        const auto &s = n.sensors[j];
-                        ss << "        {\n"
-                           << "          \"sensor_id\": \"" << s.sensor_id() << "\",\n"
-                           << "          \"name\": \"" << s.name() << "\",\n"
-                           << "          \"type\": \"" << s.type() << "\",\n"
-                           << "          \"protocol\": \"" << s.protocol() << "\",\n"
-                           << "          \"ip_address\": \"" << s.ip_address() << "\",\n"
-                           << "          \"status\": \"" << s.status() << "\",\n"
-                           << "          \"last_packet_seen_sec_ago\": " << std::fixed << std::setprecision(1) << s.last_packet_seen_sec_ago() << "\n"
-                           << "        }" << (j + 1 < n.sensors.size() ? ",\n" : "\n");
-                    }
-
-                    ss << "      ]\n"
+                       << "      \"sensors\": []\n"
                        << "    }" << (i + 1 < nodes.size() ? ",\n" : "\n");
                 }
                 ss << "  ]\n}";
@@ -349,8 +337,12 @@ namespace sentinel::nexus::cloud
                 std::string response;
                 if (http_post_json("/fleet/sync", ss.str(), response))
                 {
-                    cloud_connected_.store(true);
+                    record_success();
                     last_sync_time_.store(now_sec);
+                }
+                else
+                {
+                    record_failure();
                 }
             }
         }
@@ -361,7 +353,7 @@ namespace sentinel::nexus::cloud
         while (!st.stop_requested() && running_.load())
         {
             std::this_thread::sleep_for(std::chrono::seconds(20));
-            if (!config_.pull_global_threats || !cloud_connected_.load())
+            if (!config_.pull_global_threats || !cloud_connected_.load() || circuit_state_.load() == CircuitState::OPEN)
                 continue;
 
             std::string response;
@@ -375,13 +367,11 @@ namespace sentinel::nexus::cloud
                     if (start != std::string::npos && end != std::string::npos)
                     {
                         std::string global_ip = response.substr(start + 1, end - start - 1);
-
                         ::sentinel::nexus::ThreatIndicator global_threat;
                         global_threat.set_origin_node_id("ARYORITHM-CLOUD-FEED");
                         global_threat.set_attacker_ip(global_ip);
                         global_threat.set_type(::sentinel::nexus::THREAT_EXPLOIT_PAYLOAD);
                         global_threat.set_confidence(0.999f);
-
                         intelligence::IocBroadcaster::instance().broadcast_threat(global_threat);
                     }
                     pos = end;
@@ -395,7 +385,7 @@ namespace sentinel::nexus::cloud
         while (!st.stop_requested() && running_.load())
         {
             std::this_thread::sleep_for(std::chrono::seconds(10));
-            if (!cloud_connected_.load())
+            if (!cloud_connected_.load() || circuit_state_.load() == CircuitState::OPEN)
                 continue;
 
             std::string response;
@@ -416,7 +406,7 @@ namespace sentinel::nexus::cloud
     }
 
     // -----------------------------------------------------------------------------
-    // HTTP Client Engine (Deadlock-Free, Timeout-Protected, Content-Length Parsing)
+    // HTTP Client Engine (Noisy Terminal std::cout Removed)
     // -----------------------------------------------------------------------------
     bool SaaSConnector::http_post_json(const std::string &url_path, const std::string &json_body, std::string &out_response, bool retry_on_401)
     {
@@ -427,8 +417,7 @@ namespace sentinel::nexus::cloud
         if (sock < 0)
             return false;
 
-        // Set 3-second socket send/receive timeouts to prevent hanging
-        struct timeval tv{3, 0};
+        struct timeval tv{2, 0}; // 2-second timeout
         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
         setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
@@ -450,18 +439,13 @@ namespace sentinel::nexus::cloud
             return false;
         }
 
-        // Do NOT attach Authorization header to login route
         std::string token = (url_path == "/auth/login") ? "" : get_active_token();
 
         std::ostringstream req;
         req << "POST " << full_path << " HTTP/1.1\r\n"
             << "Host: " << purl.host << ":" << purl.port << "\r\n";
-
         if (!token.empty())
-        {
             req << "Authorization: Bearer " << token << "\r\n";
-        }
-
         req << "X-Tenant-ID: " << config_.tenant_id << "\r\n"
             << "Content-Type: application/json\r\n"
             << "Content-Length: " << json_body.size() << "\r\n"
@@ -469,13 +453,6 @@ namespace sentinel::nexus::cloud
             << json_body;
 
         std::string req_str = req.str();
-
-        std::cout << "\n\033[36m==================================================================" << std::endl;
-        std::cout << "[SaaSConnector:OUTBOUND-POST] >>> " << config_.cloud_endpoint << url_path << std::endl;
-        std::cout << "------------------------------------------------------------------" << std::endl;
-        std::cout << req_str << std::endl;
-        std::cout << "==================================================================\033[0m" << std::endl;
-
         send(sock, req_str.data(), req_str.size(), 0);
 
         char buffer[4096];
@@ -486,8 +463,6 @@ namespace sentinel::nexus::cloud
         {
             buffer[bytes] = '\0';
             out_response.append(buffer, bytes);
-
-            // Check Content-Length to exit loop immediately when response body is complete
             size_t header_end = out_response.find("\r\n\r\n");
             if (header_end != std::string::npos)
             {
@@ -501,9 +476,7 @@ namespace sentinel::nexus::cloud
                     {
                         int content_len = std::stoi(out_response.substr(cl_pos + 16, cl_end - cl_pos - 16));
                         if (out_response.size() >= (header_end + 4 + content_len))
-                        {
                             break;
-                        }
                     }
                     catch (...)
                     {
@@ -513,13 +486,8 @@ namespace sentinel::nexus::cloud
         }
         close(sock);
 
-        std::cout << "\033[33m[SaaSConnector:INBOUND-RESP] <<< Response from FastAPI backend:" << std::endl;
-        std::cout << out_response << "\033[0m\n"
-                  << std::endl;
-
         if (retry_on_401 && out_response.find("401 Unauthorized") != std::string::npos)
         {
-            NEXUS_LOG_WARN("JWT Token expired (401 Unauthorized). Re-authenticating with backend...");
             if (authenticate())
             {
                 return http_post_json(url_path, json_body, out_response, false);
@@ -538,7 +506,7 @@ namespace sentinel::nexus::cloud
         if (sock < 0)
             return false;
 
-        struct timeval tv{3, 0};
+        struct timeval tv{2, 0};
         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
         setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
@@ -565,12 +533,8 @@ namespace sentinel::nexus::cloud
         std::ostringstream req;
         req << "GET " << full_path << " HTTP/1.1\r\n"
             << "Host: " << purl.host << ":" << purl.port << "\r\n";
-
         if (!token.empty())
-        {
             req << "Authorization: Bearer " << token << "\r\n";
-        }
-
         req << "X-Tenant-ID: " << config_.tenant_id << "\r\n"
             << "Connection: close\r\n\r\n";
 
@@ -584,7 +548,6 @@ namespace sentinel::nexus::cloud
         {
             buffer[bytes] = '\0';
             out_response.append(buffer, bytes);
-
             size_t header_end = out_response.find("\r\n\r\n");
             if (header_end != std::string::npos)
             {
@@ -598,9 +561,7 @@ namespace sentinel::nexus::cloud
                     {
                         int content_len = std::stoi(out_response.substr(cl_pos + 16, cl_end - cl_pos - 16));
                         if (out_response.size() >= (header_end + 4 + content_len))
-                        {
                             break;
-                        }
                     }
                     catch (...)
                     {
@@ -612,7 +573,6 @@ namespace sentinel::nexus::cloud
 
         if (retry_on_401 && out_response.find("401 Unauthorized") != std::string::npos)
         {
-            NEXUS_LOG_WARN("JWT Token expired on GET (401). Re-authenticating with backend...");
             if (authenticate())
             {
                 return http_get_json(url_path, out_response, false);
