@@ -425,6 +425,16 @@ namespace sentinel::nexus::api
 
     std::string HttpServer::handle_post_broadcast(const std::string &body)
     {
+        const char *env_p = std::getenv("NEXUS_ENV");
+        bool is_simulation = (env_p && std::string(env_p) == "simulation");
+
+        // SAFETY INVARIANT: Reject simulated attack requests if running in production mode
+        if (body.find("\"attack_type\"") != std::string::npos && !is_simulation)
+        {
+            NEXUS_LOG_WARN("[SecurityGate] Blocked simulated attack trigger in PRODUCTION mode.");
+            return "{\"status\": \"forbidden\", \"message\": \"Simulated attack generation is strictly disabled in production mode. Set NEXUS_ENV=simulation in range environments.\"}";
+        }
+
         std::string ip;
         size_t pos = body.find("\"ip\"");
         if (pos != std::string::npos)
@@ -445,12 +455,16 @@ namespace sentinel::nexus::api
             threat.set_attacker_ip(ip);
             threat.set_type(::sentinel::nexus::THREAT_EXPLOIT_PAYLOAD);
             intelligence::IocBroadcaster::instance().broadcast_threat(threat);
+
+            if (is_simulation)
+            {
+                NEXUS_LOG_INFO("[RangeSimulation] Dispatched simulated threat injection on: " + ip);
+            }
             return "{\"status\": \"broadcast_dispatched\", \"target_ip\": \"" + ip + "\"}";
         }
 
         return "{\"status\": \"error\", \"message\": \"invalid IP\"}";
     }
-
     std::string HttpServer::handle_post_ota_stage(const std::string &body)
     {
         (void)body;
