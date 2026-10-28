@@ -10,6 +10,13 @@
 namespace sentinel::nexus::cloud
 {
 
+    enum class CircuitState : uint8_t
+    {
+        CLOSED = 0,    // Normal online operation (Connected)
+        OPEN = 1,      // Autonomous Air-Gapped mode (Unreachable, logs silenced)
+        HALF_OPEN = 2  // Testing connection with single probe
+    };
+
     struct SaaSConfig
     {
         bool enabled{false};
@@ -21,6 +28,7 @@ namespace sentinel::nexus::cloud
         std::string token_storage_path{"data/cloud_session.json"};
         uint32_t sync_interval_sec{5};
         uint32_t heartbeat_interval_sec{30};
+        uint32_t max_backoff_sec{300}; // 5 minutes max
         bool push_telemetry{true};
         bool pull_global_threats{true};
         bool pull_ota_models{true};
@@ -29,7 +37,7 @@ namespace sentinel::nexus::cloud
     struct CloudCommand
     {
         std::string command_id;
-        std::string action; // "EMERGENCY_DROP", "STAGE_MODEL", "ADVANCE_MODEL", "PURGE_IP"
+        std::string action;
         std::string target_payload;
     };
 
@@ -45,7 +53,6 @@ namespace sentinel::nexus::cloud
         bool start(const SaaSConfig &config);
         void stop();
 
-        // Authenticate with FastAPI and obtain/refresh JWT access token
         bool authenticate();
         bool is_authenticated() const { return !jwt_token_.empty(); }
 
@@ -55,6 +62,7 @@ namespace sentinel::nexus::cloud
                                   const std::string &xai_summary);
 
         bool is_connected() const { return cloud_connected_.load(); }
+        CircuitState get_circuit_state() const { return circuit_state_.load(); }
         std::string get_active_token() const;
 
     private:
@@ -68,7 +76,9 @@ namespace sentinel::nexus::cloud
         bool save_token_to_disk(const std::string &token);
         bool load_token_from_disk();
 
-        // HTTP/HTTPS dispatchers with automated JWT header injection and 401 retry
+        void record_failure();
+        void record_success();
+
         bool http_post_json(const std::string &url_path, const std::string &json_body, std::string &out_response, bool retry_on_401 = true);
         bool http_get_json(const std::string &url_path, std::string &out_response, bool retry_on_401 = true);
 
@@ -77,8 +87,13 @@ namespace sentinel::nexus::cloud
         std::atomic<bool> cloud_connected_{false};
         std::atomic<uint64_t> last_sync_time_{0};
 
-        mutable std::recursive_mutex auth_mutex_;
+        // Circuit Breaker & Exponential Backoff Controls
+        std::atomic<CircuitState> circuit_state_{CircuitState::CLOSED};
+        std::atomic<uint32_t> consecutive_failures_{0};
+        std::atomic<uint32_t> current_backoff_sec_{5};
+        std::chrono::steady_clock::time_point next_retry_time_;
 
+        mutable std::recursive_mutex auth_mutex_;
         std::string jwt_token_{""};
 
         std::jthread sync_thread_;
