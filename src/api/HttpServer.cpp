@@ -273,6 +273,13 @@ namespace sentinel::nexus::api
             route_path = route_path.substr(0, qmark);
         }
 
+        if (route_path == "/api/v1/nexus/mode")
+        {
+            content_type = "application/json";
+            const char *env_p = std::getenv("NEXUS_ENV");
+            std::string mode = (env_p && std::string(env_p) == "simulation") ? "simulation" : "production";
+            return "{\"environment\": \"" + mode + "\"}";
+        }
         if (route_path == "/api/v1/models")
         {
             content_type = "application/json";
