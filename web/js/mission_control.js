@@ -73,7 +73,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // INITIALIZATION & DROPDOWN EVENT LISTENER
     // ========================================================================
     if (nodeSelect) {
-        nodeSelect.innerHTML = Object.values(NODES).map(n => 
+        nodeSelect.innerHTML = Object.values(NODES).map(n =>
             `<option value="${n.id}">${n.name} (${n.ip})</option>`
         ).join("");
 
