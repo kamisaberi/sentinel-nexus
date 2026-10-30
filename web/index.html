@@ -92,20 +92,34 @@
         <!-- Master Viewports -->
         <main class="dashboard-viewport">
 
-            <!-- TAB 0: INTERACTIVE MULTI-FRAME MISSION CONTROL (2x2 Balanced Grid) -->
+<!-- TAB 0: INTERACTIVE MULTI-FRAME MISSION CONTROL (2x2 Balanced Grid) -->
             <div class="tab-pane active" id="tab-mission-control">
+
+                <!-- TOP GLOBAL COMMAND TOOLBAR (Clear Appliance Context) -->
+                <div class="mission-control-toolbar" style="display:flex; justify-content:space-between; align-items:center; background:rgba(14, 19, 27, 0.85); border:1px solid #243144; border-radius:6px; padding:10px 16px; margin-bottom:14px;">
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <span style="font-size:11px; font-weight:800; letter-spacing:1px; color:#94A3B8;">ACTIVE APPLIANCE TARGET:</span>
+                        <select id="mc-node-select" class="form-select-sm" style="background:#0F172A; border:1px solid #00F0FF; color:#F8FAFC; border-radius:4px; padding:4px 10px; font-weight:700; font-family:monospace;"></select>
+                        <span id="mc-site-label" style="font-size:11px; color:#94A3B8; font-family:monospace;">Substation Alpha (High-Voltage Grid)</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span class="badge badge-cyan" id="mc-node-backend-badge">INTEL OPENVINO</span>
+                        <span class="badge badge-purple" id="mc-target-ip-badge">TARGET: 10.240.0.101</span>
+                    </div>
+                </div>
+
                 <div class="mission-control-grid">
 
-                    <!-- FRAME 1: FLEET SELECTOR & MULTI-CAMERA VISION WALL -->
+                    <!-- FRAME 1: MULTI-CAMERA VISION WALL -->
                     <div class="mc-frame">
                         <div class="panel-header">
                             <div class="frame-title-group">
                                 <span class="frame-index">FRAME 01</span>
                                 <h3>VISION WALL &amp; CAMERA FEED</h3>
                             </div>
-                            <div class="node-selector-wrapper">
-                                <label for="mc-node-select" class="selector-label">TARGET NODE:</label>
-                                <select id="mc-node-select" class="form-select-sm"></select>
+                            <div class="frame-actions" style="display:flex; gap:6px;">
+                                <button class="btn-sm text-yellow" id="btn-cam-tamper" style="font-size:9px; padding:2px 8px;">[!] Inject Thermal Glare</button>
+                                <button class="btn-sm text-green" id="btn-cam-reset" style="font-size:9px; padding:2px 8px;">[+] Normal</button>
                             </div>
                         </div>
                         <div class="video-wall-container" id="mc-video-wall"></div>
@@ -118,7 +132,10 @@
                                 <span class="frame-index">FRAME 02</span>
                                 <h3>DYNAMIC PHYSICAL SENSORS &amp; CBF BARRIER</h3>
                             </div>
-                            <span class="badge badge-cyan" id="mc-node-backend-badge">INTEL OPENVINO</span>
+                            <div class="frame-actions" style="display:flex; gap:6px;">
+                                <button class="btn-sm text-yellow" id="btn-sensor-surge" style="font-size:9px; padding:2px 8px;">[!] Inject Sensor Surge</button>
+                                <button class="btn-sm text-green" id="btn-sensor-reset" style="font-size:9px; padding:2px 8px;">[+] Normal</button>
+                            </div>
                         </div>
                         <div class="dynamic-sensor-grid" id="mc-sensor-grid"></div>
                     </div>
@@ -130,39 +147,35 @@
                                 <span class="frame-index">FRAME 03</span>
                                 <h3>IN-KERNEL eBPF DROPS (&lt; 0.84 µs SLA)</h3>
                             </div>
-                            <span class="badge badge-green" id="mc-filter-status">AF_XDP LINE-RATE</span>
+                            <div class="frame-actions" style="display:flex; gap:6px;">
+                                <button class="btn-sm text-cyan" id="btn-test-drop" style="font-size:9px; padding:2px 8px;">Test 0.84µs Drop</button>
+                                <button class="btn-sm" id="btn-clear-feed" style="font-size:9px; padding:2px 8px;">Clear Feed</button>
+                            </div>
                         </div>
                         <div class="drop-log-feed" id="mc-drop-feed">
                             <div class="drop-entry text-muted">[READY] In-kernel eBPF driver rings listening on physical interfaces...</div>
                         </div>
                     </div>
 
-                    <!-- FRAME 4: SCENARIO-AWARE INTERACTIVE ATTACK INJECTOR -->
+                    <!-- FRAME 4: PROTOCOL EXPLOIT INJECTOR -->
                     <div class="mc-frame">
                         <div class="panel-header">
                             <div class="frame-title-group">
                                 <span class="frame-index">FRAME 04</span>
-                                <h3>RED-TEAM ATTACK INJECTION &amp; ANOMALY</h3>
+                                <h3>RED-TEAM INDUSTRIAL PROTOCOL EXPLOITS</h3>
                             </div>
-                            <span class="badge badge-purple" id="mc-target-ip-badge">TARGET: 10.240.0.101</span>
+                            <span class="badge badge-green" id="mc-filter-status">AF_XDP LINE-RATE</span>
                         </div>
                         <div class="attack-button-grid">
                             <button class="btn-attack" data-attack="MODBUS_FC05_OVERRIDE">Inject Modbus Coil Override (FC05)</button>
                             <button class="btn-attack" data-attack="S7COMM_CPU_STOP">Inject S7Comm CPU STOP (0x29)</button>
                             <button class="btn-attack" data-attack="5G_GTPU_SLICE_HOP">Inject 5G TEID Slice-Hop</button>
                             <button class="btn-attack" data-attack="AI_PROMPT_INJECTION">Inject AI TRiSM Prompt Jailbreak</button>
-                            <button class="btn-attack btn-attack-danger" id="btn-trigger-anomaly">
-                                [!] INJECT PHYSICAL ANOMALY (Thermal &amp; Vibration Surge)
-                            </button>
-                            <button class="btn-attack btn-attack-success" id="btn-reset-anomaly">
-                                [+] RESTORE NORMAL BASELINE OPERATING BOUNDS
-                            </button>
                         </div>
                     </div>
 
                 </div>
             </div>
-
             <!-- TAB 1: FLEET TOPOLOGY -->
             <div class="tab-pane" id="tab-topology">
                 <div class="pane-split">
