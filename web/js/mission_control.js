@@ -1,12 +1,11 @@
 /**
- * ARYORITHM SENTINEL NEXUS: MISSION CONTROL MULTI-FRAME CONTROLLER (REACTIVE)
- * Connects the Node Dropdown Context Switcher to the Vision Wall,
- * Dynamic Physical Sensors, eBPF Drop Feed, and Attack Injector.
+ * ARYORITHM SENTINEL NEXUS: MISSION CONTROL MULTI-FRAME CONTROLLER
+ * Decoupled Per-Frame Injections, Global Toolbar Selector & Dynamic Physical Gauges.
  */
 
 document.addEventListener("DOMContentLoaded", () => {
     // ------------------------------------------------------------------------
-    // HETEROGENEOUS NODE & SENSOR DEFINITIONS (Matching docker-compose.yml)
+    // HETEROGENEOUS NODE & SENSOR DEFINITIONS
     // ------------------------------------------------------------------------
     const NODES = {
         "matrix-edge-substation-01": {
@@ -57,10 +56,14 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     let activeNodeKey = "matrix-edge-substation-01";
-    let isAnomalyActive = false;
+    
+    // Decoupled Anomaly States
+    let isThermalAnomalyActive = false; // Controls Frame 1 (Vision/Camera)
+    let isSensorSurgeActive = false;    // Controls Frame 2 (Sensors/Gauges)
 
     // Elements
     const nodeSelect = document.getElementById("mc-node-select");
+    const siteLabel = document.getElementById("mc-site-label");
     const backendBadge = document.getElementById("mc-node-backend-badge");
     const targetIpBadge = document.getElementById("mc-target-ip-badge");
     const videoWall = document.getElementById("mc-video-wall");
@@ -70,11 +73,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const sensorHistories = { s1: [], s2: [], s3: [], s4: [] };
 
     // ========================================================================
-    // INITIALIZATION & DROPDOWN EVENT LISTENER
+    // GLOBAL TOOLBAR: CONTEXT SWITCHER
     // ========================================================================
     if (nodeSelect) {
-        nodeSelect.innerHTML = Object.values(NODES).map(n =>
-            `<option value="${n.id}">${n.name} (${n.ip})</option>`
+        nodeSelect.innerHTML = Object.values(NODES).map(n => 
+            `<option value="${n.id}">${n.name}</option>`
         ).join("");
 
         nodeSelect.value = activeNodeKey;
@@ -88,41 +91,38 @@ document.addEventListener("DOMContentLoaded", () => {
         const node = NODES[key];
         if (!node) return;
 
-        // 1. Update Header Badges
+        if (siteLabel) siteLabel.textContent = node.site;
         if (backendBadge) backendBadge.textContent = node.backend;
         if (targetIpBadge) targetIpBadge.textContent = `TARGET: ${node.ip}`;
 
-        logEvent(`[CONTEXT] Switched to ${node.name} (${node.site}) &bull; Target IP: ${node.ip}`, "text-cyan");
+        logEvent(`[CONTEXT] Switched to ${node.name} (${node.site}) \u2022 Target IP: ${node.ip}`, "text-cyan");
 
-        // 2. Re-render Frame 1 Vision/Camera Wall
         updateVisionWallForNode(node);
-
-        // 3. Re-render Frame 2 Sensor Grid & Plots
         renderSensorCards(node);
     }
 
     // ========================================================================
-    // FRAME 1: DYNAMIC VISION WALL
+    // FRAME 1: VISION WALL & ISOLATED THERMAL INJECTION
     // ========================================================================
     function initVideoWall() {
         if (!videoWall) return;
 
         videoWall.innerHTML = `
-            <div style="position: relative; width: 100%; height: 100%; min-height: 240px; background: #05080C; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                <video id="thermal-video" autoplay muted playsinline style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
-                <canvas id="thermal-canvas" width="640" height="360" style="width: 100%; height: 100%; object-fit: cover;"></canvas>
+            <div style="position:relative; width:100%; height:100%; min-height:240px; background:#05080C; display:flex; align-items:center; justify-content:center; overflow:hidden;">
+                <video id="thermal-video" autoplay muted playsinline style="width:100%; height:100%; object-fit:cover; display:none;"></video>
+                <canvas id="thermal-canvas" width="640" height="360" style="width:100%; height:100%; object-fit:cover;"></canvas>
 
-                <div style="position: absolute; top: 10px; left: 10px; background: rgba(14, 19, 27, 0.9); border: 1px solid #10B981; border-radius: 4px; padding: 4px 8px; font-size: 10px; font-family: monospace; color: #10B981; display: flex; align-items: center; gap: 6px; z-index: 10;">
-                    <span id="cam-status-dot" style="width: 7px; height: 7px; border-radius: 50%; background: #10B981; display: inline-block;"></span>
+                <div style="position:absolute; top:10px; left:10px; background:rgba(14, 19, 27, 0.9); border:1px solid #10B981; border-radius:4px; padding:4px 8px; font-size:10px; font-family:monospace; color:#10B981; display:flex; align-items:center; gap:6px; z-index:10;">
+                    <span id="cam-status-dot" style="width:7px; height:7px; border-radius:50%; background:#10B981; display:inline-block;"></span>
                     <span id="cam-status-text">CAMERA LIVE</span>
                 </div>
 
-                <div id="thermal-anomaly-hud" style="display: none; position: absolute; inset: 0; border: 3px solid #EF4444; background: rgba(239, 68, 68, 0.15); pointer-events: none; flex-direction: column; align-items: center; justify-content: center; z-index: 20;">
-                    <span style="background: #EF4444; color: #FFF; font-weight: 800; font-size: 12px; font-family: monospace; padding: 4px 12px; border-radius: 4px; letter-spacing: 1px;">
-                        [!] PHYSICAL INVARIANT BREACH &bull; SURGE DETECTED
+                <div id="thermal-anomaly-hud" style="display:none; position:absolute; inset:0; border:3px solid #EF4444; background:rgba(239, 68, 68, 0.15); pointer-events:none; flex-direction:column; align-items:center; justify-content:center; z-index:20;">
+                    <span style="background:#EF4444; color:#FFF; font-weight:800; font-size:12px; font-family:monospace; padding:4px 12px; border-radius:4px; letter-spacing:1px;">
+                        [!] OPTICAL / THERMAL SURGE DETECTED
                     </span>
-                    <span style="color: #FCA5A5; font-size: 10px; font-family: monospace; margin-top: 4px;">
-                        Continuous RK4 ODE Solver: T_crit = 38.4 ms (&le; 50 ms Limit)
+                    <span style="color:#FCA5A5; font-size:10px; font-family:monospace; margin-top:4px;">
+                        Camera Telemetry Divergence Reported to Nexus
                     </span>
                 </div>
             </div>
@@ -146,7 +146,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         if (node.camType === "video") {
-            // Node 02: Connect to live MediaMTX WebRTC stream
             const host = window.location.hostname || "localhost";
             const whepEndpoint = `http://${host}:8889/thermal_feed/whep`;
 
@@ -166,7 +165,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 startDynamicCanvasSimulation(canvasEl, node);
             }
         } else {
-            // Node 01 & 03: Specialized Canvas Simulation
             videoEl.style.display = "none";
             canvasEl.style.display = "block";
             startDynamicCanvasSimulation(canvasEl, node);
@@ -183,32 +181,30 @@ document.addEventListener("DOMContentLoaded", () => {
             const h = canvas.height;
 
             if (node.camType === "grid") {
-                // Node 01: Substation Sine Wave Radar
                 ctx.fillStyle = "#05080C";
                 ctx.fillRect(0, 0, w, h);
 
-                ctx.strokeStyle = isAnomalyActive ? "rgba(239, 68, 68, 0.4)" : "rgba(0, 240, 255, 0.25)";
+                ctx.strokeStyle = isThermalAnomalyActive ? "rgba(239, 68, 68, 0.4)" : "rgba(0, 240, 255, 0.25)";
                 ctx.lineWidth = 1;
                 for (let x = 0; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
                 for (let y = 0; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
 
-                ctx.strokeStyle = isAnomalyActive ? "#EF4444" : "#00F0FF";
+                ctx.strokeStyle = isThermalAnomalyActive ? "#EF4444" : "#00F0FF";
                 ctx.lineWidth = 2.5;
                 ctx.beginPath();
                 for (let x = 0; x < w; x++) {
-                    const y = (h / 2) + Math.sin((x * 0.02) + (tick * 4)) * (isAnomalyActive ? 80 : 35);
+                    const y = (h / 2) + Math.sin((x * 0.02) + (tick * 4)) * (isThermalAnomalyActive ? 80 : 35);
                     if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
                 }
                 ctx.stroke();
 
-                ctx.fillStyle = isAnomalyActive ? "#EF4444" : "#10B981";
+                ctx.fillStyle = isThermalAnomalyActive ? "#EF4444" : "#10B981";
                 ctx.font = "bold 12px monospace";
-                ctx.fillText(`SUBSTATION ALPHA: 50.02 Hz \u2022 ${isAnomalyActive ? "PHASE IMBALANCE" : "NOMINAL"}`, 20, h - 20);
+                ctx.fillText(`SUBSTATION ALPHA: 50.02 Hz \u2022 ${isThermalAnomalyActive ? "WAVEFORM CORRUPTED" : "NOMINAL"}`, 20, h - 20);
 
             } else {
-                // Node 03 / Thermal Reactor
                 const grad = ctx.createRadialGradient(w / 2, h / 2, 20, w / 2, h / 2, w / 1.5);
-                if (isAnomalyActive) {
+                if (isThermalAnomalyActive) {
                     grad.addColorStop(0, "#FFFFFF");
                     grad.addColorStop(0.3, "#FF3B00");
                     grad.addColorStop(0.7, "#990000");
@@ -224,15 +220,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 const cx = w / 2;
                 const cy = h / 2;
-                const radius = 75 + Math.sin(tick * 3) * (isAnomalyActive ? 15 : 4);
+                const radius = 75 + Math.sin(tick * 3) * (isThermalAnomalyActive ? 15 : 4);
                 ctx.beginPath();
                 ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-                ctx.fillStyle = isAnomalyActive ? "rgba(255, 255, 255, 0.85)" : "rgba(16, 185, 129, 0.45)";
+                ctx.fillStyle = isThermalAnomalyActive ? "rgba(255, 255, 255, 0.85)" : "rgba(16, 185, 129, 0.45)";
                 ctx.fill();
 
-                ctx.fillStyle = isAnomalyActive ? "#FF4444" : "#10B981";
+                ctx.fillStyle = isThermalAnomalyActive ? "#FF4444" : "#10B981";
                 ctx.font = "bold 12px monospace";
-                ctx.fillText(`REACTOR VESSEL: ${node.name} \u2022 ${isAnomalyActive ? "SURGE" : "STABLE"}`, 20, h - 20);
+                ctx.fillText(`REACTOR VESSEL: ${node.name} \u2022 ${isThermalAnomalyActive ? "OPTICAL ANOMALY" : "STABLE"}`, 20, h - 20);
             }
 
             canvasAnimId = requestAnimationFrame(draw);
@@ -240,8 +236,26 @@ document.addEventListener("DOMContentLoaded", () => {
         draw();
     }
 
+    // Frame 1 Controls
+    const hud = document.getElementById("thermal-anomaly-hud");
+    const videoTag = document.getElementById("thermal-video");
+
+    document.getElementById("btn-cam-tamper")?.addEventListener("click", () => {
+        isThermalAnomalyActive = true;
+        if (hud) hud.style.display = "flex";
+        if (videoTag) videoTag.style.filter = "hue-rotate(180deg) saturate(3.5) contrast(2.0)";
+        logEvent(`[FRAME 01] Injected optical anomaly / thermal flare on ${NODES[activeNodeKey].name}`, "text-yellow");
+    });
+
+    document.getElementById("btn-cam-reset")?.addEventListener("click", () => {
+        isThermalAnomalyActive = false;
+        if (hud) hud.style.display = "none";
+        if (videoTag) videoTag.style.filter = "none";
+        logEvent(`[FRAME 01] Restored nominal camera feed optics for ${NODES[activeNodeKey].name}`, "text-green");
+    });
+
     // ========================================================================
-    // FRAME 2: DYNAMIC PHYSICAL SENSORY GRID & PLOTS
+    // FRAME 2: SENSOR GAUGES & ISOLATED PHYSICAL SURGE INJECTION
     // ========================================================================
     function renderSensorCards(node) {
         if (!sensorGrid) return;
@@ -291,14 +305,13 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.stroke();
     }
 
-    // Live Sensor Telemetry Tick (Every 1 second)
     setInterval(() => {
         const node = NODES[activeNodeKey];
         if (!node) return;
 
         Object.entries(node.sensors).forEach(([key, s]) => {
             let val;
-            if (isAnomalyActive) {
+            if (isSensorSurgeActive) {
                 val = s.base * (1.3 + Math.random() * 0.35);
             } else {
                 val = s.base + (Math.sin(Date.now() / 2500) * (s.base * 0.02)) + ((Math.random() - 0.5) * (s.base * 0.01));
@@ -311,15 +324,29 @@ document.addEventListener("DOMContentLoaded", () => {
             const valEl = document.getElementById(`val-${key}`);
             if (valEl) {
                 valEl.textContent = `${val.toFixed(val < 10 ? 2 : 1)} ${s.unit}`;
-                valEl.style.color = isAnomalyActive ? "#EF4444" : s.color;
+                valEl.style.color = isSensorSurgeActive ? "#EF4444" : s.color;
             }
 
-            drawSparkline(`canvas-${key}`, hist, isAnomalyActive ? "#EF4444" : s.color, s.range[0], s.range[1]);
+            drawSparkline(`canvas-${key}`, hist, isSensorSurgeActive ? "#EF4444" : s.color, s.range[0], s.range[1]);
         });
     }, 1000);
 
+    // Frame 2 Controls
+    document.getElementById("btn-sensor-surge")?.addEventListener("click", () => {
+        isSensorSurgeActive = true;
+        const node = NODES[activeNodeKey];
+        logEvent(`[FRAME 02] PHYSICAL SURGE INJECTED: Accelerating physical drift on ${node.name}`, "text-yellow");
+        logEvent(`[CBF_BARRIER] Nagumo Invariance dh/dt + alpha*h >= 0 active \u2022 T_crit = 38.4 ms`, "text-purple");
+    });
+
+    document.getElementById("btn-sensor-reset")?.addEventListener("click", () => {
+        isSensorSurgeActive = false;
+        const node = NODES[activeNodeKey];
+        logEvent(`[FRAME 02] BASELINE RESTORED: Sensors for ${node.name} operating within safe bounds`, "text-green");
+    });
+
     // ========================================================================
-    // FRAME 3: LIVE eBPF MITIGATION FEED
+    // FRAME 3: LIVE eBPF MITIGATION FEED & CONTROLS
     // ========================================================================
     function logEvent(msg, colorClass = "text-cyan") {
         if (!dropFeed) return;
@@ -332,31 +359,20 @@ document.addEventListener("DOMContentLoaded", () => {
         while (dropFeed.children.length > 50) dropFeed.removeChild(dropFeed.lastChild);
     }
 
-    // ========================================================================
-    // FRAME 4: ATTACK BUTTONS & ANOMALY TOGGLE
-    // ========================================================================
-    const hud = document.getElementById("thermal-anomaly-hud");
-    const videoTag = document.getElementById("thermal-video");
-
-    document.getElementById("btn-trigger-anomaly")?.addEventListener("click", () => {
-        isAnomalyActive = true;
-        if (hud) hud.style.display = "flex";
-        if (videoTag) videoTag.style.filter = "hue-rotate(180deg) saturate(3.5) contrast(2.0)";
-
+    document.getElementById("btn-test-drop")?.addEventListener("click", () => {
         const node = NODES[activeNodeKey];
-        logEvent(`[!] PHYSICAL ANOMALY INJECTED: Thermal &amp; vibration surge on ${node.name} (${node.ip})`, "text-yellow");
-        logEvent(`[CBF_BARRIER] Nagumo Invariant dh/dt + alpha*h >= 0 enforced &bull; Clearing Time T_crit = 38.4 ms`, "text-purple");
+        logEvent(`[XDP_DROP] SLA 0.84 µs: In-kernel eBPF drop executed on ${node.ip} (Driver Ring, 2.42 IPC)`, "text-green");
     });
 
-    document.getElementById("btn-reset-anomaly")?.addEventListener("click", () => {
-        isAnomalyActive = false;
-        if (hud) hud.style.display = "none";
-        if (videoTag) videoTag.style.filter = "none";
-
-        const node = NODES[activeNodeKey];
-        logEvent(`[+] BASELINE RESTORED: All physical invariants for ${node.name} returned to safe operating bounds.`, "text-green");
+    document.getElementById("btn-clear-feed")?.addEventListener("click", () => {
+        if (dropFeed) {
+            dropFeed.innerHTML = '<div class="drop-entry text-muted">[FEED CLEARED] In-kernel eBPF driver rings listening...</div>';
+        }
     });
 
+    // ========================================================================
+    // FRAME 4: RED-TEAM INDUSTRIAL PROTOCOL EXPLOITS
+    // ========================================================================
     document.querySelectorAll(".btn-attack").forEach(btn => {
         const attack = btn.getAttribute("data-attack");
         if (!attack) return;
@@ -369,30 +385,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 const resp = await fetch("/api/v1/range/attacks/replay", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        malware: attack,
-                        target: node.ip
-                    })
+                    body: JSON.stringify({ malware: attack, target: node.ip })
                 });
 
                 if (resp.ok) {
                     const data = await resp.json();
-                    logEvent(`[XDP_DROP] SLA 0.84 µs: In-kernel eBPF drop filtered ${data.frames_injected || 120} frames of ${attack} on ${node.ip}`, "text-green");
-                } else {
-                    simulateLocalDrop(attack, node);
-                }
-            } catch (err) {
-                simulateLocalDrop(attack, node);
-            }
-        });
-    });
-
-    function simulateLocalDrop(attack, node) {
-        setTimeout(() => {
-            logEvent(`[XDP_DROP] SLA 0.84 µs: In-kernel driver ring drop on ${node.ip} for ${attack} (0 SKB copies, 2.42 IPC)`, "text-green");
-        }, 320);
-    }
-
-    // Apply default initial node state
-    applyNodeContext(activeNodeKey);
-});
+                    logEvent(`[XDP_DROP
