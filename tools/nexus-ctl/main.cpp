@@ -337,6 +337,123 @@ int main(int argc, char **argv)
         return 0;
     }
 
+    // GAP 1: AUTHOR KEY ROTATION (PUT /api/v1/hub/author/key)
+    if (cmd == "auth" && argc >= 3 && std::string(argv[2]) == "update-key")
+    {
+        fs::path key_path = (argc >= 4 && argv[3][0] != '-') ? argv[3] : "";
+        if (key_path.empty())
+        {
+            const char *home = std::getenv("HOME");
+            key_path = home ? (fs::path(home) / ".sentinel" / "keys" / "developer_private.pem") : fs::path("/etc/sentinel/keys/developer_private.pem");
+        }
+
+        if (!fs::exists(key_path))
+        {
+            std::cerr << "[-] Error: Private key file not found: " << key_path.string() << std::endl;
+            return 1;
+        }
+
+        // Derive 64-character public key hex from private key
+        std::string new_pub_hex = "";
+        FILE *fp = fopen(key_path.c_str(), "rb");
+        if (fp)
+        {
+            EVP_PKEY *pkey = PEM_read_PrivateKey(fp, nullptr, nullptr, nullptr);
+            fclose(fp);
+            if (pkey)
+            {
+                size_t len = 32;
+                uint8_t raw[32];
+                if (EVP_PKEY_get_raw_public_key(pkey, raw, &len) == 1)
+                {
+                    std::ostringstream ss;
+                    for (size_t i = 0; i < len; ++i)
+                        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(raw[i]);
+                    new_pub_hex = ss.str();
+                }
+                EVP_PKEY_free(pkey);
+            }
+        }
+
+        if (new_pub_hex.empty())
+        {
+            std::cerr << "[-] Error: Failed to derive Ed25519 public key from " << key_path.string() << std::endl;
+            return 1;
+        }
+
+        fs::path cred_path = get_credentials_path();
+        if (!fs::exists(cred_path))
+        {
+            std::cerr << "[-] Error: No active session. Run 'nexus-ctl auth login' first." << std::endl;
+            return 1;
+        }
+
+        std::ifstream cf(cred_path);
+        std::string c_content((std::istreambuf_iterator<char>(cf)), std::istreambuf_iterator<char>());
+        cf.close();
+
+        std::string jwt = json_extract_key(c_content, "jwt");
+        if (jwt.empty())
+            jwt = json_extract_key(c_content, "jwt_token");
+        std::string api_key = json_extract_key(c_content, "api_key");
+
+        std::string url = base_api + "/hub/author/key";
+        std::cout << "[*] Rotating author public key on backend to: " << new_pub_hex << "...\n";
+
+        std::string resp_file = "/tmp/nexus_rotate_key_resp.json";
+        std::string curl_cmd = "curl -sSL -w \"\\n%{http_code}\" -X PUT \"" + url + "\" " +
+                               "-H \"Authorization: Bearer " + jwt + "\" " +
+                               "-H \"Content-Type: application/json\" " +
+                               "-d '{\"author_public_key\":\"" + new_pub_hex + "\"}' > " + resp_file + " 2>&1";
+
+        std::system(curl_cmd.c_str());
+
+        std::ifstream in(resp_file);
+        std::string line, last_line, body;
+        while (std::getline(in, line))
+        {
+            if (!line.empty())
+            {
+                last_line = line;
+                body += line + "\n";
+            }
+        }
+        in.close();
+        fs::remove(resp_file);
+
+        int code = 0;
+        try
+        {
+            code = std::stoi(last_line);
+        }
+        catch (...)
+        {
+        }
+
+        if (code == 200)
+        {
+            // Update credentials.json
+            std::ofstream out(cred_path);
+            out << "{\n"
+                << "  \"jwt\": \"" << jwt << "\",\n"
+                << "  \"jwt_token\": \"" << jwt << "\",\n"
+                << "  \"api_key\": \"" << api_key << "\",\n"
+                << "  \"hub_url\": \"" << base_api << "\",\n"
+                << "  \"author_public_key\": \"" << new_pub_hex << "\"\n"
+                << "}\n";
+            out.close();
+
+            std::cout << "\033[1;32m[+] Author Public Key Successfully Rotated on Backend!\033[0m\n"
+                      << "    New Author Key : " << new_pub_hex << "\n"
+                      << "    Updated        : " << cred_path.string() << "\n";
+            return 0;
+        }
+
+        std::cerr << "[-] Error (HTTP " << code << "): Key rotation failed.\n"
+                  << body << std::endl;
+        return 1;
+    }
+
     if (cmd == "auth" && argc >= 3 && std::string(argv[2]) == "status")
     {
         fs::path cred_path = get_credentials_path();
