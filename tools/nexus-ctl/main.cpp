@@ -221,8 +221,31 @@ int main(int argc, char **argv)
 
     std::string cmd = argv[1];
 
-    // Parse global --backend-url or --url
+// --- REPLACE LINES 223-234 IN sentinel-nexus/tools/nexus-ctl/main.cpp ---
     std::string backend_host = "https://backend.aryorithm.com";
+
+    // 1. Inherit hub_url from credentials.json
+    fs::path cpath = get_credentials_path();
+    if (fs::exists(cpath))
+    {
+        std::ifstream cf(cpath);
+        std::string c_content((std::istreambuf_iterator<char>(cf)), std::istreambuf_iterator<char>());
+        cf.close();
+        std::string saved_url = json_extract_key(c_content, "hub_url");
+        if (!saved_url.empty())
+        {
+            backend_host = saved_url;
+        }
+    }
+
+    // 2. Environment variable override
+    const char *env_url = std::getenv("SENTINEL_HUB_URL");
+    if (env_url && std::strlen(env_url) > 0)
+    {
+        backend_host = env_url;
+    }
+
+    // 3. CLI flag override (--backend-url, --url, --hub-url)
     for (int i = 2; i < argc; ++i)
     {
         if ((std::string(argv[i]) == "--backend-url" || std::string(argv[i]) == "--url" || std::string(argv[i]) == "--hub-url") && i + 1 < argc)
@@ -232,6 +255,7 @@ int main(int argc, char **argv)
     }
     std::string base_api = normalize_url(backend_host);
 
+    
     // =========================================================================
     // AUTHENTICATION COMMANDS
     // =========================================================================
