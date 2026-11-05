@@ -1,21 +1,12 @@
-# Operations CLI
+# Operations CLI (`nexus-ctl`)
 
-> **Status:** Draft — placeholder content. Final technical prose is forthcoming.
+`nexus-ctl` is a native ISO C++20 command-line administration utility providing programmatic control over the fleet orchestrator and collective defense grid.
 
-Section overview for Operations CLI — start with any guide below.
+## Section Navigation
 
-- [Command: auth login](./command-auth-login.md)
-
-- [Command: compliance reports](./command-compliance-reports.md)
-
-- [Command: fleet list](./command-fleet-list.md)
-
-- [Command: ota management](./command-ota-management.md)
-
-- [Command: threat drop](./command-threat-drop.md)
-
-- [nexus-ctl Overview](./nexus-ctl-overview.md)
-
----
-
-*Part of the sentinel-nexus documentation set.*
+- [nexus-ctl Overview](./nexus-ctl-overview.md): Global options, command tree summary, and local session caching (`~/.nexus/session.json`).
+- [nexus-ctl fleet list](./command-fleet-list.md): Querying active managed node inventories, status filters, and JSON output formatting.
+- [nexus-ctl threat drop](./command-threat-drop.md): Broadcasting emergency IP drop rules fleet-wide via the sub-50ms defense bus.
+- [nexus-ctl ota](./command-ota-management.md): Inspecting Canary rollouts, staging models, advancing phases, and executing rollbacks.
+- [nexus-ctl report](./command-compliance-reports.md): Compiling automated compliance scorecards (CMMC Level 2, IEC 62443, EU NIS 2).
+- [nexus-ctl auth login](./command-auth-login.md): Authenticating operators, processing MFA tokens, and caching Bearer JWT leases.

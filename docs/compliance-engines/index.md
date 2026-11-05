@@ -1,17 +1,10 @@
-# Compliance Engines
+# Automated Compliance & GRC Audit Engines
 
-> **Status:** Draft — placeholder content. Final technical prose is forthcoming.
+`sentinel-nexus` includes automated compliance audit engines that evaluate fleet configurations and telemetry against international regulatory standards.
 
-Section overview for Compliance Engines — start with any guide below.
+## Section Navigation
 
-- [CMMC 2.0 Audit Engine](./cmmc-2.0-audit-engine.md)
-
-- [IEC 62443 Audit Engine](./iec-62443-audit-engine.md)
-
-- [Latency SLA Percentile Proofs](./latency-sla-percentile-proofs.md)
-
-- [Tamper-Evident Audit Logging](./tamper-evident-audit-logging.md)
-
----
-
-*Part of the sentinel-nexus documentation set.*
+- [CMMC 2.0 Audit Engine](./cmmc-2.0-audit-engine.md): Automated audit readiness for CMMC 2.0 Level 2 & NIST SP 800-171 Rev 2 controls.
+- [IEC 62443 Audit Engine](./iec-62443-audit-engine.md): Validating Security Level 3 and 4 (SL 3/SL 4) compliance for industrial automation.
+- [Latency SLA Percentile Proofs](./latency-sla-percentile-proofs.md): Empirical CDF mathematical proofs ($p50 - p99.9$) certifying sub-microsecond mitigation.
+- [Tamper-Evident Audit Logging](./tamper-evident-audit-logging.md): Forward-secure cryptographic state journaling in `nexus_state.json` anchored to TPM PCR 12.
