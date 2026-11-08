@@ -273,7 +273,6 @@ namespace sentinel::nexus::api
             route_path = route_path.substr(0, qmark);
         }
 
-
         // ---------------------------------------------------------------------
         // SENTINEL-LAB SCIENTIFIC RESEARCH COCKPIT ENDPOINTS
         // ---------------------------------------------------------------------
@@ -292,8 +291,12 @@ namespace sentinel::nexus::api
             content_type = "application/json";
             return handle_get_lab_scorecard();
         }
-
-// ---------------------------------------------------------------------
+        if (route_path == "/api/v1/lab/logs")
+        {
+            content_type = "application/json";
+            return handle_get_lab_logs();
+        }
+        // ---------------------------------------------------------------------
         // DYNAMIC SENSOR TELEMETRY & INTERACTIVE ANOMALY CONTROL PROXIES
         // ---------------------------------------------------------------------
         if (route_path == "/api/v1/sensors/live")
@@ -303,9 +306,11 @@ namespace sentinel::nexus::api
             std::string resp;
             std::string cmd = "curl -s --max-time 1 http://10.240.0.76:8088/ 2>/dev/null || echo '{\"readings\":{\"temperature_c\":74.5,\"vibration_mm_s\":1.24}}'";
             FILE *fp = popen(cmd.c_str(), "r");
-            if (fp) {
+            if (fp)
+            {
                 char buf[512];
-                while (fgets(buf, sizeof(buf), fp)) resp += buf;
+                while (fgets(buf, sizeof(buf), fp))
+                    resp += buf;
                 pclose(fp);
             }
             return resp.empty() ? "{\"readings\":{\"temperature_c\":74.5,\"vibration_mm_s\":1.24}}" : resp;
@@ -327,7 +332,6 @@ namespace sentinel::nexus::api
 
             return "{\"status\": \"dispatched\", \"action\": \"" + action + "\"}";
         }
-
 
         if (route_path == "/api/v1/nexus/mode")
         {
@@ -732,14 +736,23 @@ namespace sentinel::nexus::api
         std::string cmd = "curl -s --max-time 1 http://10.240.0.150:502 2>/dev/null || echo ''";
         // Query sensor readings if available
         FILE *fp = popen("curl -s --max-time 1 http://127.0.0.1:9443/api/v1/sensors/live 2>/dev/null", "r");
-        if (fp) {
+        if (fp)
+        {
             char buf[512];
             std::string s_out;
-            while (fgets(buf, sizeof(buf), fp)) s_out += buf;
+            while (fgets(buf, sizeof(buf), fp))
+                s_out += buf;
             pclose(fp);
             size_t t_pos = s_out.find("\"temperature_c\":");
-            if (t_pos != std::string::npos) {
-                try { temp_c = std::stod(s_out.substr(t_pos + 16, 5)); } catch (...) {}
+            if (t_pos != std::string::npos)
+            {
+                try
+                {
+                    temp_c = std::stod(s_out.substr(t_pos + 16, 5));
+                }
+                catch (...)
+                {
+                }
             }
         }
 
@@ -748,10 +761,12 @@ namespace sentinel::nexus::api
         double nagumo_val = -0.5 + (0.5 * cbf_h);
         double lyapunov_lambda = (temp_c > 115.0) ? 0.08 : -0.15;
         double t_crit_ms = (temp_c > 100.0) ? (38.4 * (120.0 - temp_c) / 20.0) : 38.4;
-        if (t_crit_ms < 0.0) t_crit_ms = 0.0;
+        if (t_crit_ms < 0.0)
+            t_crit_ms = 0.0;
 
         uint64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()).count();
+                              std::chrono::system_clock::now().time_since_epoch())
+                              .count();
 
         std::ostringstream ss;
         ss << std::fixed << std::setprecision(3);
