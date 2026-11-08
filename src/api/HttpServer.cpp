@@ -722,15 +722,15 @@ namespace sentinel::nexus::api
         return ss.str();
     }
 
-    // -------------------------------------------------------------------------
-    // SENTINEL-LAB REAL-TIME HANDLERS (NATIVE MODBUS SOCKET & LIVE LOG BUFFER)
+// -------------------------------------------------------------------------
+    // SENTINEL-LAB REAL-TIME HANDLERS (CORRECTED MODBUS BYTE BOUNDS & ANSI STRIP)
     // -------------------------------------------------------------------------
     static bool query_modbus_plc(const std::string &ip, int port, double &temp, double &pressure, double &vibration)
     {
         int sock = socket(AF_INET, SOCK_STREAM, 0);
         if (sock < 0) return false;
 
-        struct timeval tv{0, 60000}; // 60ms timeout
+        struct timeval tv{0, 80000}; // 80ms timeout
         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
         setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
 
@@ -745,23 +745,22 @@ namespace sentinel::nexus::api
             return false;
         }
 
-        // Modbus TCP: Read Holding Registers 0..3 (12 bytes)
-        // TxID(2B=1), Proto(2B=0), Len(2B=6), UnitID(1B=1), FC(1B=3), Addr(2B=0), Qty(2B=4)
-        uint8_t req[] = {0x00, 0x01, 0x00, 0x00, 0x00, 0x06, 0x01, 0x03, 0x00, 0x00, 0x00, 0x04};
+        // Modbus TCP: Read Holding Registers 0..2 (12 bytes request)
+        uint8_t req[] = {0x00, 0x01, 0x00, 0x00, 0x00, 0x06, 0x01, 0x03, 0x00, 0x00, 0x00, 0x03};
         send(sock, req, sizeof(req), 0);
 
         uint8_t resp[64];
         ssize_t n = recv(sock, resp, sizeof(resp), 0);
         close(sock);
 
-        if (n >= 17 && resp[7] == 0x03)
+        // Fixed: mock_plc.c returns exactly 15 bytes for 3 registers!
+        if (n >= 15 && resp[7] == 0x03)
         {
-            uint16_t raw_t = (resp[11] << 8) | resp[12];
-            uint16_t raw_v = (resp[13] << 8) | resp[14];
-            uint16_t raw_p = (resp[15] << 8) | resp[16];
+            uint16_t raw_t = (resp[11] << 8) | resp[12]; // Register 1: Temperature
+            uint16_t raw_v = (resp[13] << 8) | resp[14]; // Register 2: Vibration
             temp = static_cast<double>(raw_t);
             vibration = static_cast<double>(raw_v);
-            pressure = static_cast<double>(raw_p);
+            pressure = 100.0;
             return true;
         }
         return false;
@@ -771,13 +770,13 @@ namespace sentinel::nexus::api
     {
         int sock = socket(AF_INET, SOCK_STREAM, 0);
         if (sock < 0) return;
-        struct timeval tv{0, 60000};
+        struct timeval tv{0, 80000};
         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
         setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
         sockaddr_in addr{};
         addr.sin_family = AF_INET;
         addr.sin_port = htons(port);
-        inet_pton(AF_INET, ip.c_str(), &addr.sin_addr);
+        if (inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) <= 0) { close(sock); return; }
         if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) { close(sock); return; }
 
         uint16_t val = on ? 0xFF00 : 0x0000;
@@ -792,27 +791,36 @@ namespace sentinel::nexus::api
         close(sock);
     }
 
+    // In-memory simulation state if mock_plc process is offline
+    static double g_sim_temp = 85.0;
+    static bool g_sim_heater_active = false;
+
     std::string HttpServer::handle_get_lab_telemetry()
     {
         double temp_c = 85.0;
         double pressure_psi = 100.0;
         double vibration = 1200.0;
 
-        // Attempt Modbus queries across possible PLC endpoints
+        // Try querying live Mock PLC across all potential local/docker endpoints
         bool queried = query_modbus_plc("127.0.0.1", 502, temp_c, pressure_psi, vibration) ||
                        query_modbus_plc("10.240.0.150", 502, temp_c, pressure_psi, vibration) ||
                        query_modbus_plc("127.0.0.1", 15501, temp_c, pressure_psi, vibration);
 
-        // Dynamic oscillation fallback if PLC is not reachable
-        uint64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()).count();
-        double sec = now_ms / 1000.0;
-
-        if (!queried)
+        if (queried)
         {
-            temp_c = 85.0 + 2.5 * std::sin(sec * 0.8);
-            pressure_psi = 100.0 + 1.8 * std::cos(sec * 0.5);
-            vibration = 1200.0 + 35.0 * std::sin(sec * 1.5);
+            g_sim_temp = temp_c;
+        }
+        else
+        {
+            // Dynamic simulation state that climbs above 120°C when heater is triggered
+            if (g_sim_heater_active) {
+                if (g_sim_temp < 125.0) g_sim_temp += 0.8;
+            } else {
+                if (g_sim_temp > 85.0) g_sim_temp -= 0.5;
+            }
+            temp_c = g_sim_temp;
+            pressure_psi = 100.0 + (temp_c - 85.0) * 0.4;
+            vibration = 1200.0 + (temp_c - 85.0) * 5.0;
         }
 
         double cbf_h = 120.0 - temp_c;
@@ -820,6 +828,9 @@ namespace sentinel::nexus::api
         double lyapunov_lambda = (temp_c > 115.0) ? 0.08 : -0.15;
         double t_crit_ms = (temp_c > 100.0) ? (38.4 * (120.0 - temp_c) / 20.0) : 38.4;
         if (t_crit_ms < 0.0) t_crit_ms = 0.0;
+
+        uint64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
 
         std::ostringstream ss;
         ss << std::fixed << std::setprecision(3);
@@ -861,70 +872,85 @@ namespace sentinel::nexus::api
     std::string HttpServer::handle_post_lab_inject(const std::string &body)
     {
         std::string action = "cbf";
-        size_t act_pos = body.find("\"action\":\"");
+        // Robust JSON extraction supporting optional whitespace
+        size_t act_pos = body.find("\"action\"");
         if (act_pos != std::string::npos)
         {
-            size_t end = body.find('"', act_pos + 10);
-            if (end != std::string::npos)
-                action = body.substr(act_pos + 10, end - (act_pos + 10));
+            size_t colon = body.find(':', act_pos);
+            size_t start = body.find('"', colon + 1);
+            size_t end = body.find('"', start + 1);
+            if (start != std::string::npos && end != std::string::npos)
+                action = body.substr(start + 1, end - start - 1);
         }
 
         NEXUS_LOG_INFO("[LabCockpit] Dispatched interactive injection: " + action);
 
-        // Prepend log header
+        // Prepend action notification to live log
         std::ofstream log_init("/tmp/sentinel_lab_live.log", std::ios::app);
-        log_init << "\n\033[1;36m==================================================================\033[0m\n"
+        log_init << "\n==================================================================\n"
                  << "[+] [Web Cockpit Trigger] Executing: " << action << "\n"
-                 << "\033[1;36m==================================================================\033[0m\n";
+                 << "==================================================================\n";
         log_init.close();
 
-        // Physical coil trip controls for live visual temperature spikes
+        // 1. Thermal Spike & Normal (Forces physical coil & simulation state)
         if (action == "heater_spike")
         {
+            g_sim_heater_active = true;
             send_modbus_coil("127.0.0.1", 502, 0, true);
             send_modbus_coil("10.240.0.150", 502, 0, true);
+            send_modbus_coil("127.0.0.1", 15501, 0, true);
             std::ofstream lf("/tmp/sentinel_lab_live.log", std::ios::app);
             lf << "[!] INJECTED: Physical Heater Coil Forced ON (u1 = 1.0)\n"
-               << "[*] Thermal state T(t) is climbing toward 120°C safety barrier!\n";
+               << "[*] Thermal state T(t) is climbing past 100°C toward 120°C safety barrier!\n";
             return "{\"status\": \"dispatched\", \"action\": \"heater_spike\"}";
         }
         else if (action == "heater_normal")
         {
+            g_sim_heater_active = false;
             send_modbus_coil("127.0.0.1", 502, 0, false);
             send_modbus_coil("10.240.0.150", 502, 0, false);
+            send_modbus_coil("127.0.0.1", 15501, 0, false);
             std::ofstream lf("/tmp/sentinel_lab_live.log", std::ios::app);
             lf << "[+] RESTORED: Physical Heater Coil Set to Nominal (u1 = 0.2)\n"
                << "[*] Thermal state cooling back to safe 85°C baseline.\n";
             return "{\"status\": \"dispatched\", \"action\": \"heater_normal\"}";
         }
 
-        // Execute research modules via aryo with output captured to live log file
-        std::string env_prefix = "export PATH=/usr/local/bin:/opt/sentinel-stack/venv/bin:$PATH; ";
-        std::string log_file = " >> /tmp/sentinel_lab_live.log 2>&1 &";
+        // 2. Synchronous execution for immediate output into the log file
+        std::string env_prefix = "PATH=/usr/local/bin:/opt/sentinel-stack/venv/bin:/usr/bin:/bin:$PATH ";
+        std::string log_file = " >> /tmp/sentinel_lab_live.log 2>&1";
 
+        std::string cmd;
         if (action == "cbf")
-            std::system((env_prefix + "aryo lab cbf" + log_file).c_str());
+            cmd = env_prefix + "/usr/local/bin/aryo lab cbf" + log_file;
         else if (action == "hil")
-            std::system((env_prefix + "aryo lab hil -t 5" + log_file).c_str());
+            cmd = env_prefix + "/usr/local/bin/aryo lab hil -t 5" + log_file;
         else if (action == "fuzzer")
-            std::system((env_prefix + "aryo lab fuzzer -port 502" + log_file).c_str());
+            cmd = env_prefix + "/usr/local/bin/aryo lab fuzzer -port 502" + log_file;
         else if (action == "blast")
-            std::system((env_prefix + "aryo lab blast -r 50000" + log_file).c_str());
+            cmd = env_prefix + "/usr/local/bin/aryo lab blast -r 50000" + log_file;
         else if (action == "evasion")
-            std::system((env_prefix + "aryo lab evasion --epsilon 0.05" + log_file).c_str());
+            cmd = env_prefix + "/usr/local/bin/aryo lab evasion --epsilon 0.05" + log_file;
         else if (action == "5g_slice_hop")
-            std::system((env_prefix + "aryo 5g blast-test lo" + log_file).c_str());
+            cmd = env_prefix + "/usr/local/bin/aryo 5g blast-test lo" + log_file;
         else if (action == "trism_jailbreak")
-            std::system((env_prefix + "aryo trism test-jailbreak" + log_file).c_str());
+            cmd = env_prefix + "/usr/local/bin/aryo trism test-jailbreak" + log_file;
         else if (action == "patch_regression")
-            std::system((env_prefix + "aryo matrix honeynet-autohunt" + log_file).c_str());
+            cmd = env_prefix + "/usr/local/bin/aryo matrix honeynet-autohunt" + log_file;
         else if (action == "reset")
         {
+            g_sim_heater_active = false;
             send_modbus_coil("127.0.0.1", 502, 0, false);
             send_modbus_coil("10.240.0.150", 502, 0, false);
             std::system("pkill -f 'socket_injector' 2>/dev/null; pkill -f 'scada_fuzzer' 2>/dev/null || true");
             std::ofstream lf("/tmp/sentinel_lab_live.log", std::ios::trunc);
             lf << "[*] Terminal buffer cleared. Simulation reset to safe nominal state.\n";
+            return "{\"status\": \"dispatched\", \"action\": \"reset\"}";
+        }
+
+        if (!cmd.empty())
+        {
+            std::thread([cmd]() { std::system(cmd.c_str()); }).detach();
         }
 
         return "{\"status\": \"dispatched\", \"action\": \"" + action + "\"}";
@@ -933,31 +959,51 @@ namespace sentinel::nexus::api
     std::string HttpServer::handle_get_lab_logs()
     {
         std::ifstream f("/tmp/sentinel_lab_live.log");
-        std::string content;
+        std::string raw_content;
         if (f.is_open())
         {
-            content.assign((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+            raw_content.assign((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
         }
         else
         {
-            content = "[*] Sentinel-Lab live log buffer initialized. Click any injection button to execute.\n";
+            raw_content = "[*] Sentinel-Lab live log buffer initialized. Click any injection button to execute.\n";
         }
 
-        // Limit to last 8000 characters to prevent buffer bloat
-        if (content.size() > 8000)
+        if (raw_content.size() > 8000)
         {
-            content = content.substr(content.size() - 8000);
+            raw_content = raw_content.substr(raw_content.size() - 8000);
         }
 
-        // JSON escape newlines and quotes
+        // Clean ANSI escape sequences (\033[...m) and illegal JSON control characters
+        std::string clean_content;
+        bool in_escape = false;
+        for (size_t i = 0; i < raw_content.size(); ++i)
+        {
+            char c = raw_content[i];
+            if (c == '\033')
+            {
+                in_escape = true;
+                continue;
+            }
+            if (in_escape)
+            {
+                if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))
+                    in_escape = false;
+                continue;
+            }
+            clean_content += c;
+        }
+
+        // Format into valid JSON string
         std::ostringstream escaped;
-        for (char c : content)
+        for (char c : clean_content)
         {
             if (c == '"') escaped << "\\\"";
             else if (c == '\\') escaped << "\\\\";
             else if (c == '\n') escaped << "\\n";
             else if (c == '\r') continue;
             else if (c == '\t') escaped << "\\t";
+            else if (static_cast<unsigned char>(c) < 0x20) continue; // Drop any unprintable byte
             else escaped << c;
         }
 
