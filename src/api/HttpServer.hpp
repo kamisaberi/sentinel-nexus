@@ -50,6 +50,7 @@ namespace sentinel::nexus::api
         std::string handle_get_lab_telemetry();
         std::string handle_post_lab_inject(const std::string &body);
         std::string handle_get_lab_scorecard();
+        std::string handle_get_lab_logs();
 
         // --- NEW EXTENSION & .SPKG HANDLERS ---
         std::string handle_get_extensions_status();
