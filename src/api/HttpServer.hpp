@@ -46,6 +46,11 @@ namespace sentinel::nexus::api
         std::string handle_post_ota_advance();
         std::string handle_post_ota_rollback();
 
+        // --- SENTINEL-LAB VISUAL COCKPIT REST HANDLERS ---
+        std::string handle_get_lab_telemetry();
+        std::string handle_post_lab_inject(const std::string &body);
+        std::string handle_get_lab_scorecard();
+
         // --- NEW EXTENSION & .SPKG HANDLERS ---
         std::string handle_get_extensions_status();
         std::string handle_post_extension_deploy(const std::string &body);
