@@ -799,10 +799,11 @@ namespace sentinel::nexus::api
 
     std::string HttpServer::handle_get_lab_telemetry()
     {
-        double temp_c = 85.0;
+double temp_c = 85.0;
         double pressure_psi = 100.0;
         double vibration = 1200.0;
 
+        // Query real Modbus PLC if active
         bool queried = query_modbus_plc("127.0.0.1", 502, temp_c, pressure_psi, vibration) ||
                        query_modbus_plc("10.240.0.150", 502, temp_c, pressure_psi, vibration) ||
                        query_modbus_plc("127.0.0.1", 15501, temp_c, pressure_psi, vibration);
@@ -813,17 +814,18 @@ namespace sentinel::nexus::api
         }
         else
         {
-            // Accelerated thermal dynamics: surges in 3-4 seconds when spike is triggered
+            // Rapid thermal dynamics: surges past 120°C in 3 seconds when spike is clicked
             if (g_sim_heater_active) {
-                if (g_sim_temp < 126.0) g_sim_temp += 3.2; // Fast climb toward barrier
+                if (g_sim_temp < 126.0) g_sim_temp += 3.5;
             } else {
-                if (g_sim_temp > 85.0) g_sim_temp -= 2.4;  // Smooth cooling to baseline
+                if (g_sim_temp > 85.0) g_sim_temp -= 2.5;
             }
             temp_c = g_sim_temp;
             pressure_psi = 100.0 + (temp_c - 85.0) * 0.5;
             vibration = 1200.0 + (temp_c - 85.0) * 8.0;
         }
 
+        
         double cbf_h = 120.0 - temp_c;
         double nagumo_val = -0.5 + (0.5 * cbf_h);
         double lyapunov_lambda = (temp_c > 115.0) ? 0.082 : -0.150;
