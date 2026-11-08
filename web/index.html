@@ -10,6 +10,187 @@
     <link rel="stylesheet" href="css/topology_map.css">
     <link rel="stylesheet" href="css/studio.css">
     <style>
+        /* =====================================================================
+           Aryorithm Admin Design System Parity (app.aryorithm.com)
+           ===================================================================== */
+        :root {
+            --void: #07090e;
+            --panel: #0d111a;
+            --hairline: #1a2232;
+            --accent: #00e5ff;
+            --kernel: #00ffa3;
+            --threat: #ff3366;
+            --telemetry: #ffb800;
+            --ink: #f0f4f8;
+            --muted: #8a99ad;
+        }
+
+        body.dark-theme {
+            background-color: var(--void) !important;
+            color: var(--ink) !important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* Fixed Left Admin Sidebar (w-64 = 256px) */
+        .admin-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 256px;
+            background: var(--panel);
+            border-right: 1px solid var(--hairline);
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+        }
+
+        .admin-sidebar-logo {
+            height: 64px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--hairline);
+        }
+
+        .pip-pulse-cyan {
+            display: block;
+            width: 10px;
+            height: 10px;
+            background: var(--accent);
+            box-shadow: 0 0 12px rgba(0, 229, 255, 0.9);
+            border-radius: 2px;
+        }
+
+        .admin-logo-text {
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            color: var(--ink);
+        }
+
+        .admin-badge-chip {
+            margin-left: auto;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: var(--muted);
+            background: rgba(138, 153, 173, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+            border: 1px solid var(--hairline);
+        }
+
+        .admin-nav {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 12px;
+        }
+
+        .admin-group-title {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.22em;
+            color: rgba(138, 153, 173, 0.6);
+            margin: 16px 0 6px 10px;
+        }
+        .admin-group-title:first-child { margin-top: 0; }
+
+        .admin-nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+            background: transparent;
+            border: 1px solid transparent;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.15s ease-in-out;
+            margin-bottom: 2px;
+        }
+
+        .admin-nav-item:hover {
+            color: var(--ink);
+            background: rgba(26, 34, 50, 0.6);
+            border-color: var(--hairline);
+        }
+
+        .admin-nav-item.active {
+            color: var(--ink) !important;
+            background: rgba(0, 229, 255, 0.08) !important;
+            border-color: var(--accent) !important;
+        }
+
+        .admin-nav-item.highlight-lab {
+            color: var(--accent) !important;
+        }
+        .admin-nav-item.highlight-lab.active {
+            background: rgba(0, 229, 255, 0.15) !important;
+            border-color: var(--accent) !important;
+        }
+
+        /* Main Content Canvas (Offset by 256px) */
+        .admin-main {
+            margin-left: 256px;
+            background: var(--void);
+            min-height: 100vh;
+            padding: 20px 28px;
+            box-sizing: border-box;
+        }
+
+        .admin-topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--hairline);
+            margin-bottom: 20px;
+        }
+
+        /* Reskinned Hairline KPI Cards */
+        .kpi-ribbon {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .kpi-card {
+            background: var(--panel) !important;
+            border: 1px solid var(--hairline) !important;
+            border-radius: 4px !important;
+            padding: 14px 16px !important;
+        }
+
+        .kpi-label {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 10px !important;
+            letter-spacing: 0.1em;
+            color: var(--muted) !important;
+        }
+
+        .kpi-value {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 22px !important;
+            font-weight: 800 !important;
+            color: var(--ink) !important;
+        }
+
+        .kpi-sub {
+            font-size: 11px !important;
+            color: var(--muted) !important;
+        }
         /* Dedicated Lab Cockpit Air-Gapped Theme */
         .lab-grid {
             display: grid;
