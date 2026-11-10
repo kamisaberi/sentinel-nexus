@@ -55,7 +55,7 @@ namespace sentinel::nexus::api
         // --- NEW EXTENSION & .SPKG HANDLERS ---
         std::string handle_get_extensions_status();
         std::string handle_post_extension_deploy(const std::string &body);
-        std::string handle_get_active_sensors()
+        std::string handle_get_active_sensors();
 
         std::string serve_static_file(const std::string &path, std::string &content_type, int &status_code);
 
