@@ -829,3 +829,30 @@ document.addEventListener("DOMContentLoaded", () => {
     // Initialize Default Context & Active Sensors
     applyNodeContext(activeNodeKey);
 });
+
+
+// --- INSERT AT BOTTOM OF mission_control.js ---
+
+// Automatically resize and restore charts whenever switching back to Mission Control
+document.querySelectorAll('.admin-nav-item, .nav-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const targetId = btn.getAttribute('data-tab');
+        if (targetId === 'tab-mission-control') {
+            // Give the browser 60ms to apply display: block and calculate flexbox geometry
+            setTimeout(() => {
+                Object.values(echartsInstances).forEach(chart => {
+                    if (chart && !chart.isDisposed()) {
+                        chart.resize();
+                    }
+                });
+            }, 60);
+        }
+    });
+});
+
+// Also handle window resize
+window.addEventListener('resize', () => {
+    Object.values(echartsInstances).forEach(c => {
+        if (c && !c.isDisposed()) c.resize();
+    });
+});
