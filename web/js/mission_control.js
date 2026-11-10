@@ -673,6 +673,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Dynamic Multi-Sensor Stepper Loop (1000ms tick)
+// --- IN setInterval() IN mission_control.js ---
     setInterval(() => {
         if (!activeSensors || activeSensors.length === 0) return;
 
@@ -697,10 +698,12 @@ document.addEventListener("DOMContentLoaded", () => {
                 valEl.style.color = isSensorSurge ? "#EF4444" : (val > base * 1.2 ? "#EF4444" : "#00F0FF");
             }
 
-            drawSparkline(`canvas-${sid}`, hist, isSensorSurge ? "#EF4444" : "#00F0FF", base * 0.7, base * 1.5);
+            // Dispatch to specialized 60-FPS canvas renderer
+            drawSensorWidget(`canvas-${sid}`, s, val, hist);
         });
     }, 1000);
 
+    
     // Frame 2 Global Action Buttons
     document.getElementById("btn-sensor-surge")?.addEventListener("click", () => {
         isSensorSurge = true;
