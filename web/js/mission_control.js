@@ -393,6 +393,259 @@ document.addEventListener("DOMContentLoaded", () => {
             });
         });
     }
+
+    // --- 5 SPECIALIZED INDUSTRIAL CANVAS RENDERERS ---
+
+    // 1. Radial Arc Dial (Pressure, Temperature, Flow)
+    function drawRadialGauge(ctx, w, h, val, minV, maxV, unit, color) {
+        ctx.clearRect(0, 0, w, h);
+        const cx = w / 2;
+        const cy = h - 6;
+        const radius = Math.min(w * 0.42, h * 0.82);
+        const norm = Math.max(0, Math.min(1, (val - minV) / ((maxV - minV) || 1)));
+
+        // Background track arc
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, Math.PI, 2 * Math.PI);
+        ctx.strokeStyle = "#1E293B";
+        ctx.lineWidth = 6;
+        ctx.stroke();
+
+        // Safe green arc (first 70%)
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, Math.PI, Math.PI + Math.PI * 0.7);
+        ctx.strokeStyle = "rgba(16, 185, 129, 0.4)";
+        ctx.lineWidth = 6;
+        ctx.stroke();
+
+        // Red trip zone (last 30%)
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, Math.PI + Math.PI * 0.7, 2 * Math.PI);
+        ctx.strokeStyle = "rgba(239, 68, 68, 0.5)";
+        ctx.lineWidth = 6;
+        ctx.stroke();
+
+        // Active value sweep
+        const targetAngle = Math.PI + norm * Math.PI;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, Math.PI, targetAngle);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 6;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // Needle tip
+        const nx = cx + (radius - 10) * Math.cos(targetAngle);
+        const ny = cy + (radius - 10) * Math.sin(targetAngle);
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(nx, ny);
+        ctx.strokeStyle = "#FFFFFF";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Center hub
+        ctx.beginPath();
+        ctx.arc(cx, cy, 3, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+    }
+
+    // 2. Continuous Rolling Waveform & Scope (Vibration, Acoustic, Seismic)
+    function drawWaveformScope(ctx, w, h, history, color, maxV) {
+        ctx.clearRect(0, 0, w, h);
+
+        // Subtle background oscilloscope grid lines
+        ctx.strokeStyle = "rgba(30, 41, 59, 0.5)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, h / 2); ctx.lineTo(w, h / 2);
+        ctx.moveTo(w / 2, 0); ctx.lineTo(w / 2, h);
+        ctx.stroke();
+
+        // Alarm limit dashed line (at 80% height)
+        ctx.strokeStyle = "rgba(239, 68, 68, 0.4)";
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(0, h * 0.2); ctx.lineTo(w, h * 0.2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        if (history.length < 2) return;
+
+        // Rolling sinusoidal wave
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.8;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        const step = w / (history.length - 1);
+        history.forEach((v, i) => {
+            const norm = Math.min(1.2, v / (maxV || 10));
+            const y = h - (norm * (h - 8)) - 4;
+            const x = i * step;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+    }
+
+    // 3. Chemical & Gas Gradient Strip (pH, Gas, Nuclear)
+    function drawGradientBar(ctx, w, h, val, minV, maxV, unit) {
+        ctx.clearRect(0, 0, w, h);
+        const barH = 14;
+        const barY = (h - barH) / 2;
+        const norm = Math.max(0, Math.min(1, (val - minV) / ((maxV - minV) || 14)));
+
+        // Color-coded gradient: Red (Acid) -> Green (Neutral) -> Violet (Base)
+        const grad = ctx.createLinearGradient(0, 0, w, 0);
+        grad.addColorStop(0.0, "#EF4444");  // Lethal acid
+        grad.addColorStop(0.45, "#EAB308"); // Mild acid
+        grad.addColorStop(0.5, "#10B981");  // Neutral (7.0 pH)
+        grad.addColorStop(0.65, "#06B6D4"); // Potable
+        grad.addColorStop(1.0, "#A855F7");  // Caustic danger
+
+        ctx.fillStyle = grad;
+        ctx.fillRect(8, barY, w - 16, barH);
+        ctx.strokeStyle = "#334155";
+        ctx.strokeRect(8, barY, w - 16, barH);
+
+        // Moving triangular pointer
+        const px = 8 + norm * (w - 16);
+        ctx.fillStyle = "#FFFFFF";
+        ctx.beginPath();
+        ctx.moveTo(px, barY - 4);
+        ctx.lineTo(px - 5, barY - 10);
+        ctx.lineTo(px + 5, barY - 10);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.font = "bold 9px monospace";
+        ctx.fillStyle = "#94A3B8";
+        ctx.fillText("0", 8, barY + barH + 11);
+        ctx.fillText("7 (SAFE)", (w / 2) - 18, barY + barH + 11);
+        ctx.fillText("14", w - 22, barY + barH + 11);
+    }
+
+    // 4. Polar Radar Range Sweep (LiDAR, Spatial, Proximity)
+    function drawRadarSweep(ctx, w, h, val) {
+        ctx.clearRect(0, 0, w, h);
+        const cx = w / 2;
+        const cy = h / 2;
+        const radius = Math.min(w * 0.35, h * 0.45);
+
+        // Concentric distance rings
+        ctx.strokeStyle = "rgba(0, 240, 255, 0.25)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius * 0.35, 0, 2 * Math.PI);
+        ctx.arc(cx, cy, radius * 0.70, 0, 2 * Math.PI);
+        ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+        ctx.stroke();
+
+        // Crosshairs
+        ctx.beginPath();
+        ctx.moveTo(cx - radius, cy); ctx.lineTo(cx + radius, cy);
+        ctx.moveTo(cx, cy - radius); ctx.lineTo(cx, cy + radius);
+        ctx.stroke();
+
+        // Rotating radar beam
+        const angle = (Date.now() / 600) % (2 * Math.PI);
+        ctx.strokeStyle = "#00F0FF";
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + radius * Math.cos(angle), cy + radius * Math.sin(angle));
+        ctx.stroke();
+
+        // Obstacle detection blip
+        const blipDist = radius * 0.55;
+        const bx = cx + blipDist * Math.cos(1.2);
+        const by = cy + blipDist * Math.sin(1.2);
+        ctx.fillStyle = "#10B981";
+        ctx.beginPath();
+        ctx.arc(bx, by, 3, 0, 2 * Math.PI);
+        ctx.fill();
+    }
+
+    // 5. High-Tech Cyber Sparkline with Neon Fill (Data/Network Streams)
+    function drawModernSparkline(ctx, w, h, history, color, minV, maxV) {
+        ctx.clearRect(0, 0, w, h);
+        if (history.length < 2) return;
+
+        // Subtle background grid
+        ctx.strokeStyle = "rgba(30, 41, 59, 0.4)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(0, 0, w, h);
+
+        const step = w / (history.length - 1);
+        const range = (maxV - minV) || 1;
+
+        // Gradient area fill under curve
+        const grad = ctx.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, color + "33");
+        grad.addColorStop(1, color + "00");
+
+        ctx.beginPath();
+        history.forEach((v, i) => {
+            const norm = (v - minV) / range;
+            const y = h - (norm * (h - 8)) - 4;
+            const x = i * step;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.lineTo(w, h);
+        ctx.lineTo(0, h);
+        ctx.closePath();
+        ctx.fillStyle = grad;
+        ctx.fill();
+
+        // Glowing stroke line
+        ctx.beginPath();
+        history.forEach((v, i) => {
+            const norm = (v - minV) / range;
+            const y = h - (norm * (h - 8)) - 4;
+            const x = i * step;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.8;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 6;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+    }
+
+    // Master Canvas Dispatcher
+    function drawSensorWidget(canvasId, s, val, history) {
+        const cvs = document.getElementById(canvasId);
+        if (!cvs) return;
+        const ctx = cvs.getContext("2d");
+        const w = cvs.width;
+        const h = cvs.height;
+
+        const cat = (s.category || "").toUpperCase();
+        let color = isSensorSurge ? "#EF4444" : "#00F0FF";
+        if (cat === "VIBRATION") color = isSensorSurge ? "#EF4444" : "#10B981";
+        if (cat === "TEMPERATURE") color = isSensorSurge ? "#EF4444" : "#F59E0B";
+
+        const base = parseFloat(s.baseline) || 10.0;
+        const minV = parseFloat(s.min_val) || 0.0;
+        const maxV = parseFloat(s.max_val) || (base * 2.5);
+
+        if (cat === "PRESSURE" || cat === "TEMPERATURE" || cat === "FLOW" || cat === "LEVEL") {
+            drawRadialGauge(ctx, w, h, val, minV, maxV, s.unit, color);
+        } else if (cat === "VIBRATION" || cat === "ACOUSTIC" || cat === "SEISMIC") {
+            drawWaveformScope(ctx, w, h, history, color, maxV);
+        } else if (cat === "CHEMICAL" || cat === "GAS" || cat === "NUCLEAR") {
+            drawGradientBar(ctx, w, h, val, minV, maxV, s.unit);
+        } else if (cat === "LIDAR" || cat === "SPATIAL" || cat === "RADAR") {
+            drawRadarSweep(ctx, w, h, val);
+        } else {
+            drawModernSparkline(ctx, w, h, history, color, minV, maxV);
+        }
+    }
     function drawSparkline(canvasId, values, color, minVal, maxVal) {
         const cvs = document.getElementById(canvasId);
         if (!cvs) return;
