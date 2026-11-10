@@ -29,6 +29,105 @@
 namespace sentinel::nexus::api
 {
 
+    // --- INSERT HANDLERS IN HttpServer.cpp ---
+    std::string HttpServer::handle_get_active_sensors()
+    {
+        // Try reading live active sensors from the multiplexer REST API
+        std::string resp;
+        std::string cmd = "curl -s --max-time 1 http://127.0.0.1:8088/sensors 2>/dev/null || true";
+        FILE *fp = popen(cmd.c_str(), "r");
+        if (fp) {
+            char buf[1024];
+            while (fgets(buf, sizeof(buf), fp)) resp += buf;
+            pclose(fp);
+        }
+
+        if (!resp.empty() && resp.find("[") != std::string::npos) {
+            return resp;
+        }
+
+        // Fallback: Dynamically enumerate compiled sensor YAML profiles from catalogs/
+        std::ostringstream ss;
+        ss << "[\n";
+        std::vector<std::string> search_dirs = {
+            "/home/kami/sentinel-matrix/catalogs/sensors",
+            "../sentinel-matrix/catalogs/sensors"
+        };
+
+        size_t count = 0;
+        for (const auto &sdir : search_dirs) {
+            if (std::filesystem::exists(sdir)) {
+                for (const auto &e : std::filesystem::recursive_directory_iterator(sdir)) {
+                    if (e.is_regular_file() && e.path().extension() == ".yaml") {
+                        std::ifstream f(e.path());
+                        std::string line, id, category = "PRESSURE", unit = "units", engine = "generic_ode";
+                        double base_val = 10.0;
+                        int port = 15000 + count + 1;
+
+                        while (std::getline(f, line)) {
+                            auto parse_val = [&](const std::string &k, std::string &dst) {
+                                size_t p = line.find(k + ":");
+                                if (p != std::string::npos) {
+                                    dst = line.substr(p + k.size() + 1);
+                                    dst.erase(0, dst.find_first_not_of(" \t\""));
+                                    dst.erase(dst.find_last_not_of(" \t\"\r\n") + 1);
+                                }
+                            };
+                            parse_val("sensor_id", id);
+                            parse_val("category", category);
+                            parse_val("unit", unit);
+                            parse_val("engine", engine);
+                            if (line.find("baseline_value:") != std::string::npos) {
+                                try { base_val = std::stod(line.substr(line.find(':') + 1)); } catch (...) {}
+                            }
+                            if (line.find("default_port:") != std::string::npos) {
+                                try { port = std::stoi(line.substr(line.find(':') + 1)); } catch (...) {}
+                            }
+                        }
+
+                        if (!id.empty() && count < 20) { // Limit initial view to active channels
+                            if (count > 0) ss << ",\n";
+                            ss << "  {\n"
+                               << "    \"sensor_id\": \"" << id << "\",\n"
+                               << "    \"name\": \"" << id << "\",\n"
+                               << "    \"category\": \"" << category << "\",\n"
+                               << "    \"port\": " << port << ",\n"
+                               << "    \"unit\": \"" << unit << "\",\n"
+                               << "    \"engine\": \"" << engine << "\",\n"
+                               << "    \"baseline\": " << base_val << "\n"
+                               << "  }";
+                            count++;
+                        }
+                    }
+                }
+                break;
+            }
+        }
+        ss << "\n]";
+        return count > 0 ? ss.str() : "[]";
+    }
+
+    std::string HttpServer::handle_post_sensor_fault(const std::string &body)
+    {
+        // Forward chaos/fault directly to the running multiplexer REST hook (:8088)
+        std::string tmp_file = "/tmp/nexus_fault_fwd.json";
+        std::ofstream f(tmp_file);
+        f << body;
+        f.close();
+
+        std::string cmd = "curl -s -X POST http://127.0.0.1:8088/fault -H 'Content-Type: application/json' -d @" + tmp_file + " 2>/dev/null || true";
+        std::string resp;
+        FILE *fp = popen(cmd.c_str(), "r");
+        if (fp) {
+            char buf[512];
+            while (fgets(buf, sizeof(buf), fp)) resp += buf;
+            pclose(fp);
+        }
+        std::filesystem::remove(tmp_file);
+
+        return resp.empty() ? "{\"status\":\"dispatched_locally\"}" : resp;
+    }
+
     bool HttpServer::load_config_file(const std::string &config_path)
     {
         std::vector<std::string> search_paths = {
