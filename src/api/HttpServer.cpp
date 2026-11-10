@@ -273,6 +273,18 @@ namespace sentinel::nexus::api
             route_path = route_path.substr(0, qmark);
         }
 
+        // --- INSERT IN route_request() IN HttpServer.cpp ---
+        if (route_path == "/api/v1/matrix/active-sensors")
+        {
+            content_type = "application/json";
+            return handle_get_active_sensors();
+        }
+
+        if (route_path == "/api/v1/sensors/fault" && method == "POST")
+        {
+            content_type = "application/json";
+            return handle_post_sensor_fault(body);
+        }
         // ---------------------------------------------------------------------
         // SENTINEL-LAB SCIENTIFIC RESEARCH COCKPIT ENDPOINTS
         // ---------------------------------------------------------------------
@@ -722,13 +734,14 @@ namespace sentinel::nexus::api
         return ss.str();
     }
 
-// -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // SENTINEL-LAB REAL-TIME HANDLERS (CORRECTED MODBUS BYTE BOUNDS & ANSI STRIP)
     // -------------------------------------------------------------------------
     static bool query_modbus_plc(const std::string &ip, int port, double &temp, double &pressure, double &vibration)
     {
         int sock = socket(AF_INET, SOCK_STREAM, 0);
-        if (sock < 0) return false;
+        if (sock < 0)
+            return false;
 
         struct timeval tv{0, 80000}; // 80ms timeout
         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
@@ -737,7 +750,11 @@ namespace sentinel::nexus::api
         sockaddr_in addr{};
         addr.sin_family = AF_INET;
         addr.sin_port = htons(port);
-        if (inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) <= 0) { close(sock); return false; }
+        if (inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) <= 0)
+        {
+            close(sock);
+            return false;
+        }
 
         if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0)
         {
@@ -769,29 +786,37 @@ namespace sentinel::nexus::api
     static void send_modbus_coil(const std::string &ip, int port, uint16_t coil_addr, bool on)
     {
         int sock = socket(AF_INET, SOCK_STREAM, 0);
-        if (sock < 0) return;
+        if (sock < 0)
+            return;
         struct timeval tv{0, 80000};
         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
         setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
         sockaddr_in addr{};
         addr.sin_family = AF_INET;
         addr.sin_port = htons(port);
-        if (inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) <= 0) { close(sock); return; }
-        if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) { close(sock); return; }
+        if (inet_pton(AF_INET, ip.c_str(), &addr.sin_addr) <= 0)
+        {
+            close(sock);
+            return;
+        }
+        if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0)
+        {
+            close(sock);
+            return;
+        }
 
         uint16_t val = on ? 0xFF00 : 0x0000;
         uint8_t req[] = {
             0x00, 0x01, 0x00, 0x00, 0x00, 0x06, 0x01, 0x05,
             static_cast<uint8_t>(coil_addr >> 8), static_cast<uint8_t>(coil_addr & 0xFF),
-            static_cast<uint8_t>(val >> 8), static_cast<uint8_t>(val & 0xFF)
-        };
+            static_cast<uint8_t>(val >> 8), static_cast<uint8_t>(val & 0xFF)};
         send(sock, req, sizeof(req), 0);
         uint8_t buf[32];
         recv(sock, buf, sizeof(buf), 0);
         close(sock);
     }
 
-// -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // SENTINEL-LAB REAL-TIME HANDLERS (FAST HEATING + NATIVE CONTAINER EVALUATOR)
     // -------------------------------------------------------------------------
     static double g_sim_temp = 85.0;
@@ -799,7 +824,7 @@ namespace sentinel::nexus::api
 
     std::string HttpServer::handle_get_lab_telemetry()
     {
-double temp_c = 85.0;
+        double temp_c = 85.0;
         double pressure_psi = 100.0;
         double vibration = 1200.0;
 
@@ -815,25 +840,31 @@ double temp_c = 85.0;
         else
         {
             // Rapid thermal dynamics: surges past 120°C in 3 seconds when spike is clicked
-            if (g_sim_heater_active) {
-                if (g_sim_temp < 126.0) g_sim_temp += 3.5;
-            } else {
-                if (g_sim_temp > 85.0) g_sim_temp -= 2.5;
+            if (g_sim_heater_active)
+            {
+                if (g_sim_temp < 126.0)
+                    g_sim_temp += 3.5;
+            }
+            else
+            {
+                if (g_sim_temp > 85.0)
+                    g_sim_temp -= 2.5;
             }
             temp_c = g_sim_temp;
             pressure_psi = 100.0 + (temp_c - 85.0) * 0.5;
             vibration = 1200.0 + (temp_c - 85.0) * 8.0;
         }
 
-        
         double cbf_h = 120.0 - temp_c;
         double nagumo_val = -0.5 + (0.5 * cbf_h);
         double lyapunov_lambda = (temp_c > 115.0) ? 0.082 : -0.150;
         double t_crit_ms = (temp_c > 100.0) ? (38.4 * (120.0 - temp_c) / 20.0) : 38.4;
-        if (t_crit_ms < 0.0) t_crit_ms = 0.0;
+        if (t_crit_ms < 0.0)
+            t_crit_ms = 0.0;
 
         uint64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()).count();
+                              std::chrono::system_clock::now().time_since_epoch())
+                              .count();
 
         std::ostringstream ss;
         ss << std::fixed << std::setprecision(3);
@@ -1046,13 +1077,20 @@ double temp_c = 85.0;
         std::ostringstream escaped;
         for (char c : clean_content)
         {
-            if (c == '"') escaped << "\\\"";
-            else if (c == '\\') escaped << "\\\\";
-            else if (c == '\n') escaped << "\\n";
-            else if (c == '\r') continue;
-            else if (c == '\t') escaped << "\\t";
-            else if (static_cast<unsigned char>(c) < 0x20) continue; // Drop any unprintable byte
-            else escaped << c;
+            if (c == '"')
+                escaped << "\\\"";
+            else if (c == '\\')
+                escaped << "\\\\";
+            else if (c == '\n')
+                escaped << "\\n";
+            else if (c == '\r')
+                continue;
+            else if (c == '\t')
+                escaped << "\\t";
+            else if (static_cast<unsigned char>(c) < 0x20)
+                continue; // Drop any unprintable byte
+            else
+                escaped << c;
         }
 
         return "{\"logs\":\"" + escaped.str() + "\"}";
@@ -1079,7 +1117,5 @@ double temp_c = 85.0;
            << "}";
         return ss.str();
     }
-
-
 
 } // namespace sentinel::nexus::api
