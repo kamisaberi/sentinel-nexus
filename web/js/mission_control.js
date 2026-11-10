@@ -278,6 +278,7 @@ document.addEventListener("DOMContentLoaded", () => {
         renderDynamicSensorCards();
     }
 
+// --- REPLACE renderDynamicSensorCards() IN mission_control.js ---
     function renderDynamicSensorCards() {
         if (!sensorGrid) return;
 
@@ -288,43 +289,70 @@ document.addEventListener("DOMContentLoaded", () => {
             const sid = s.sensor_id;
             sensorHistories[sid] = sensorHistories[sid] || [];
 
+            // Category color coding & tags
             let badgeClass = "badge-cyan";
             let color = "#00F0FF";
-            if (s.category === "VIBRATION") { badgeClass = "badge-green"; color = "#10B981"; }
-            else if (s.category === "TEMPERATURE") { badgeClass = "badge-purple"; color = "#F59E0B"; }
-            else if (s.category === "CHEMICAL") { badgeClass = "badge-cyan"; color = "#38BDF8"; }
-            else if (s.category === "PRESSURE") { badgeClass = "badge-cyan"; color = "#00E5FF"; }
-            else if (s.category === "ELECTRICAL") { badgeClass = "badge-green"; color = "#10B981"; }
+            let catTag = s.category || "PROCESS";
+            let safeRange = `Safe: ${s.min_val || 0} - ${s.max_val || 100} ${s.unit || ''}`;
+
+            if (s.category === "VIBRATION") {
+                badgeClass = "badge-green"; color = "#10B981";
+                safeRange = `ISO 10816 Limit: < 4.5 ${s.unit || 'mm/s'}`;
+            } else if (s.category === "TEMPERATURE") {
+                badgeClass = "badge-purple"; color = "#F59E0B";
+                safeRange = `Nominal: ${s.baseline || 65} ± 15 ${s.unit || '°C'}`;
+            } else if (s.category === "CHEMICAL") {
+                badgeClass = "badge-cyan"; color = "#38BDF8";
+                safeRange = `Potable Band: 6.5 - 8.5 ${s.unit || 'pH'}`;
+            } else if (s.category === "PRESSURE") {
+                badgeClass = "badge-cyan"; color = "#00E5FF";
+                safeRange = `Joukowsky Limit: < 10.0 ${s.unit || 'bar'}`;
+            }
 
             const cleanName = (s.name || sid).replace(/^s\d+_/i, '').replace(/_/g, ' ');
-            const portDisplay = s.port ? `:${s.port}` : (s.category || 'LIVE');
+            const portDisplay = s.port ? `:${s.port}` : ':MODBUS';
+            const faultLabel = (s.fault_hooks && s.fault_hooks[0]) ? s.fault_hooks[0].id.replace(/_/g, ' ') : "INJECT FAULT";
 
             return `
-                <div class="sensor-card" id="card-${sid}" style="background:#0A0E14; border:1px solid #243144; border-radius:6px; padding:10px; display:flex; flex-direction:column; justify-content:space-between; box-sizing:border-box;">
+                <div class="sensor-card" id="card-${sid}" style="background:#080C13; border:1px solid #1E293B; border-radius:6px; padding:12px; display:flex; flex-direction:column; justify-content:space-between; box-sizing:border-box;">
                     <div>
+                        <!-- Header with Name, Port, Category Badge -->
                         <div style="display:flex; justify-content:space-between; align-items:center;">
-                            <span style="font-size:10px; font-weight:800; color:#F8FAFC; text-transform:uppercase; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:140px;" title="${cleanName}">
+                            <span style="font-size:11px; font-weight:800; color:#F8FAFC; text-transform:uppercase; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:145px;" title="${cleanName}">
                                 ${cleanName}
                             </span>
-                            <span class="badge ${badgeClass}" style="font-size:8px; padding:2px 5px;">${portDisplay}</span>
+                            <div style="display:flex; gap:4px; align-items:center;">
+                                <span class="badge ${badgeClass}" style="font-size:8px; padding:2px 5px;">${portDisplay}</span>
+                                <span class="badge badge-cyan" style="font-size:8px; padding:2px 5px;">${catTag}</span>
+                            </div>
                         </div>
-                        <div style="display:flex; justify-content:space-between; align-items:baseline; margin:6px 0;">
-                            <span style="font-size:9px; color:#94A3B8;">Measured PV:</span>
-                            <span id="val-${sid}" style="font-family:monospace; font-size:13px; font-weight:800; color:${color};">
+
+                        <!-- Technical Role & Safety Boundary -->
+                        <div style="display:flex; justify-content:space-between; font-size:9px; color:#64748B; margin:4px 0 2px 0;">
+                            <span>${s.interface || 'Analog Telemetry Bus'}</span>
+                            <span style="color:#94A3B8; font-family:monospace;">${safeRange}</span>
+                        </div>
+
+                        <!-- Live Digital Metric Readout -->
+                        <div style="display:flex; justify-content:space-between; align-items:baseline; margin:4px 0 6px 0;">
+                            <span style="font-size:9px; color:#94A3B8; text-transform:uppercase;">Measured PV:</span>
+                            <span id="val-${sid}" style="font-family:'JetBrains Mono', ui-monospace, monospace; font-size:15px; font-weight:800; color:${color};">
                                 ${s.baseline || 0.0} ${s.unit || ''}
                             </span>
                         </div>
-                        <canvas id="canvas-${sid}" width="200" height="36" style="width:100%; height:36px; display:block; background:#05080C; border-radius:3px;"></canvas>
+
+                        <!-- Specialized Canvas Display (Height: 54px) -->
+                        <canvas id="canvas-${sid}" width="220" height="54" style="width:100%; height:54px; display:block; background:#04060A; border-radius:4px; border:1px solid #111827;"></canvas>
                     </div>
 
-                    <!-- Dynamic Chaos/Fault Hook Buttons -->
-                    <div style="margin-top:8px; display:flex; gap:4px;">
+                    <!-- Dynamic Chaos / Fault Action Footer -->
+                    <div style="margin-top:10px; display:flex; gap:6px;">
                         <button class="btn-ctrl btn-fault-inject" data-sensor="${sid}" data-action="step_increase" data-val="8.5"
-                            style="flex:1; font-size:9px; padding:4px 6px; background:rgba(239,68,68,0.15); border:1px solid #EF4444; color:#EF4444; border-radius:3px; cursor:pointer; font-weight:700;">
-                            [!] INJECT FAULT
+                            style="flex:1; font-size:9px; padding:5px 6px; background:rgba(239,68,68,0.12); border:1px solid #EF4444; color:#EF4444; border-radius:3px; cursor:pointer; font-weight:800; text-transform:uppercase;">
+                            [!] ${faultLabel.slice(0, 18)}
                         </button>
-                        <button class="btn-ctrl btn-fault-reset" data-sensor="${sid}" data-action="drop_to_zero" data-val="0.0"
-                            style="font-size:9px; padding:4px 6px; background:#111827; border:1px solid #334155; color:#94A3B8; border-radius:3px; cursor:pointer;">
+                        <button class="btn-ctrl btn-fault-reset" data-sensor="${sid}" data-action="reset" data-val="0.0"
+                            style="font-size:9px; padding:5px 8px; background:#0F172A; border:1px solid #334155; color:#94A3B8; border-radius:3px; cursor:pointer; font-weight:700;">
                             RST
                         </button>
                     </div>
@@ -332,13 +360,13 @@ document.addEventListener("DOMContentLoaded", () => {
             `;
         }).join("");
 
-        // Attach dynamic fault injection event listeners
+        // Wire fault buttons
         document.querySelectorAll(".btn-fault-inject").forEach(btn => {
             btn.addEventListener("click", async () => {
                 const sid = btn.getAttribute("data-sensor");
                 const action = btn.getAttribute("data-action") || "step_increase";
                 const val = parseFloat(btn.getAttribute("data-val") || "8.5");
-                logEvent(`[CHAOS HOOK] Dispatching ${action} (+${val}) to ${sid}`, "text-yellow");
+                logEvent(`[CHAOS INJECTION] Triggered ${action} on ${sid} (Modifier: +${val})`, "text-yellow");
 
                 try {
                     await fetch("/api/v1/sensors/fault", {
@@ -346,16 +374,14 @@ document.addEventListener("DOMContentLoaded", () => {
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ sensor_id: sid, action: action, value: val })
                     });
-                } catch (err) {
-                    console.error("Fault dispatch failed", err);
-                }
+                } catch (e) { console.error("Fault dispatch failed", e); }
             });
         });
 
         document.querySelectorAll(".btn-fault-reset").forEach(btn => {
             btn.addEventListener("click", async () => {
                 const sid = btn.getAttribute("data-sensor");
-                logEvent(`[CHAOS RESET] Resetting physical baseline on ${sid}`, "text-green");
+                logEvent(`[CHAOS RESET] Restored physical baseline on ${sid}`, "text-green");
 
                 try {
                     await fetch("/api/v1/sensors/fault", {
@@ -363,13 +389,10 @@ document.addEventListener("DOMContentLoaded", () => {
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ sensor_id: sid, action: "reset", value: 0.0 })
                     });
-                } catch (err) {
-                    console.error("Fault reset failed", err);
-                }
+                } catch (e) { console.error("Fault reset failed", e); }
             });
         });
     }
-
     function drawSparkline(canvasId, values, color, minVal, maxVal) {
         const cvs = document.getElementById(canvasId);
         if (!cvs) return;
