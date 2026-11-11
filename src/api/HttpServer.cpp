@@ -36,13 +36,16 @@ namespace sentinel::nexus::api
         std::string resp;
         std::string cmd = "curl -s --max-time 1 http://127.0.0.1:8088/sensors 2>/dev/null || true";
         FILE *fp = popen(cmd.c_str(), "r");
-        if (fp) {
+        if (fp)
+        {
             char buf[1024];
-            while (fgets(buf, sizeof(buf), fp)) resp += buf;
+            while (fgets(buf, sizeof(buf), fp))
+                resp += buf;
             pclose(fp);
         }
 
-        if (!resp.empty() && resp.find("[") != std::string::npos) {
+        if (!resp.empty() && resp.find("[") != std::string::npos)
+        {
             return resp;
         }
 
@@ -51,23 +54,29 @@ namespace sentinel::nexus::api
         ss << "[\n";
         std::vector<std::string> search_dirs = {
             "/home/kami/sentinel-matrix/catalogs/sensors",
-            "../sentinel-matrix/catalogs/sensors"
-        };
+            "../sentinel-matrix/catalogs/sensors"};
 
         size_t count = 0;
-        for (const auto &sdir : search_dirs) {
-            if (std::filesystem::exists(sdir)) {
-                for (const auto &e : std::filesystem::recursive_directory_iterator(sdir)) {
-                    if (e.is_regular_file() && e.path().extension() == ".yaml") {
+        for (const auto &sdir : search_dirs)
+        {
+            if (std::filesystem::exists(sdir))
+            {
+                for (const auto &e : std::filesystem::recursive_directory_iterator(sdir))
+                {
+                    if (e.is_regular_file() && e.path().extension() == ".yaml")
+                    {
                         std::ifstream f(e.path());
                         std::string line, id, category = "PRESSURE", unit = "units", engine = "generic_ode";
                         double base_val = 10.0;
                         int port = 15000 + count + 1;
 
-                        while (std::getline(f, line)) {
-                            auto parse_val = [&](const std::string &k, std::string &dst) {
+                        while (std::getline(f, line))
+                        {
+                            auto parse_val = [&](const std::string &k, std::string &dst)
+                            {
                                 size_t p = line.find(k + ":");
-                                if (p != std::string::npos) {
+                                if (p != std::string::npos)
+                                {
                                     dst = line.substr(p + k.size() + 1);
                                     dst.erase(0, dst.find_first_not_of(" \t\""));
                                     dst.erase(dst.find_last_not_of(" \t\"\r\n") + 1);
@@ -77,16 +86,32 @@ namespace sentinel::nexus::api
                             parse_val("category", category);
                             parse_val("unit", unit);
                             parse_val("engine", engine);
-                            if (line.find("baseline_value:") != std::string::npos) {
-                                try { base_val = std::stod(line.substr(line.find(':') + 1)); } catch (...) {}
+                            if (line.find("baseline_value:") != std::string::npos)
+                            {
+                                try
+                                {
+                                    base_val = std::stod(line.substr(line.find(':') + 1));
+                                }
+                                catch (...)
+                                {
+                                }
                             }
-                            if (line.find("default_port:") != std::string::npos) {
-                                try { port = std::stoi(line.substr(line.find(':') + 1)); } catch (...) {}
+                            if (line.find("default_port:") != std::string::npos)
+                            {
+                                try
+                                {
+                                    port = std::stoi(line.substr(line.find(':') + 1));
+                                }
+                                catch (...)
+                                {
+                                }
                             }
                         }
 
-                        if (!id.empty() && count < 20) { // Limit initial view to active channels
-                            if (count > 0) ss << ",\n";
+                        if (!id.empty() && count < 20)
+                        { // Limit initial view to active channels
+                            if (count > 0)
+                                ss << ",\n";
                             ss << "  {\n"
                                << "    \"sensor_id\": \"" << id << "\",\n"
                                << "    \"name\": \"" << id << "\",\n"
@@ -118,9 +143,11 @@ namespace sentinel::nexus::api
         std::string cmd = "curl -s -X POST http://127.0.0.1:8088/fault -H 'Content-Type: application/json' -d @" + tmp_file + " 2>/dev/null || true";
         std::string resp;
         FILE *fp = popen(cmd.c_str(), "r");
-        if (fp) {
+        if (fp)
+        {
             char buf[512];
-            while (fgets(buf, sizeof(buf), fp)) resp += buf;
+            while (fgets(buf, sizeof(buf), fp))
+                resp += buf;
             pclose(fp);
         }
         std::filesystem::remove(tmp_file);
@@ -586,9 +613,6 @@ namespace sentinel::nexus::api
         return ss.str();
     }
 
-
-
-
     std::string HttpServer::handle_get_node_detail(const std::string &node_id)
     {
         auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
@@ -614,7 +638,8 @@ namespace sentinel::nexus::api
         }
 
         std::string site_lower = found->site_identifier;
-        for (auto &c : site_lower) c = std::tolower(c);
+        for (auto &c : site_lower)
+            c = std::tolower(c);
 
         std::string inst_title = "POWER QUALITY & SYNCHROPHASOR SCOPE";
         std::string inst_proto = "IEEE C37.118 / MODBUS :15501";
@@ -646,36 +671,35 @@ namespace sentinel::nexus::api
             inst_title = "EXOTHERMIC REACTION VESSEL CORE";
             inst_proto = "S7COMM :102 / HART-IP";
             inst_type = "reactor";
-            attacks_json = R"([
+            attacks_json = R"json([
                 {"id":"S7COMM_CPU_STOP","name":"S7Comm CPU STOP (0x29)"},
                 {"id":"MODBUS_FC05_OVERRIDE","name":"Valve Surge Coil Force"},
                 {"id":"SAFETY_SIS_BYPASS","name":"Safety SIS Interlock Bypass"},
                 {"id":"5G_GTPU_SLICE_HOP","name":"5G Edge Gateway Slice Hop"}
-            ])";
-            sensors_json = R"([
+            ])json";
+            sensors_json = R"json([
                 {"sensor_id":"s037_reactor_temp","name":"IFM Reactor Bearing Temperature","category":"TEMPERATURE","port":15502,"unit":"°C","baseline":85.4,"min_val":0,"max_val":150,"interface":"Modbus :15502"},
                 {"sensor_id":"s031_bearing_vibe","name":"IFM 3-Axis Bearing Vibration Peak","category":"VIBRATION","port":15502,"unit":"mm/s","baseline":1.24,"min_val":0,"max_val":10,"interface":"Modbus :15502"},
                 {"sensor_id":"s052_pressure","name":"Hydraulic Manifold Pressure Sensor","category":"PRESSURE","port":102,"unit":"PSI","baseline":100.2,"min_val":0,"max_val":200,"interface":"S7Comm :102"},
                 {"sensor_id":"s046_cbf_barrier","name":"Lyapunov Safety Barrier h(x)","category":"INVARIANT","port":502,"unit":"invar","baseline":34.6,"min_val":0,"max_val":50,"interface":"RK4 ODE"}
-            ])";
+            ])json";
         }
         else
         {
             // Default: Substation High-Voltage Grid
-            attacks_json = R"([
+            attacks_json = R"json([
                 {"id":"MODBUS_FC05_OVERRIDE","name":"Modbus Coil Override (FC05)"},
                 {"id":"IEC104_BREAKER_TRIP","name":"IEC-104 Breaker Trip (COT 6)"},
                 {"id":"5G_GTPU_SLICE_HOP","name":"5G TEID Slice-Hopping"},
                 {"id":"AI_PROMPT_INJECTION","name":"AI TRiSM Prompt Jailbreak"}
-            ])";
-            sensors_json = R"([
+            ])json";
+            sensors_json = R"json([
                 {"sensor_id":"s044_frequency","name":"Substation Grid Frequency Monitor","category":"ELECTRICAL","port":15501,"unit":"Hz","baseline":50.02,"min_val":48,"max_val":52,"interface":"Modbus :15501"},
                 {"sensor_id":"s044_power_load","name":"Active Feeder Power Load","category":"ELECTRICAL","port":15501,"unit":"kW","baseline":420.8,"min_val":0,"max_val":600,"interface":"Modbus :15501"},
                 {"sensor_id":"s078_voltage","name":"High-Voltage Busbar Potential","category":"ELECTRICAL","port":2404,"unit":"kV","baseline":220.4,"min_val":0,"max_val":300,"interface":"IEC-104 :2404"},
                 {"sensor_id":"s021_5g_slice","name":"3GPP URLLC S-NSSAI Slice Guard","category":"NETWORK","port":2152,"unit":"TEID","baseline":1.0,"min_val":1,"max_val":4,"interface":"GTP-U :2152"}
-            ])";
+            ])json";
         }
-
         std::ostringstream ss;
         ss << std::fixed << std::setprecision(2);
         ss << "{\n"
@@ -700,7 +724,6 @@ namespace sentinel::nexus::api
         return ss.str();
     }
 
-    
     std::string HttpServer::handle_get_compliance()
     {
         return reporting::ReportGenerator::instance().generate_json_compliance_report();
