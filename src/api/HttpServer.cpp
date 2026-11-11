@@ -29,6 +29,401 @@
 namespace sentinel::nexus::api
 {
 
+    // =============================================================================
+    // DYNAMIC TOPOLOGY, SENSOR & ATTACK VECTOR RESOLUTION ENGINE
+    // =============================================================================
+
+    namespace
+    {
+
+        struct DynamicSensorItem
+        {
+            std::string sensor_id;
+            std::string name;
+            std::string category;
+            int port{502};
+            std::string unit{"units"};
+            double baseline{10.0};
+            double min_val{0.0};
+            double max_val{100.0};
+            std::string interface{"TCP :502"};
+        };
+
+        struct DynamicAttackItem
+        {
+            std::string id;
+            std::string name;
+        };
+
+        static std::string trim_str(const std::string &s)
+        {
+            size_t first = s.find_first_not_of(" \t\r\n\"'");
+            if (first == std::string::npos)
+                return "";
+            size_t last = s.find_last_not_of(" \t\r\n\"'");
+            return s.substr(first, (last - first + 1));
+        }
+
+        static std::string to_upper_str(std::string s)
+        {
+            for (auto &c : s)
+                c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            return s;
+        }
+
+        static std::string to_lower_str(std::string s)
+        {
+            for (auto &c : s)
+                c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            return s;
+        }
+
+        static void enrich_sensor_physics(DynamicSensorItem &item, const std::string &type_hint, const std::string &transport)
+        {
+            std::string upper_type = to_upper_str(type_hint);
+            std::string upper_id = to_upper_str(item.sensor_id);
+            std::string key = upper_type + " " + upper_id;
+
+            if (key.find("VIBRAT") != std::string::npos || key.find("BEARING") != std::string::npos)
+            {
+                item.category = "VIBRATION";
+                item.unit = "mm/s";
+                item.baseline = 1.24;
+                item.min_val = 0.0;
+                item.max_val = 10.0;
+                item.interface = "Modbus :" + std::to_string(item.port);
+            }
+            else if (key.find("CRYO") != std::string::npos)
+            {
+                item.category = "TEMPERATURE";
+                item.unit = "K";
+                item.baseline = 4.2;
+                item.min_val = 0.0;
+                item.max_val = 10.0;
+                item.interface = "DICOM :" + std::to_string(item.port);
+            }
+            else if (key.find("TEMP") != std::string::npos || key.find("THERM") != std::string::npos || key.find("PYRO") != std::string::npos)
+            {
+                item.category = "TEMPERATURE";
+                item.unit = "°C";
+                item.baseline = 85.4;
+                item.min_val = 0.0;
+                item.max_val = 150.0;
+                item.interface = (item.port == 8554 ? "RTSP :8554" : "Modbus :" + std::to_string(item.port));
+            }
+            else if (key.find("LIDAR") != std::string::npos || key.find("SPATIAL") != std::string::npos)
+            {
+                item.category = "LIDAR";
+                item.unit = "pts";
+                item.baseline = 848.0;
+                item.min_val = 0.0;
+                item.max_val = 1200.0;
+                item.interface = "UDP :" + std::to_string(item.port);
+            }
+            else if (key.find("FREQ") != std::string::npos)
+            {
+                item.category = "ELECTRICAL";
+                item.unit = "Hz";
+                item.baseline = 50.02;
+                item.min_val = 48.0;
+                item.max_val = 52.0;
+                item.interface = "Modbus :" + std::to_string(item.port);
+            }
+            else if (key.find("VOLT") != std::string::npos || key.find("BUSBAR") != std::string::npos || key.find("IEC104") != std::string::npos)
+            {
+                item.category = "ELECTRICAL";
+                item.unit = "kV";
+                item.baseline = 220.4;
+                item.min_val = 0.0;
+                item.max_val = 300.0;
+                item.interface = "IEC-104 :" + std::to_string(item.port);
+            }
+            else if (key.find("LOAD") != std::string::npos || key.find("POWER") != std::string::npos || key.find("PAC3200") != std::string::npos)
+            {
+                item.category = "ELECTRICAL";
+                item.unit = "kW";
+                item.baseline = 420.8;
+                item.min_val = 0.0;
+                item.max_val = 600.0;
+                item.interface = "Modbus :" + std::to_string(item.port);
+            }
+            else if (key.find("PRESS") != std::string::npos || key.find("HYDRAULIC") != std::string::npos)
+            {
+                item.category = "PRESSURE";
+                item.unit = "PSI";
+                item.baseline = 100.2;
+                item.min_val = 0.0;
+                item.max_val = 200.0;
+                item.interface = (item.port == 102 ? "S7Comm :102" : "Modbus :" + std::to_string(item.port));
+            }
+            else if (key.find("DICOM") != std::string::npos || key.find("PACS") != std::string::npos)
+            {
+                item.category = "NETWORK";
+                item.unit = "MB/s";
+                item.baseline = 83.1;
+                item.min_val = 0.0;
+                item.max_val = 200.0;
+                item.interface = "DIMSE :" + std::to_string(item.port);
+            }
+            else if (key.find("TRISM") != std::string::npos || key.find("AI") != std::string::npos)
+            {
+                item.category = "STREAM";
+                item.unit = "tok/s";
+                item.baseline = 1246.0;
+                item.min_val = 0.0;
+                item.max_val = 3000.0;
+                item.interface = "REST :" + std::to_string(item.port);
+            }
+            else if (key.find("5G") != std::string::npos || key.find("GTP") != std::string::npos || key.find("SLICE") != std::string::npos)
+            {
+                item.category = "NETWORK";
+                item.unit = "TEID";
+                item.baseline = 1.0;
+                item.min_val = 1.0;
+                item.max_val = 4.0;
+                item.interface = "GTP-U :" + std::to_string(item.port);
+            }
+            else
+            {
+                item.category = "INVARIANT";
+                item.unit = "invar";
+                item.baseline = 34.6;
+                item.min_val = 0.0;
+                item.max_val = 50.0;
+                item.interface = to_upper_str(transport) + " :" + std::to_string(item.port);
+            }
+        }
+
+        // Find the node YAML on disk that matches this node's site, hostname, or ID
+        static std::filesystem::path locate_node_yaml(const std::string &site, const std::string &host, const std::string &id)
+        {
+            const std::vector<std::string> node_dirs = {
+                "/opt/sentinel-nexus/configs/nodes",
+                "configs/nodes",
+                "../configs/nodes",
+                "/home/kami/sentinel-matrix/configs/nodes",
+                "sentinel-matrix/configs/nodes"};
+
+            std::string s_low = to_lower_str(site);
+            std::string h_low = to_lower_str(host);
+            std::string id_low = to_lower_str(id);
+
+            for (const auto &dir : node_dirs)
+            {
+                if (!std::filesystem::exists(dir))
+                    continue;
+                for (const auto &entry : std::filesystem::directory_iterator(dir))
+                {
+                    if (entry.is_regular_file() && (entry.path().extension() == ".yaml" || entry.path().extension() == ".yml"))
+                    {
+                        std::ifstream f(entry.path());
+                        std::string line;
+                        while (std::getline(f, line))
+                        {
+                            std::string l_low = to_lower_str(line);
+                            if (l_low.find("identifier:") != std::string::npos || l_low.find("site_identifier:") != std::string::npos)
+                            {
+                                if ((!s_low.empty() && l_low.find(s_low) != std::string::npos) ||
+                                    (!h_low.empty() && l_low.find(h_low) != std::string::npos) ||
+                                    (!id_low.empty() && l_low.find(id_low) != std::string::npos))
+                                {
+                                    return entry.path();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return {};
+        }
+
+        // Dynamically extract routes from node YAML
+        static std::vector<DynamicSensorItem> parse_node_yaml_sensors(const std::filesystem::path &yaml_path)
+        {
+            std::vector<DynamicSensorItem> sensors;
+            std::ifstream f(yaml_path);
+            if (!f.is_open())
+                return sensors;
+
+            std::string line;
+            bool in_routes = false;
+            DynamicSensorItem cur;
+            std::string cur_type, cur_transport = "tcp";
+            bool has_cur = false;
+
+            auto push_cur = [&]()
+            {
+                if (has_cur && !cur.sensor_id.empty())
+                {
+                    enrich_sensor_physics(cur, cur_type, cur_transport);
+                    sensors.push_back(cur);
+                    cur = DynamicSensorItem();
+                    cur_type.clear();
+                    cur_transport = "tcp";
+                    has_cur = false;
+                }
+            };
+
+            while (std::getline(f, line))
+            {
+                std::string trimmed = trim_str(line);
+                if (trimmed == "routes:")
+                {
+                    in_routes = true;
+                    continue;
+                }
+                if (!in_routes)
+                    continue;
+                if (!trimmed.empty() && line.find_first_not_of(" \t") == 0 && trimmed.back() == ':')
+                {
+                    // New top-level block (e.g. fusion_rules:)
+                    break;
+                }
+
+                if (trimmed.rfind("- sensor_id:", 0) == 0)
+                {
+                    push_cur();
+                    cur.sensor_id = trim_str(trimmed.substr(12));
+                    cur.name = cur.sensor_id;
+                    has_cur = true;
+                }
+                else if (has_cur && trimmed.rfind("sensor_type:", 0) == 0)
+                {
+                    cur_type = trim_str(trimmed.substr(12));
+                }
+                else if (has_cur && trimmed.rfind("port:", 0) == 0)
+                {
+                    try
+                    {
+                        cur.port = std::stoi(trim_str(trimmed.substr(5)));
+                    }
+                    catch (...)
+                    {
+                    }
+                }
+                else if (has_cur && trimmed.rfind("transport:", 0) == 0)
+                {
+                    cur_transport = trim_str(trimmed.substr(10));
+                }
+            }
+            push_cur();
+            return sensors;
+        }
+
+        // Dynamically discover attacks from scenario definitions targeting this node
+        static std::vector<DynamicAttackItem> discover_scenarios_for_node(
+            const std::string &site, const std::string &host, const std::string &protocols_hint)
+        {
+
+            std::vector<DynamicAttackItem> attacks;
+            const std::vector<std::string> scenario_dirs = {
+                "/opt/sentinel-nexus/configs/scenarios",
+                "configs/scenarios",
+                "../configs/scenarios",
+                "/home/kami/sentinel-matrix/configs/scenarios",
+                "sentinel-matrix/configs/scenarios"};
+
+            std::string s_low = to_lower_str(site);
+            std::string h_low = to_lower_str(host);
+            std::string p_low = to_lower_str(protocols_hint);
+
+            for (const auto &dir : scenario_dirs)
+            {
+                if (!std::filesystem::exists(dir))
+                    continue;
+                for (const auto &entry : std::filesystem::directory_iterator(dir))
+                {
+                    if (entry.is_regular_file() && (entry.path().extension() == ".yaml" || entry.path().extension() == ".yml"))
+                    {
+                        std::ifstream f(entry.path());
+                        std::string line, name, payload_pat, mitre_name, protocol;
+                        bool targets_node = false;
+                        bool in_targets = false;
+
+                        while (std::getline(f, line))
+                        {
+                            std::string trimmed = trim_str(line);
+                            if (trimmed.rfind("name:", 0) == 0)
+                            {
+                                name = trim_str(trimmed.substr(5));
+                            }
+                            else if (trimmed.rfind("payload_pattern:", 0) == 0)
+                            {
+                                payload_pat = trim_str(trimmed.substr(16));
+                            }
+                            else if (trimmed.rfind("mitre_name:", 0) == 0)
+                            {
+                                mitre_name = trim_str(trimmed.substr(11));
+                            }
+                            else if (trimmed.rfind("protocol:", 0) == 0)
+                            {
+                                protocol = trim_str(trimmed.substr(9));
+                            }
+                            else if (trimmed.rfind("target_nodes:", 0) == 0)
+                            {
+                                std::string rest = trimmed.substr(13);
+                                std::string rest_low = to_lower_str(rest);
+                                if (rest_low.find("all") != std::string::npos ||
+                                    (!s_low.empty() && rest_low.find(s_low) != std::string::npos) ||
+                                    (!h_low.empty() && rest_low.find(h_low) != std::string::npos))
+                                {
+                                    targets_node = true;
+                                }
+                                in_targets = true;
+                            }
+                            else if (in_targets)
+                            {
+                                if (trimmed.rfind("-", 0) == 0)
+                                {
+                                    std::string t_low = to_lower_str(trim_str(trimmed.substr(1)));
+                                    if (t_low == "all" ||
+                                        (!s_low.empty() && (s_low.find(t_low) != std::string::npos || t_low.find(s_low) != std::string::npos)) ||
+                                        (!h_low.empty() && (h_low.find(t_low) != std::string::npos || t_low.find(h_low) != std::string::npos)))
+                                    {
+                                        targets_node = true;
+                                    }
+                                }
+                                else if (trimmed.back() == ':')
+                                {
+                                    in_targets = false;
+                                }
+                            }
+                        }
+
+                        if (!targets_node && !protocol.empty() && p_low.find(to_lower_str(protocol)) != std::string::npos)
+                        {
+                            targets_node = true;
+                        }
+
+                        if (targets_node && !name.empty())
+                        {
+                            std::string aid = payload_pat.empty() ? entry.path().stem().string() : payload_pat;
+                            aid = to_upper_str(aid);
+                            // Avoid duplicates
+                            bool exists = false;
+                            for (const auto &a : attacks)
+                            {
+                                if (a.id == aid || a.name == name)
+                                {
+                                    exists = true;
+                                    break;
+                                }
+                            }
+                            if (!exists)
+                            {
+                                attacks.push_back({.id = aid, .name = name});
+                            }
+                        }
+                    }
+                }
+                if (!attacks.empty())
+                    break;
+            }
+            return attacks;
+        }
+
+    } // anonymous namespace
+
     // --- INSERT HANDLERS IN HttpServer.cpp ---
     std::string HttpServer::handle_get_active_sensors()
     {
