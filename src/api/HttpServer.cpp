@@ -1045,16 +1045,18 @@ namespace sentinel::nexus::api
         std::string site = found->site_identifier;
         std::string host = found->identity.hostname();
 
-        // 1. DYNAMICALLY DISCOVER NODE CONFIG ON DISK
-        auto yaml_path = locate_node_yaml(site, host, found->node_id);
-        std::vector<DynamicSensorItem> active_sensors;
+        // 1. DYNAMICALLY RESOLVE NODE YAML & NODE IDENTIFIER
+        std::string node_ident;
+        auto yaml_path = locate_node_yaml(site, host, found->node_id, node_ident);
 
+        // 2. PARSE EXACT SENSORS BOUND TO THIS SPECIFIC EDGE APPLIANCE
+        std::vector<DynamicSensorItem> active_sensors;
         if (!yaml_path.empty())
         {
             active_sensors = parse_node_yaml_sensors(yaml_path);
         }
 
-        // 2. PROTOBUF HEARTBEAT SENSOR FALLBACK (if edge reported sensors via gRPC)
+        // If YAML had no routes, read real sensors reported over protobuf heartbeat
         if (active_sensors.empty() && !found->sensors.empty())
         {
             for (const auto &s : found->sensors)
@@ -1067,98 +1069,37 @@ namespace sentinel::nexus::api
             }
         }
 
-        // 3. DETERMINISTIC ARCHETYPE INFERENCE (Guarantees full 4-channel telemetry matrix)
-        std::string combined_context = to_lower_str(site + " " + host + " " + yaml_path.string());
+        // 3. DYNAMIC PRIMARY INSTRUMENT DETERMINATION (Inferred from actual sensors on this node)
+        std::string sensor_context = to_lower_str(site + " " + host + " " + node_ident);
         for (const auto &s : active_sensors)
         {
-            combined_context += " " + to_lower_str(s.sensor_id + " " + s.category);
+            sensor_context += " " + to_lower_str(s.sensor_id + " " + s.category + " " + s.interface);
         }
 
-        if (active_sensors.size() < 4)
-        {
-            if (combined_context.find("hospital") != std::string::npos || combined_context.find("pacs") != std::string::npos || combined_context.find("vision") != std::string::npos)
-            {
-                active_sensors = {
-                    {"s098_lidar", "SICK LiDAR Perimeter Scanner", "LIDAR", 2368, "pts", 848.0, 0.0, 1200.0, "UDP :2368"},
-                    {"s038_cryo", "MRI Cryogenic Temperature Sentry", "TEMPERATURE", 104, "K", 4.2, 0.0, 10.0, "DICOM :104"},
-                    {"s022_pacs", "PACS DICOM Image Telemetry Stream", "NETWORK", 4242, "MB/s", 83.1, 0.0, 200.0, "DIMSE :4242"},
-                    {"s001_trism", "AI TRiSM Real-Time Token Buffer", "STREAM", 9443, "tok/s", 1246.0, 0.0, 3000.0, "REST :9443"}};
-            }
-            else if (combined_context.find("refinery") != std::string::npos || combined_context.find("reactor") != std::string::npos || combined_context.find("rknn") != std::string::npos)
-            {
-                active_sensors = {
-                    {"s037_reactor_temp", "IFM Reactor Bearing Temperature", "TEMPERATURE", 15502, "°C", 85.4, 0.0, 150.0, "Modbus :15502"},
-                    {"s031_bearing_vibe", "IFM 3-Axis Bearing Vibration Peak", "VIBRATION", 15502, "mm/s", 1.24, 0.0, 10.0, "Modbus :15502"},
-                    {"s052_pressure", "Hydraulic Manifold Pressure Sensor", "PRESSURE", 102, "PSI", 100.2, 0.0, 200.0, "S7Comm :102"},
-                    {"s046_cbf_barrier", "Lyapunov Safety Barrier h(x)", "INVARIANT", 502, "invar", 34.6, 0.0, 50.0, "RK4 ODE"}};
-            }
-            else
-            {
-                active_sensors = {
-                    {"s044_frequency", "Substation Grid Frequency Monitor", "ELECTRICAL", 15501, "Hz", 50.02, 48.0, 52.0, "Modbus :15501"},
-                    {"s044_power_load", "Active Feeder Power Load", "ELECTRICAL", 15501, "kW", 420.8, 0.0, 600.0, "Modbus :15501"},
-                    {"s078_voltage", "High-Voltage Busbar Potential", "ELECTRICAL", 2404, "kV", 220.4, 0.0, 300.0, "IEC-104 :2404"},
-                    {"s021_5g_slice", "3GPP URLLC S-NSSAI Slice Guard", "NETWORK", 2152, "TEID", 1.0, 1.0, 4.0, "GTP-U :2152"}};
-            }
-        }
-
-        // 4. DYNAMIC PRIMARY INSTRUMENT DETERMINATION
         std::string inst_title = "POWER QUALITY & SYNCHROPHASOR SCOPE";
         std::string inst_proto = "IEEE C37.118 / MODBUS :15501";
         std::string inst_type = "grid";
 
-        if (combined_context.find("hospital") != std::string::npos || combined_context.find("pacs") != std::string::npos ||
-            combined_context.find("vision") != std::string::npos || combined_context.find("camera") != std::string::npos ||
-            combined_context.find("rtsp") != std::string::npos)
+        if (sensor_context.find("thermal") != std::string::npos || sensor_context.find("camera") != std::string::npos ||
+            sensor_context.find("rtsp") != std::string::npos || sensor_context.find("lidar") != std::string::npos ||
+            sensor_context.find("pacs") != std::string::npos || sensor_context.find("hospital") != std::string::npos)
         {
             inst_title = "RADIOMETRIC THERMAL VISION";
             inst_proto = "WHEP / RTSP :8554";
             inst_type = "video";
         }
-        else if (combined_context.find("refinery") != std::string::npos || combined_context.find("reactor") != std::string::npos ||
-                 combined_context.find("s7comm") != std::string::npos || combined_context.find("vibration") != std::string::npos)
+        else if (sensor_context.find("reactor") != std::string::npos || sensor_context.find("refinery") != std::string::npos ||
+                 sensor_context.find("vibration") != std::string::npos || sensor_context.find("s7comm") != std::string::npos)
         {
             inst_title = "EXOTHERMIC REACTION VESSEL CORE";
             inst_proto = "S7COMM :102 / HART-IP";
             inst_type = "reactor";
         }
 
-        // 5. DYNAMIC ATTACK DISCOVERY FROM SCENARIO REPOSITORY
-        auto discovered_attacks = discover_scenarios_for_node(site, host, combined_context);
+        // 4. DISCOVER TARGET SCENARIOS (Strictly attacks that target this node)
+        auto attacks = discover_scenarios_for_node(site, host, found->node_id, node_ident);
 
-        // Ensure 4 high-fidelity attack vectors are present matching node protocol surface
-        if (discovered_attacks.size() < 4)
-        {
-            if (inst_type == "video")
-            {
-                discovered_attacks.push_back({.id = "DICOM_CSTORE_FLOOD", .name = "DICOM C-STORE Flood Attack"});
-                discovered_attacks.push_back({.id = "AI_PROMPT_INJECTION", .name = "AI TRiSM Diagnostics Jailbreak"});
-                discovered_attacks.push_back({.id = "LIDAR_SPOOF_OBSTACLE", .name = "LiDAR Point-Cloud Blind Vector"});
-                discovered_attacks.push_back({.id = "MODBUS_FC05_OVERRIDE", .name = "Chiller Temperature Override"});
-            }
-            else if (inst_type == "reactor")
-            {
-                discovered_attacks.push_back({.id = "S7COMM_CPU_STOP", .name = "S7Comm CPU STOP (0x29)"});
-                discovered_attacks.push_back({.id = "MODBUS_FC05_OVERRIDE", .name = "Valve Surge Coil Force"});
-                discovered_attacks.push_back({.id = "SAFETY_SIS_BYPASS", .name = "Safety SIS Interlock Bypass"});
-                discovered_attacks.push_back({.id = "5G_GTPU_SLICE_HOP", .name = "5G Edge Gateway Slice Hop"});
-            }
-            else
-            {
-                discovered_attacks.push_back({.id = "MODBUS_FC05_OVERRIDE", .name = "Modbus Coil Override (FC05)"});
-                discovered_attacks.push_back({.id = "IEC104_BREAKER_TRIP", .name = "IEC-104 Breaker Trip (COT 6)"});
-                discovered_attacks.push_back({.id = "5G_GTPU_SLICE_HOP", .name = "5G TEID Slice-Hopping"});
-                discovered_attacks.push_back({.id = "AI_PROMPT_INJECTION", .name = "AI TRiSM Prompt Jailbreak"});
-            }
-        }
-
-        // Limit to 4 contextual attacks to match UI grid layout
-        if (discovered_attacks.size() > 4)
-        {
-            discovered_attacks.resize(4);
-        }
-
-        // 6. SERIALIZE TO IDENTICAL JSON SPEC FOR MISSION CONTROL
+        // 5. SERIALIZE TO IDENTICAL JSON SPEC FOR MISSION CONTROL
         std::ostringstream ss;
         ss << std::fixed << std::setprecision(2);
         ss << "{\n"
@@ -1198,11 +1139,11 @@ namespace sentinel::nexus::api
         ss << "  ],\n"
            << "  \"attacks\": [\n";
 
-        for (size_t i = 0; i < discovered_attacks.size(); ++i)
+        for (size_t i = 0; i < attacks.size(); ++i)
         {
-            const auto &a = discovered_attacks[i];
+            const auto &a = attacks[i];
             ss << "    {\"id\": \"" << a.id << "\", \"name\": \"" << a.name << "\"}"
-               << (i + 1 < discovered_attacks.size() ? ",\n" : "\n");
+               << (i + 1 < attacks.size() ? ",\n" : "\n");
         }
 
         ss << "  ]\n"
@@ -1210,6 +1151,7 @@ namespace sentinel::nexus::api
 
         return ss.str();
     }
+
     std::string HttpServer::handle_get_compliance()
     {
         return reporting::ReportGenerator::instance().generate_json_compliance_report();
