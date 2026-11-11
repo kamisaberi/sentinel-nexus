@@ -39,6 +39,7 @@ namespace sentinel::nexus::api
                                   int &status_code);
 
         std::string handle_get_nodes();
+        std::string handle_get_node_detail(const std::string &node_id);
         std::string handle_get_compliance();
         std::string handle_get_ota();
         std::string handle_post_broadcast(const std::string &body);
