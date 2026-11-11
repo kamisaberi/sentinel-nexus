@@ -113,11 +113,11 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    async function selectSentry(nodeId) {
+ async function selectSentry(nodeId) {
+        if (!nodeId) return;
         activeNodeId = nodeId;
         renderSentryRail();
 
-        const workspace = document.getElementById("mc-sentry-workspace");
         const titleEl = document.getElementById("sentry-header-title");
         const hostEl = document.getElementById("sentry-header-host");
         const pipEl = document.getElementById("sentry-header-pip");
@@ -131,7 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 activeNodeData = await resp.json();
 
                 if (titleEl) titleEl.textContent = activeNodeData.site || activeNodeData.node_id;
-                if (hostEl) hostEl.textContent = `${activeNodeData.hostname} (${activeNodeData.node_id})`;
+                if (hostEl) hostEl.textContent = `${activeNodeData.hostname} (${activeNodeData.node_id.slice(0, 10)})`;
                 if (backendEl) backendEl.textContent = activeNodeData.kernel || "IN-KERNEL eBPF";
                 if (dropsEl) dropsEl.textContent = `DROPS: ${activeNodeData.ebpf_drops || 0}`;
                 if (statusEl) statusEl.textContent = activeNodeData.status;
@@ -139,23 +139,30 @@ document.addEventListener("DOMContentLoaded", () => {
                 const isOnline = (activeNodeData.status === "ONLINE");
                 if (pipEl) pipEl.style.background = isOnline ? "#00FFA3" : "#FF3366";
 
-                logEvent(`[FOCUS] Sentry Cockpit switched to ${activeNodeData.site} (${activeNodeData.hostname})`, "text-cyan");
-
-                // Render Pane 1 (Primary Apparatus)
+                // 1. Render Pane 1 (Primary Apparatus)
                 updatePrimaryInstrument(activeNodeData.primary_instrument || {});
 
-                // Render Pane 2 (Field Sensors)
+                // 2. Render Pane 2 (Field Sensors)
                 activeSensors = activeNodeData.sensors || [];
                 renderDynamicSensorCards();
 
-                // Render Pane 4 (Target Protocol Exploits)
+                // 3. Render Pane 4 (Target Protocol Exploits)
                 renderContextualAttacks(activeNodeData.attacks || []);
+
+                // 4. Force initial chart draw immediately after layout settles (no 300ms delay)
+                setTimeout(() => {
+                    activeSensors.forEach(s => {
+                        const sid = s.sensor_id;
+                        const base = parseFloat(s.baseline) || 10.0;
+                        const hist = sensorHistories[sid] || [base];
+                        updateSensorEChart(sid, s, base, hist);
+                    });
+                }, 50);
             }
         } catch (e) {
-            console.error("Failed to load node detail", e);
+            console.error("Failed to load node detail for " + nodeId, e);
         }
     }
-
     // ========================================================================
     // 2. OUTAGE AND LOCKOUT CONTROLLER
     // ========================================================================
