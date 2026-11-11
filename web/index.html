@@ -455,7 +455,21 @@
 
     <!-- Main Content Canvas (Offset by 256px) -->
     <div class="admin-main">
-
+        <!-- --- INSERT ALARM BANNER IN index.html ABOVE admin-topbar --- -->
+        <!-- Flashing System & Edge Node Alarm Banner -->
+        <div id="system-alarm-banner"
+            style="display: none; width: 100%; margin-bottom: 16px; padding: 12px 18px; border-radius: 4px; box-sizing: border-box; font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span id="alarm-pip"
+                    style="width: 10px; height: 10px; border-radius: 50%; display: inline-block;"></span>
+                <span id="alarm-title">SYSTEM ALARM</span>
+                <span id="alarm-message" style="font-weight: 500; opacity: 0.9;">-</span>
+            </div>
+            <button id="btn-silence-alarm"
+                style="background: rgba(0,0,0,0.3); border: 1px solid currentColor; color: inherit; padding: 3px 8px; border-radius: 3px; font-size: 10px; cursor: pointer; font-weight: 700;">
+                SILENCE AUDIO
+            </button>
+        </div>
         <!-- Top Status Bar -->
         <header class="admin-topbar">
             <div>
