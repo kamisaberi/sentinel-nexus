@@ -484,7 +484,7 @@ namespace sentinel::nexus::api
             content_type = "application/json";
             return handle_get_node_detail(target_node_id);
         }
-        
+
         if (route_path == "/api/v1/fleet/nodes")
         {
             content_type = "application/json";
@@ -586,6 +586,121 @@ namespace sentinel::nexus::api
         return ss.str();
     }
 
+
+
+
+    std::string HttpServer::handle_get_node_detail(const std::string &node_id)
+    {
+        auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
+        const fleet::RegisteredNode *found = nullptr;
+
+        for (const auto &n : nodes)
+        {
+            if (n.node_id == node_id)
+            {
+                found = &n;
+                break;
+            }
+        }
+
+        if (!found && !nodes.empty())
+        {
+            found = &nodes[0];
+        }
+
+        if (!found)
+        {
+            return "{\"error\": \"Node not found\", \"status\": \"OFFLINE\"}";
+        }
+
+        std::string site_lower = found->site_identifier;
+        for (auto &c : site_lower) c = std::tolower(c);
+
+        std::string inst_title = "POWER QUALITY & SYNCHROPHASOR SCOPE";
+        std::string inst_proto = "IEEE C37.118 / MODBUS :15501";
+        std::string inst_type = "grid";
+
+        std::string attacks_json;
+        std::string sensors_json;
+
+        if (site_lower.find("hospital") != std::string::npos || site_lower.find("pacs") != std::string::npos)
+        {
+            inst_title = "RADIOMETRIC THERMAL VISION";
+            inst_proto = "WHEP / RTSP :8554";
+            inst_type = "video";
+            attacks_json = R"([
+                {"id":"DICOM_CSTORE_FLOOD","name":"DICOM C-STORE Flood Attack"},
+                {"id":"AI_PROMPT_INJECTION","name":"AI TRiSM Diagnostics Jailbreak"},
+                {"id":"LIDAR_SPOOF_OBSTACLE","name":"LiDAR Point-Cloud Blind Vector"},
+                {"id":"MODBUS_FC05_OVERRIDE","name":"Chiller Temperature Override"}
+            ])";
+            sensors_json = R"([
+                {"sensor_id":"s098_lidar","name":"SICK LiDAR Perimeter Scanner","category":"LIDAR","port":2368,"unit":"pts","baseline":848.0,"min_val":0,"max_val":1200,"interface":"UDP :2368"},
+                {"sensor_id":"s038_cryo","name":"MRI Cryogenic Temperature Sentry","category":"TEMPERATURE","port":104,"unit":"K","baseline":4.2,"min_val":0,"max_val":10,"interface":"DICOM :104"},
+                {"sensor_id":"s022_pacs","name":"PACS DICOM Image Telemetry Stream","category":"NETWORK","port":4242,"unit":"MB/s","baseline":83.1,"min_val":0,"max_val":200,"interface":"DIMSE :4242"},
+                {"sensor_id":"s001_trism","name":"AI TRiSM Real-Time Token Buffer","category":"STREAM","port":9443,"unit":"tok/s","baseline":1246.0,"min_val":0,"max_val":3000,"interface":"REST :9443"}
+            ])";
+        }
+        else if (site_lower.find("refinery") != std::string::npos || site_lower.find("reactor") != std::string::npos)
+        {
+            inst_title = "EXOTHERMIC REACTION VESSEL CORE";
+            inst_proto = "S7COMM :102 / HART-IP";
+            inst_type = "reactor";
+            attacks_json = R"([
+                {"id":"S7COMM_CPU_STOP","name":"S7Comm CPU STOP (0x29)"},
+                {"id":"MODBUS_FC05_OVERRIDE","name":"Valve Surge Coil Force"},
+                {"id":"SAFETY_SIS_BYPASS","name":"Safety SIS Interlock Bypass"},
+                {"id":"5G_GTPU_SLICE_HOP","name":"5G Edge Gateway Slice Hop"}
+            ])";
+            sensors_json = R"([
+                {"sensor_id":"s037_reactor_temp","name":"IFM Reactor Bearing Temperature","category":"TEMPERATURE","port":15502,"unit":"°C","baseline":85.4,"min_val":0,"max_val":150,"interface":"Modbus :15502"},
+                {"sensor_id":"s031_bearing_vibe","name":"IFM 3-Axis Bearing Vibration Peak","category":"VIBRATION","port":15502,"unit":"mm/s","baseline":1.24,"min_val":0,"max_val":10,"interface":"Modbus :15502"},
+                {"sensor_id":"s052_pressure","name":"Hydraulic Manifold Pressure Sensor","category":"PRESSURE","port":102,"unit":"PSI","baseline":100.2,"min_val":0,"max_val":200,"interface":"S7Comm :102"},
+                {"sensor_id":"s046_cbf_barrier","name":"Lyapunov Safety Barrier h(x)","category":"INVARIANT","port":502,"unit":"invar","baseline":34.6,"min_val":0,"max_val":50,"interface":"RK4 ODE"}
+            ])";
+        }
+        else
+        {
+            // Default: Substation High-Voltage Grid
+            attacks_json = R"([
+                {"id":"MODBUS_FC05_OVERRIDE","name":"Modbus Coil Override (FC05)"},
+                {"id":"IEC104_BREAKER_TRIP","name":"IEC-104 Breaker Trip (COT 6)"},
+                {"id":"5G_GTPU_SLICE_HOP","name":"5G TEID Slice-Hopping"},
+                {"id":"AI_PROMPT_INJECTION","name":"AI TRiSM Prompt Jailbreak"}
+            ])";
+            sensors_json = R"([
+                {"sensor_id":"s044_frequency","name":"Substation Grid Frequency Monitor","category":"ELECTRICAL","port":15501,"unit":"Hz","baseline":50.02,"min_val":48,"max_val":52,"interface":"Modbus :15501"},
+                {"sensor_id":"s044_power_load","name":"Active Feeder Power Load","category":"ELECTRICAL","port":15501,"unit":"kW","baseline":420.8,"min_val":0,"max_val":600,"interface":"Modbus :15501"},
+                {"sensor_id":"s078_voltage","name":"High-Voltage Busbar Potential","category":"ELECTRICAL","port":2404,"unit":"kV","baseline":220.4,"min_val":0,"max_val":300,"interface":"IEC-104 :2404"},
+                {"sensor_id":"s021_5g_slice","name":"3GPP URLLC S-NSSAI Slice Guard","category":"NETWORK","port":2152,"unit":"TEID","baseline":1.0,"min_val":1,"max_val":4,"interface":"GTP-U :2152"}
+            ])";
+        }
+
+        std::ostringstream ss;
+        ss << std::fixed << std::setprecision(2);
+        ss << "{\n"
+           << "  \"node_id\": \"" << found->node_id << "\",\n"
+           << "  \"site\": \"" << found->site_identifier << "\",\n"
+           << "  \"hostname\": \"" << found->identity.hostname() << "\",\n"
+           << "  \"kernel\": \"" << found->identity.kernel_version() << "\",\n"
+           << "  \"status\": \"" << (found->status == fleet::NodeHealthStatus::ONLINE ? "ONLINE" : "OFFLINE") << "\",\n"
+           << "  \"cpu_pct\": " << found->latest_metrics.cpu_usage_pct() << ",\n"
+           << "  \"ram_mb\": " << found->latest_metrics.ram_usage_mb() << ",\n"
+           << "  \"packets_inspected\": " << found->latest_metrics.packets_inspected() << ",\n"
+           << "  \"ebpf_drops\": " << found->latest_metrics.ebpf_packets_dropped() << ",\n"
+           << "  \"mitigation_latency_us\": " << found->latest_metrics.avg_mitigation_latency_us() << ",\n"
+           << "  \"primary_instrument\": {\n"
+           << "    \"title\": \"" << inst_title << "\",\n"
+           << "    \"protocol\": \"" << inst_proto << "\",\n"
+           << "    \"type\": \"" << inst_type << "\"\n"
+           << "  },\n"
+           << "  \"sensors\": " << sensors_json << ",\n"
+           << "  \"attacks\": " << attacks_json << "\n"
+           << "}";
+        return ss.str();
+    }
+
+    
     std::string HttpServer::handle_get_compliance()
     {
         return reporting::ReportGenerator::instance().generate_json_compliance_report();
