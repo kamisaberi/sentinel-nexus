@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let audioSilenced = false;
     let audioCtx = null;
 
-// --- REPLACE loadFleetNodes() IN mission_control.js ---
+    // --- REPLACE loadFleetNodes() IN mission_control.js ---
 
     let currentSelectedNodeId = null;
 
@@ -42,7 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 const nodes = await resp.json();
                 if (Array.isArray(nodes)) {
                     liveNodes = nodes;
-                    
+
                     if (activeNodeCountEl) {
                         const onlineCount = liveNodes.filter(n => n.status === "ONLINE").length;
                         activeNodeCountEl.textContent = `${onlineCount}/${liveNodes.length}`;
@@ -67,7 +67,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     // 3. Update Dropdown Options (Preserve user selection)
                     if (nodeSelect) {
                         const previousValue = nodeSelect.value;
-                        nodeSelect.innerHTML = liveNodes.map(n => 
+                        nodeSelect.innerHTML = liveNodes.map(n =>
                             `<option value="${n.node_id}" ${n.status === 'OFFLINE' ? 'style="color:#EF4444;"' : ''}>
                                 [${n.status}] [${n.node_id.slice(0, 10)}] ${n.site} (${n.hostname})
                             </option>`
