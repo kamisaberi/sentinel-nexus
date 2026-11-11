@@ -425,7 +425,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             updateSensorEChart(sid, s, val, hist);
         });
-    }, 1000);
+    }, 300);
 
     // ========================================================================
     // 5. PANE 03: IN-KERNEL eBPF FLIGHT RECORDER LOGS
