@@ -476,6 +476,15 @@ namespace sentinel::nexus::api
             content_type = "application/json";
             return intelligence::GlobalThreatCache::instance().generate_xai_summary_json();
         }
+
+        // Dynamic Node Detail Endpoint for Mission Control Master-Detail Workspace
+        if (route_path.rfind("/api/v1/fleet/nodes/", 0) == 0 && route_path.size() > 20)
+        {
+            std::string target_node_id = route_path.substr(20);
+            content_type = "application/json";
+            return handle_get_node_detail(target_node_id);
+        }
+        
         if (route_path == "/api/v1/fleet/nodes")
         {
             content_type = "application/json";
