@@ -113,7 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
- async function selectSentry(nodeId) {
+    async function selectSentry(nodeId) {
         if (!nodeId) return;
         activeNodeId = nodeId;
         renderSentryRail();
