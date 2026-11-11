@@ -8,6 +8,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let activeNodeId = null;
     let activeNodeData = null;
     let isSystemOffline = false;
+    let isThermalAnomaly = false;   // <--- ADD THIS VARIABLE DECLARATION!
+
     let activeSensors = [];
     const sensorHistories = {};
     const echartsInstances = {};
