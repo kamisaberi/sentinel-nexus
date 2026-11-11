@@ -26,21 +26,46 @@ document.addEventListener("DOMContentLoaded", () => {
     // ========================================================================
     // 1. DYNAMIC FLEET DISCOVERY (Zero Hardcoding)
     // ========================================================================
+// --- REPLACE loadFleetNodes() IN mission_control.js ---
+    let systemAlarmActive = false;
+    let audioSilenced = false;
+    let audioCtx = null;
+
     async function loadFleetNodes() {
         try {
             const resp = await fetch("/api/v1/fleet/nodes");
             if (resp.ok) {
                 const nodes = await resp.json();
-                if (Array.isArray(nodes) && nodes.length > 0) {
+                if (Array.isArray(nodes)) {
                     liveNodes = nodes;
                     
                     if (activeNodeCountEl) {
-                        activeNodeCountEl.textContent = liveNodes.length;
+                        const onlineCount = liveNodes.filter(n => n.status === "ONLINE").length;
+                        activeNodeCountEl.textContent = `${onlineCount}/${liveNodes.length}`;
                     }
 
+                    // 1. Check for Complete System / Sentry Outage
+                    if (liveNodes.length === 0) {
+                        triggerSystemAlarm("CRITICAL", "ALL EDGE SENTRIES OFFLINE — ZERO NODES REGISTERED IN C2");
+                        if (nodeSelect) nodeSelect.innerHTML = `<option value="">[SYSTEM OFFLINE] No Sentries Online</option>`;
+                        return;
+                    }
+
+                    // 2. Check for Individual Node Outage
+                    const offlineNodes = liveNodes.filter(n => n.status === "OFFLINE");
+                    if (offlineNodes.length > 0) {
+                        const offNames = offlineNodes.map(n => n.site || n.node_id).join(", ");
+                        triggerSystemAlarm("WARNING", `SENTRY DISCONNECTED &bull; Offline Node(s): ${offNames}`);
+                    } else {
+                        clearSystemAlarm();
+                    }
+
+                    // 3. Populate Selector with Live Nodes
                     if (nodeSelect) {
                         nodeSelect.innerHTML = liveNodes.map(n => 
-                            `<option value="${n.node_id}">[${n.node_id.slice(0, 12)}] ${n.site} (${n.hostname})</option>`
+                            `<option value="${n.node_id}" ${n.status === 'OFFLINE' ? 'style="color:#EF4444;"' : ''}>
+                                [${n.status}] [${n.node_id.slice(0, 10)}] ${n.site} (${n.hostname})
+                            </option>`
                         ).join("");
 
                         if (!activeNodeId || !liveNodes.some(n => n.node_id === activeNodeId)) {
@@ -54,23 +79,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
             }
         } catch (e) {
-            console.warn("Failed to fetch live fleet nodes from Nexus, using fallback context", e);
+            triggerSystemAlarm("CRITICAL", "SENTINEL-NEXUS C2 UNREACHABLE — NETWORK CONNECTION OR BACKEND DAEMON DOWN");
         }
-
-        // Fallback placeholder node if no containers are registered
-        liveNodes = [{
-            node_id: "NODE-DEFAULT",
-            site: "Substation Alpha (High-Voltage Grid)",
-            hostname: "substation-01.matrix.internal",
-            kernel: "6.8.0-generic",
-            mitigation_latency_us: 0.84
-        }];
-        if (nodeSelect) {
-            nodeSelect.innerHTML = `<option value="NODE-DEFAULT">[NODE-DEFAULT] Substation Alpha (10.240.0.101)</option>`;
-        }
-        applyNodeContext("NODE-DEFAULT");
     }
-
     if (nodeSelect) {
         nodeSelect.addEventListener("change", (e) => {
             activeNodeId = e.target.value;
