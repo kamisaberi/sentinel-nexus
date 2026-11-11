@@ -29,12 +29,15 @@ document.addEventListener("DOMContentLoaded", () => {
     // ========================================================================
     // 1. FLEET DISCOVERY & MASTER SENTRY RAIL (No Hardcoding)
     // ========================================================================
+    let consecutiveFailures = 0;
+
     async function loadFleetNodes() {
         try {
             const resp = await fetch("/api/v1/fleet/nodes");
             if (resp.ok) {
                 const nodes = await resp.json();
                 if (Array.isArray(nodes) && nodes.length > 0) {
+                    consecutiveFailures = 0;
                     liveNodes = nodes;
                     isSystemOffline = false;
                     clearSystemOutage();
@@ -53,19 +56,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     renderSentryRail();
 
-                    // If first load or active node removed, select first available
+                    // RESILIENCE FIX: If no sentry is selected, OR if the right workspace failed to load sensors, reload!
                     if (!activeNodeId || !liveNodes.some(n => n.node_id === activeNodeId)) {
                         selectSentry(liveNodes[0].node_id);
+                    } else if (!activeNodeData || activeSensors.length === 0) {
+                        // Automatically heal blank panes if a previous fetch lagged
+                        selectSentry(activeNodeId);
                     }
                     return;
                 }
             }
-            triggerSystemOutage("ZERO EDGE SENTRIES REGISTERED IN NEXUS C2");
         } catch (err) {
-            triggerSystemOutage("NEXUS C2 BACKEND UNREACHABLE (HTTP 9443 FAILED)");
+            console.warn("Heartbeat poll failed", err);
+        }
+
+        consecutiveFailures++;
+        // Require 2 consecutive failures before declaring a full system outage
+        if (consecutiveFailures >= 2) {
+            triggerSystemOutage("ZERO EDGE SENTRIES RESPONDING IN NEXUS C2");
         }
     }
-
     function renderSentryRail() {
         if (!sentryRail) return;
         if (sentryRailCount) sentryRailCount.textContent = `${liveNodes.length} NODES`;
@@ -336,7 +346,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-// --- REPLACE updateSensorEChart() IN mission_control.js ---
+    // --- REPLACE updateSensorEChart() IN mission_control.js ---
     function updateSensorEChart(sid, s, val, history) {
         const chartDom = document.getElementById(`echart-${sid}`);
         if (!chartDom || chartDom.clientWidth === 0) return;
