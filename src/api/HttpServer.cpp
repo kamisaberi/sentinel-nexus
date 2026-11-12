@@ -91,7 +91,7 @@ namespace sentinel::nexus::api
 
             if (key.find("VIBRAT") != std::string::npos || key.find("BEARING") != std::string::npos)
             {
-                item.category = "VIBRATION";
+                item.category = "vibration";
                 item.unit = "mm/s";
                 item.baseline = 1.24;
                 item.min_val = 0.0;
@@ -100,7 +100,7 @@ namespace sentinel::nexus::api
             }
             else if (key.find("CRYO") != std::string::npos)
             {
-                item.category = "TEMPERATURE";
+                item.category = "temperature";
                 item.unit = "K";
                 item.baseline = 4.2;
                 item.min_val = 0.0;
@@ -109,7 +109,7 @@ namespace sentinel::nexus::api
             }
             else if (key.find("TEMP") != std::string::npos || key.find("THERM") != std::string::npos || key.find("PYRO") != std::string::npos)
             {
-                item.category = "TEMPERATURE";
+                item.category = "temperature";
                 item.unit = "°C";
                 item.baseline = 85.4;
                 item.min_val = 0.0;
@@ -118,7 +118,7 @@ namespace sentinel::nexus::api
             }
             else if (key.find("LIDAR") != std::string::npos || key.find("SPATIAL") != std::string::npos)
             {
-                item.category = "LIDAR";
+                item.category = "lidar";
                 item.unit = "pts";
                 item.baseline = 848.0;
                 item.min_val = 0.0;
@@ -127,7 +127,7 @@ namespace sentinel::nexus::api
             }
             else if (key.find("FREQ") != std::string::npos || (item.port == 15501 && key.find("POWER") == std::string::npos && key.find("LOAD") == std::string::npos))
             {
-                item.category = "ELECTRICAL";
+                item.category = "electrical";
                 item.unit = "Hz";
                 item.baseline = 50.02;
                 item.min_val = 48.0;
@@ -136,7 +136,7 @@ namespace sentinel::nexus::api
             }
             else if (key.find("POWER") != std::string::npos || key.find("PAC3200") != std::string::npos || key.find("LOAD") != std::string::npos)
             {
-                item.category = "ELECTRICAL";
+                item.category = "electrical";
                 item.unit = "kW";
                 item.baseline = 420.8;
                 item.min_val = 0.0;
@@ -145,7 +145,7 @@ namespace sentinel::nexus::api
             }
             else if (key.find("VOLT") != std::string::npos || key.find("BUSBAR") != std::string::npos || key.find("IEC104") != std::string::npos)
             {
-                item.category = "ELECTRICAL";
+                item.category = "electrical";
                 item.unit = "kV";
                 item.baseline = 220.4;
                 item.min_val = 0.0;
@@ -154,7 +154,7 @@ namespace sentinel::nexus::api
             }
             else if (key.find("RTSP") != std::string::npos || key.find("CAMERA") != std::string::npos || key.find("VISION") != std::string::npos)
             {
-                item.category = "VISION";
+                item.category = "optical";
                 item.unit = "FPS";
                 item.baseline = 15.0;
                 item.min_val = 0.0;
@@ -163,7 +163,7 @@ namespace sentinel::nexus::api
             }
             else if (key.find("PRESS") != std::string::npos || key.find("HYDRAULIC") != std::string::npos || key.find("S7COMM") != std::string::npos)
             {
-                item.category = "PRESSURE";
+                item.category = "pressure";
                 item.unit = "PSI";
                 item.baseline = 100.2;
                 item.min_val = 0.0;
@@ -172,7 +172,7 @@ namespace sentinel::nexus::api
             }
             else if (key.find("DICOM") != std::string::npos || key.find("PACS") != std::string::npos)
             {
-                item.category = "NETWORK";
+                item.category = "network";
                 item.unit = "MB/s";
                 item.baseline = 83.1;
                 item.min_val = 0.0;
@@ -181,7 +181,7 @@ namespace sentinel::nexus::api
             }
             else if (key.find("5G") != std::string::npos || key.find("GTP") != std::string::npos || key.find("SLICE") != std::string::npos)
             {
-                item.category = "NETWORK";
+                item.category = "network";
                 item.unit = "TEID";
                 item.baseline = 1.0;
                 item.min_val = 1.0;
@@ -190,7 +190,7 @@ namespace sentinel::nexus::api
             }
             else
             {
-                item.category = "SCADA";
+                item.category = "industrial_cps";
                 item.unit = "units";
                 item.baseline = 50.0;
                 item.min_val = 0.0;
@@ -199,8 +199,8 @@ namespace sentinel::nexus::api
             }
         }
 
-        // Find the matching node YAML on disk and extract its official node identifier
-        static std::filesystem::path locate_node_yaml(const std::string &site, const std::string &host, const std::string &id, std::string &out_node_identifier)
+        // Locate matching node YAML file on disk
+        static std::filesystem::path locate_node_yaml(const std::string &site, const std::string &host, const std::string &id)
         {
             const std::vector<std::string> node_dirs = {
                 "/opt/sentinel-nexus/configs/nodes",
@@ -222,29 +222,19 @@ namespace sentinel::nexus::api
                     if (entry.is_regular_file() && (entry.path().extension() == ".yaml" || entry.path().extension() == ".yml"))
                     {
                         std::ifstream f(entry.path());
-                        std::string line, found_id;
-                        bool match = false;
+                        std::string line;
                         while (std::getline(f, line))
                         {
                             std::string l_low = to_lower_str(line);
-                            if (l_low.find("identifier:") != std::string::npos)
-                            {
-                                found_id = trim_str(line.substr(line.find(':') + 1));
-                            }
                             if (l_low.find("identifier:") != std::string::npos || l_low.find("site_identifier:") != std::string::npos)
                             {
                                 if ((!s_low.empty() && l_low.find(s_low) != std::string::npos) ||
                                     (!h_low.empty() && l_low.find(h_low) != std::string::npos) ||
                                     (!id_low.empty() && l_low.find(id_low) != std::string::npos))
                                 {
-                                    match = true;
+                                    return entry.path();
                                 }
                             }
-                        }
-                        if (match)
-                        {
-                            out_node_identifier = found_id;
-                            return entry.path();
                         }
                     }
                 }
@@ -324,116 +314,148 @@ namespace sentinel::nexus::api
             return sensors;
         }
 
-        // Discover strictly real adversarial attack scenarios targeting this node
-        static std::vector<DynamicAttackItem> discover_scenarios_for_node(
-            const std::string &site, const std::string &host, const std::string &node_id, const std::string &node_ident)
+        // Load attack taxonomy strictly from external JSON data file on disk
+        static void load_external_attack_matrix(
+            std::unordered_map<std::string, DynamicAttackItem> &out_attack_defs,
+            std::unordered_map<std::string, std::vector<std::string>> &out_category_map)
         {
 
-            std::vector<DynamicAttackItem> attacks;
-            const std::vector<std::string> scenario_dirs = {
-                "/opt/sentinel-nexus/configs/scenarios",
-                "configs/scenarios",
-                "../configs/scenarios",
-                "/home/kami/sentinel-matrix/configs/scenarios",
-                "sentinel-matrix/configs/scenarios"};
+            const std::vector<std::string> search_paths = {
+                "/opt/sentinel-nexus/configs/sensor_attack_matrix.json",
+                "configs/sensor_attack_matrix.json",
+                "../configs/sensor_attack_matrix.json",
+                "/home/kami/sentinel-matrix/configs/sensor_attack_matrix.json",
+                "/home/kami/sentinel-nexus/configs/sensor_attack_matrix.json"};
 
-            std::string s_low = to_lower_str(site);
-            std::string h_low = to_lower_str(host);
-            std::string n_low = to_lower_str(node_ident);
-
-            for (const auto &dir : scenario_dirs)
+            std::ifstream file;
+            for (const auto &p : search_paths)
             {
-                if (!std::filesystem::exists(dir))
-                    continue;
-                for (const auto &entry : std::filesystem::directory_iterator(dir))
+                if (std::filesystem::exists(p))
                 {
-                    if (entry.is_regular_file() && (entry.path().extension() == ".yaml" || entry.path().extension() == ".yml"))
+                    file.open(p);
+                    if (file.is_open())
+                        break;
+                }
+            }
+
+            if (!file.is_open())
+                return;
+
+            std::string line;
+            std::string section;
+            std::string cur_attack_slug;
+
+            while (std::getline(file, line))
+            {
+                std::string trimmed = trim_str(line);
+                if (trimmed.empty())
+                    continue;
+
+                if (trimmed.find("\"attacks\"") != std::string::npos)
+                {
+                    section = "attacks";
+                    continue;
+                }
+                else if (trimmed.find("\"categories\"") != std::string::npos)
+                {
+                    section = "categories";
+                    continue;
+                }
+
+                if (section == "attacks")
+                {
+                    size_t colon_pos = trimmed.find(':');
+                    if (trimmed.find('{') != std::string::npos && colon_pos != std::string::npos)
                     {
-                        std::ifstream f(entry.path());
-                        std::string line, name, payload_pat, type_val;
-                        bool targets_node = false;
-                        bool in_targets = false;
-
-                        while (std::getline(f, line))
+                        cur_attack_slug = trim_str(trimmed.substr(0, colon_pos));
+                    }
+                    if (!cur_attack_slug.empty())
+                    {
+                        if (trimmed.find("\"id\"") != std::string::npos)
                         {
-                            std::string trimmed = trim_str(line);
-                            if (trimmed.rfind("type:", 0) == 0)
-                            {
-                                type_val = trim_str(trimmed.substr(5));
-                            }
-                            else if (trimmed.rfind("name:", 0) == 0)
-                            {
-                                name = trim_str(trimmed.substr(5));
-                            }
-                            else if (trimmed.rfind("payload_pattern:", 0) == 0)
-                            {
-                                payload_pat = trim_str(trimmed.substr(16));
-                            }
-                            else if (trimmed.rfind("target_nodes:", 0) == 0)
-                            {
-                                std::string rest_low = to_lower_str(trimmed.substr(13));
-                                if ((!s_low.empty() && rest_low.find(s_low) != std::string::npos) ||
-                                    (!h_low.empty() && rest_low.find(h_low) != std::string::npos) ||
-                                    (!n_low.empty() && rest_low.find(n_low) != std::string::npos))
-                                {
-                                    targets_node = true;
-                                }
-                                in_targets = true;
-                            }
-                            else if (in_targets)
-                            {
-                                if (trimmed.rfind("-", 0) == 0)
-                                {
-                                    std::string t_low = to_lower_str(trim_str(trimmed.substr(1)));
-                                    if ((!s_low.empty() && (s_low.find(t_low) != std::string::npos || t_low.find(s_low) != std::string::npos)) ||
-                                        (!h_low.empty() && (h_low.find(t_low) != std::string::npos || t_low.find(h_low) != std::string::npos)) ||
-                                        (!n_low.empty() && (n_low.find(t_low) != std::string::npos || t_low.find(n_low) != std::string::npos)))
-                                    {
-                                        targets_node = true;
-                                    }
-                                }
-                                else if (trimmed.back() == ':')
-                                {
-                                    in_targets = false;
-                                }
-                            }
+                            size_t p = trimmed.find(':');
+                            std::string id_val = trim_str(trimmed.substr(p + 1));
+                            if (!id_val.empty() && id_val.back() == ',')
+                                id_val.pop_back();
+                            out_attack_defs[cur_attack_slug].id = trim_str(id_val);
                         }
-
-                        // INVARIANT: Skip baseline/ambient normal traffic (Pane 04 displays strictly attack vectors)
-                        std::string type_upper = to_upper_str(type_val);
-                        if (type_upper.find("BASELINE") != std::string::npos || type_upper.find("NORMAL") != std::string::npos)
+                        else if (trimmed.find("\"name\"") != std::string::npos)
                         {
-                            continue;
-                        }
-
-                        if (targets_node && !name.empty())
-                        {
-                            std::string aid = payload_pat.empty() ? entry.path().stem().string() : payload_pat;
-                            aid = to_upper_str(aid);
-
-                            bool exists = false;
-                            for (const auto &a : attacks)
-                            {
-                                if (a.id == aid || a.name == name)
-                                {
-                                    exists = true;
-                                    break;
-                                }
-                            }
-                            if (!exists)
-                            {
-                                attacks.push_back({.id = aid, .name = name});
-                            }
+                            size_t p = trimmed.find(':');
+                            std::string name_val = trim_str(trimmed.substr(p + 1));
+                            if (!name_val.empty() && name_val.back() == ',')
+                                name_val.pop_back();
+                            out_attack_defs[cur_attack_slug].name = trim_str(name_val);
                         }
                     }
                 }
-                if (!attacks.empty())
-                    break;
+                else if (section == "categories")
+                {
+                    size_t colon_pos = trimmed.find(':');
+                    if (colon_pos != std::string::npos && trimmed.find('[') != std::string::npos)
+                    {
+                        std::string cat = trim_str(trimmed.substr(0, colon_pos));
+                        std::string list_part = trimmed.substr(trimmed.find('[') + 1);
+                        size_t close_bracket = list_part.find(']');
+                        if (close_bracket != std::string::npos)
+                            list_part = list_part.substr(0, close_bracket);
+
+                        std::stringstream ss(list_part);
+                        std::string item;
+                        while (std::getline(ss, item, ','))
+                        {
+                            std::string slug = trim_str(item);
+                            if (!slug.empty())
+                                out_category_map[cat].push_back(slug);
+                        }
+                    }
+                }
             }
-            return attacks;
         }
 
-    }
+        // Dynamically resolve attacks for this node strictly from its active sensor categories
+        static std::vector<DynamicAttackItem> resolve_attacks_from_sensors(const std::vector<DynamicSensorItem> &sensors)
+        {
+            std::unordered_map<std::string, DynamicAttackItem> attack_defs;
+            std::unordered_map<std::string, std::vector<std::string>> category_map;
+            load_external_attack_matrix(attack_defs, category_map);
+
+            std::vector<DynamicAttackItem> result;
+            std::unordered_set<std::string> seen;
+
+            for (const auto &s : sensors)
+            {
+                std::string cat = to_lower_str(s.category);
+                auto it = category_map.find(cat);
+                if (it != category_map.end())
+                {
+                    for (const auto &slug : it->second)
+                    {
+                        if (seen.find(slug) == seen.end())
+                        {
+                            seen.insert(slug);
+                            auto def_it = attack_defs.find(slug);
+                            if (def_it != attack_defs.end())
+                            {
+                                result.push_back(def_it->second);
+                            }
+                            else
+                            {
+                                result.push_back({.id = to_upper_str(slug), .name = slug});
+                            }
+                            if (result.size() >= 4)
+                                break;
+                        }
+                    }
+                }
+                if (result.size() >= 4)
+                    break;
+            }
+            return result;
+        }
+
+    } // anonymous namespace
+
     // --- INSERT HANDLERS IN HttpServer.cpp ---
     std::string HttpServer::handle_get_active_sensors()
     {
