@@ -424,7 +424,7 @@
                     if (statusEl) statusEl.innerText = 'UPDATED ' + new Date().toLocaleTimeString();
                 }
             }
-        } catch (e) {}
+        } catch (e) { }
     }
 
     // --------------------------------------------------------------------------
@@ -462,7 +462,7 @@
         try {
             const res = await fetch('/api/v1/lab/scorecard');
             if (res.ok) scorecardData = await res.json();
-        } catch (e) {}
+        } catch (e) { }
 
         const latexTable = `% ==============================================================================
 % Blackbox Sentinel Empirical Benchmark Scorecard
