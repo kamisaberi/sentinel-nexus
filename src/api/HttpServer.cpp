@@ -1040,7 +1040,7 @@ namespace sentinel::nexus::api
         return ss.str();
     }
 
-    std::string HttpServer::handle_get_node_detail(const std::string &node_id)
+     std::string HttpServer::handle_get_node_detail(const std::string &node_id)
     {
         auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
         const fleet::RegisteredNode *found = nullptr;
@@ -1067,11 +1067,10 @@ namespace sentinel::nexus::api
         std::string site = found->site_identifier;
         std::string host = found->identity.hostname();
 
-        // 1. DYNAMICALLY RESOLVE NODE YAML & NODE IDENTIFIER
-        std::string node_ident;
-        auto yaml_path = locate_node_yaml(site, host, found->node_id, node_ident);
+        // 1. DYNAMICALLY RESOLVE NODE YAML ON DISK
+        auto yaml_path = locate_node_yaml(site, host, found->node_id);
 
-        // 2. PARSE EXACT SENSORS BOUND TO THIS SPECIFIC EDGE APPLIANCE
+        // 2. PARSE STRICTLY THE EXACT SENSORS BOUND TO THIS SPECIFIC EDGE APPLIANCE
         std::vector<DynamicSensorItem> active_sensors;
         if (!yaml_path.empty())
         {
@@ -1092,9 +1091,8 @@ namespace sentinel::nexus::api
         }
 
         // 3. DYNAMIC PRIMARY INSTRUMENT DETERMINATION (Inferred from actual sensors on this node)
-        std::string sensor_context = to_lower_str(site + " " + host + " " + node_ident);
-        for (const auto &s : active_sensors)
-        {
+        std::string sensor_context = to_lower_str(site + " " + host);
+        for (const auto &s : active_sensors) {
             sensor_context += " " + to_lower_str(s.sensor_id + " " + s.category + " " + s.interface);
         }
 
@@ -1104,7 +1102,7 @@ namespace sentinel::nexus::api
 
         if (sensor_context.find("thermal") != std::string::npos || sensor_context.find("camera") != std::string::npos ||
             sensor_context.find("rtsp") != std::string::npos || sensor_context.find("lidar") != std::string::npos ||
-            sensor_context.find("pacs") != std::string::npos || sensor_context.find("hospital") != std::string::npos)
+            sensor_context.find("optical") != std::string::npos)
         {
             inst_title = "RADIOMETRIC THERMAL VISION";
             inst_proto = "WHEP / RTSP :8554";
@@ -1118,8 +1116,8 @@ namespace sentinel::nexus::api
             inst_type = "reactor";
         }
 
-        // 4. DISCOVER TARGET SCENARIOS (Strictly attacks that target this node)
-        auto attacks = discover_scenarios_for_node(site, host, found->node_id, node_ident);
+        // 4. DYNAMIC ATTACK DISCOVERY FROM STANDALONE EXTERNAL JSON DATA FILE
+        auto attacks = resolve_attacks_from_sensors(active_sensors);
 
         // 5. SERIALIZE TO IDENTICAL JSON SPEC FOR MISSION CONTROL
         std::ostringstream ss;
@@ -1148,7 +1146,7 @@ namespace sentinel::nexus::api
             ss << "    {\n"
                << "      \"sensor_id\": \"" << s.sensor_id << "\",\n"
                << "      \"name\": \"" << s.name << "\",\n"
-               << "      \"category\": \"" << s.category << "\",\n"
+               << "      \"category\": \"" << to_upper_str(s.category) << "\",\n"
                << "      \"port\": " << s.port << ",\n"
                << "      \"unit\": \"" << s.unit << "\",\n"
                << "      \"baseline\": " << s.baseline << ",\n"
