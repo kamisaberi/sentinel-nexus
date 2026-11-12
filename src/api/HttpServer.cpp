@@ -314,6 +314,42 @@ namespace sentinel::nexus::api
             return sensors;
         }
 
+        // Helper: Extract all quoted strings from a JSON line cleanly
+        static std::vector<std::string> extract_json_quoted_tokens(const std::string &line)
+        {
+            std::vector<std::string> tokens;
+            bool in_quote = false;
+            std::string cur;
+            for (size_t i = 0; i < line.size(); ++i)
+            {
+                char c = line[i];
+                if (c == '\\' && i + 1 < line.size())
+                {
+                    if (in_quote)
+                        cur += line[++i];
+                    continue;
+                }
+                if (c == '"')
+                {
+                    if (in_quote)
+                    {
+                        tokens.push_back(cur);
+                        cur.clear();
+                        in_quote = false;
+                    }
+                    else
+                    {
+                        in_quote = true;
+                    }
+                }
+                else if (in_quote)
+                {
+                    cur += c;
+                }
+            }
+            return tokens;
+        }
+
         // Load attack taxonomy strictly from external JSON data file on disk
         static void load_external_attack_matrix(
             std::unordered_map<std::string, DynamicAttackItem> &out_attack_defs,
@@ -328,89 +364,75 @@ namespace sentinel::nexus::api
                 "/home/kami/sentinel-nexus/configs/sensor_attack_matrix.json"};
 
             std::ifstream file;
+            std::string resolved_path;
             for (const auto &p : search_paths)
             {
                 if (std::filesystem::exists(p))
                 {
                     file.open(p);
                     if (file.is_open())
+                    {
+                        resolved_path = p;
                         break;
+                    }
                 }
             }
 
             if (!file.is_open())
+            {
+                NEXUS_LOG_WARN("[AttackMatrix] sensor_attack_matrix.json not found in search paths!");
                 return;
+            }
 
             std::string line;
-            std::string section;
-            std::string cur_attack_slug;
+            std::string current_section;
 
             while (std::getline(file, line))
             {
-                std::string trimmed = trim_str(line);
-                if (trimmed.empty())
+                auto tokens = extract_json_quoted_tokens(line);
+                if (tokens.empty())
                     continue;
 
-                if (trimmed.find("\"attacks\"") != std::string::npos)
+                if (tokens[0] == "attacks")
                 {
-                    section = "attacks";
+                    current_section = "attacks";
                     continue;
                 }
-                else if (trimmed.find("\"categories\"") != std::string::npos)
+                else if (tokens[0] == "categories")
                 {
-                    section = "categories";
+                    current_section = "categories";
                     continue;
                 }
 
-                if (section == "attacks")
+                if (current_section == "attacks")
                 {
-                    size_t colon_pos = trimmed.find(':');
-                    if (trimmed.find('{') != std::string::npos && colon_pos != std::string::npos)
+                    // Expected line: "slug": { "id": "ID_VAL", "name": "NAME_VAL" }
+                    // tokens: [0] = slug, [1] = "id", [2] = ID_VAL, [3] = "name", [4] = NAME_VAL
+                    if (tokens.size() >= 5 && tokens[1] == "id" && tokens[3] == "name")
                     {
-                        cur_attack_slug = trim_str(trimmed.substr(0, colon_pos));
-                    }
-                    if (!cur_attack_slug.empty())
-                    {
-                        if (trimmed.find("\"id\"") != std::string::npos)
-                        {
-                            size_t p = trimmed.find(':');
-                            std::string id_val = trim_str(trimmed.substr(p + 1));
-                            if (!id_val.empty() && id_val.back() == ',')
-                                id_val.pop_back();
-                            out_attack_defs[cur_attack_slug].id = trim_str(id_val);
-                        }
-                        else if (trimmed.find("\"name\"") != std::string::npos)
-                        {
-                            size_t p = trimmed.find(':');
-                            std::string name_val = trim_str(trimmed.substr(p + 1));
-                            if (!name_val.empty() && name_val.back() == ',')
-                                name_val.pop_back();
-                            out_attack_defs[cur_attack_slug].name = trim_str(name_val);
-                        }
+                        out_attack_defs[tokens[0]] = DynamicAttackItem{
+                            .id = tokens[2],
+                            .name = tokens[4]};
                     }
                 }
-                else if (section == "categories")
+                else if (current_section == "categories")
                 {
-                    size_t colon_pos = trimmed.find(':');
-                    if (colon_pos != std::string::npos && trimmed.find('[') != std::string::npos)
+                    // Expected line: "category": ["slug1", "slug2", ...]
+                    // tokens: [0] = category, [1..N] = attack slugs
+                    if (tokens.size() >= 2)
                     {
-                        std::string cat = trim_str(trimmed.substr(0, colon_pos));
-                        std::string list_part = trimmed.substr(trimmed.find('[') + 1);
-                        size_t close_bracket = list_part.find(']');
-                        if (close_bracket != std::string::npos)
-                            list_part = list_part.substr(0, close_bracket);
-
-                        std::stringstream ss(list_part);
-                        std::string item;
-                        while (std::getline(ss, item, ','))
+                        std::string cat_name = to_lower_str(tokens[0]);
+                        for (size_t i = 1; i < tokens.size(); ++i)
                         {
-                            std::string slug = trim_str(item);
-                            if (!slug.empty())
-                                out_category_map[cat].push_back(slug);
+                            out_category_map[cat_name].push_back(tokens[i]);
                         }
                     }
                 }
             }
+
+            NEXUS_LOG_INFO("[AttackMatrix] Loaded " + std::to_string(out_attack_defs.size()) +
+                           " attack definitions across " + std::to_string(out_category_map.size()) +
+                           " categories from " + resolved_path);
         }
 
         // Dynamically resolve attacks for this node strictly from its active sensor categories
@@ -441,7 +463,7 @@ namespace sentinel::nexus::api
                             }
                             else
                             {
-                                result.push_back({.id = to_upper_str(slug), .name = slug});
+                                result.push_back(DynamicAttackItem{.id = to_upper_str(slug), .name = slug});
                             }
                             if (result.size() >= 4)
                                 break;
@@ -453,7 +475,6 @@ namespace sentinel::nexus::api
             }
             return result;
         }
-
     } // anonymous namespace
 
     // --- INSERT HANDLERS IN HttpServer.cpp ---
@@ -1040,7 +1061,7 @@ namespace sentinel::nexus::api
         return ss.str();
     }
 
-     std::string HttpServer::handle_get_node_detail(const std::string &node_id)
+    std::string HttpServer::handle_get_node_detail(const std::string &node_id)
     {
         auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
         const fleet::RegisteredNode *found = nullptr;
@@ -1092,7 +1113,8 @@ namespace sentinel::nexus::api
 
         // 3. DYNAMIC PRIMARY INSTRUMENT DETERMINATION (Inferred from actual sensors on this node)
         std::string sensor_context = to_lower_str(site + " " + host);
-        for (const auto &s : active_sensors) {
+        for (const auto &s : active_sensors)
+        {
             sensor_context += " " + to_lower_str(s.sensor_id + " " + s.category + " " + s.interface);
         }
 
