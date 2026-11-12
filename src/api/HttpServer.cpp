@@ -436,6 +436,8 @@ namespace sentinel::nexus::api
         }
 
         // Dynamically resolve attacks for this node strictly from its active sensor categories
+
+        // Dynamically resolve attacks for this node strictly from its active sensor categories (UNCAPPED)
         static std::vector<DynamicAttackItem> resolve_attacks_from_sensors(const std::vector<DynamicSensorItem> &sensors)
         {
             std::unordered_map<std::string, DynamicAttackItem> attack_defs;
@@ -465,16 +467,13 @@ namespace sentinel::nexus::api
                             {
                                 result.push_back(DynamicAttackItem{.id = to_upper_str(slug), .name = slug});
                             }
-                            if (result.size() >= 4)
-                                break;
                         }
                     }
                 }
-                if (result.size() >= 4)
-                    break;
             }
             return result;
         }
+
     } // anonymous namespace
 
     // --- INSERT HANDLERS IN HttpServer.cpp ---
