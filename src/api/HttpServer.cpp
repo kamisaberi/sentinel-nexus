@@ -1823,26 +1823,6 @@ namespace sentinel::nexus::api
         return "{\"logs\":\"" + escaped.str() + "\"}";
     }
 
-    std::string HttpServer::handle_get_lab_scorecard()
-    {
-        std::ostringstream ss;
-        ss << "{\n"
-           << "  \"doi\": \"10.5281/zenodo.23598779\",\n"
-           << "  \"benchmark\": \"Sentinel-Bench 14-Dimensional Verification\",\n"
-           << "  \"results\": {\n"
-           << "    \"in_kernel_drop_sla\": \"0.84 µs (PASS)\",\n"
-           << "    \"evt_p99_999_wcet\": \"1.82 µs (PASS < 100 µs)\",\n"
-           << "    \"cbf_forward_invariance\": \"VERIFIED (h(x) >= 0)\",\n"
-           << "    \"lyapunov_stability\": \"STABLE (lambda = -0.15)\",\n"
-           << "    \"pmu_ipc\": \"2.42 (> 1.0)\",\n"
-           << "    \"pmu_llc_miss_rate\": \"1.24% (< 15% SLA)\",\n"
-           << "    \"single_node_af_xdp\": \"10.25M EPS\",\n"
-           << "    \"multiqueue_rss_af_xdp\": \"40.00M+ EPS\",\n"
-           << "    \"critical_clearing_time\": \"38.4 ms (<= 50.0 ms)\"\n"
-           << "  },\n"
-           << "  \"latex_table\": \"\\\\begin{table}[t]...\\\\end{table}\"\n"
-           << "}";
-        return ss.str();
-    }
+    
 
 } // namespace sentinel::nexus::api
