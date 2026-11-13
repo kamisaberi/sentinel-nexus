@@ -10,11 +10,14 @@ document.addEventListener("DOMContentLoaded", () => {
     let isSystemOffline = false;
     let isThermalAnomaly = false;   // <--- ADD THIS VARIABLE DECLARATION!
 
+
     let activeSensors = [];
     const sensorHistories = {};
     const echartsInstances = {};
     const activeSensorFaults = {}; // Per-sensor isolated chaos dictionary
     let canvasAnimId = null;
+
+    const sentryAnomalyStates = {}; // Strictly isolated per sentry: { [nodeId]: boolean }
 
     // DOM Elements
     const sentryRail = document.getElementById("mc-sentry-rail");
@@ -230,25 +233,42 @@ document.addEventListener("DOMContentLoaded", () => {
                     <button class="btn-attack btn-attack-danger" id="btn-act-grid-fault" style="flex:1; padding:6px; font-size:10px;">[!] INJECT HARMONIC DISTORTION</button>
                     <button class="btn-attack btn-attack-success" id="btn-act-grid-rst" style="flex:1; padding:6px; font-size:10px;">[+] RESTORE 50.00 Hz SYNCH</button>
                 `;
-                document.getElementById("btn-act-grid-fault")?.addEventListener("click", () => { isThermalAnomaly = true; logEvent("[PANE 01] Grid harmonic distortion injected (THD > 18%)", "text-yellow"); });
-                document.getElementById("btn-act-grid-rst")?.addEventListener("click", () => { isThermalAnomaly = false; logEvent("[PANE 01] Grid synchronized to nominal 50.00 Hz", "text-green"); });
+                document.getElementById("btn-act-grid-fault")?.addEventListener("click", () => {
+                    if (activeNodeId) sentryAnomalyStates[activeNodeId] = true;
+                    logEvent(`[PANE 01] Grid harmonic distortion injected on ${activeNodeData?.site || activeNodeId} (THD > 18%)`, "text-yellow");
+                });
+                document.getElementById("btn-act-grid-rst")?.addEventListener("click", () => {
+                    if (activeNodeId) delete sentryAnomalyStates[activeNodeId];
+                    logEvent(`[PANE 01] Grid synchronized to nominal 50.00 Hz on ${activeNodeData?.site || activeNodeId}`, "text-green");
+                });
             } else if (inst.type === "video") {
                 actionsEl.innerHTML = `
                     <button class="btn-attack btn-attack-danger" id="btn-act-therm-spike" style="flex:1; padding:6px; font-size:10px;">[!] TRIGGER THERMAL RUNAWAY</button>
                     <button class="btn-attack btn-attack-success" id="btn-act-therm-rst" style="flex:1; padding:6px; font-size:10px;">[+] RESTORE OPTICAL BASELINE</button>
                 `;
-                document.getElementById("btn-act-therm-spike")?.addEventListener("click", () => { isThermalAnomaly = true; logEvent("[PANE 01] Thermal runaway induced on infrared optics (>118°C)", "text-yellow"); });
-                document.getElementById("btn-act-therm-rst")?.addEventListener("click", () => { isThermalAnomaly = false; logEvent("[PANE 01] Optical baseline restored", "text-green"); });
+                document.getElementById("btn-act-therm-spike")?.addEventListener("click", () => {
+                    if (activeNodeId) sentryAnomalyStates[activeNodeId] = true;
+                    logEvent(`[PANE 01] Thermal runaway induced on infrared optics (>118°C) on ${activeNodeData?.site || activeNodeId}`, "text-yellow");
+                });
+                document.getElementById("btn-act-therm-rst")?.addEventListener("click", () => {
+                    if (activeNodeId) delete sentryAnomalyStates[activeNodeId];
+                    logEvent(`[PANE 01] Optical baseline restored on ${activeNodeData?.site || activeNodeId}`, "text-green");
+                });
             } else {
                 actionsEl.innerHTML = `
                     <button class="btn-attack btn-attack-danger" id="btn-act-rx-run" style="flex:1; padding:6px; font-size:10px;">[!] EXOTHERMIC REACTOR SPIKE</button>
                     <button class="btn-attack btn-attack-success" id="btn-act-rx-rst" style="flex:1; padding:6px; font-size:10px;">[+] NITROGEN QUENCH DUMP</button>
                 `;
-                document.getElementById("btn-act-rx-run")?.addEventListener("click", () => { isThermalAnomaly = true; logEvent("[PANE 01] Exothermic chemical runaway initiated", "text-yellow"); });
-                document.getElementById("btn-act-rx-rst")?.addEventListener("click", () => { isThermalAnomaly = false; logEvent("[PANE 01] Reactor cooled with emergency nitrogen quench", "text-green"); });
+                document.getElementById("btn-act-rx-run")?.addEventListener("click", () => {
+                    if (activeNodeId) sentryAnomalyStates[activeNodeId] = true;
+                    logEvent(`[PANE 01] Exothermic chemical runaway initiated on ${activeNodeData?.site || activeNodeId}`, "text-yellow");
+                });
+                document.getElementById("btn-act-rx-rst")?.addEventListener("click", () => {
+                    if (activeNodeId) delete sentryAnomalyStates[activeNodeId];
+                    logEvent(`[PANE 01] Reactor cooled with emergency nitrogen quench on ${activeNodeData?.site || activeNodeId}`, "text-green");
+                });
             }
         }
-
         if (canvasAnimId) cancelAnimationFrame(canvasAnimId);
         if (canvasEl) {
             videoEl.style.display = "none";
