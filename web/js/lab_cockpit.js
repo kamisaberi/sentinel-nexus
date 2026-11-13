@@ -475,7 +475,7 @@
     }
 
 
-    
+
     async function pollLogs() {
         if (!isTabVisible && document.getElementById('tab-lab-cockpit')?.classList.contains('active') === false) {
             return;
@@ -520,6 +520,8 @@
         setTimeout(pollLogs, 250);
         setTimeout(pollLogs, 800);
     };
+
+
 
     window.exportLabScorecard = async function () {
         let scorecardData = {
