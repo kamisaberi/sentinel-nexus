@@ -284,21 +284,22 @@ document.addEventListener("DOMContentLoaded", () => {
             tick += 0.04;
             const w = canvas.width;
             const h = canvas.height;
+            const isAnomaly = !!(activeNodeId && sentryAnomalyStates[activeNodeId]);
 
             if (type === "grid") {
                 ctx.fillStyle = "#05080C";
                 ctx.fillRect(0, 0, w, h);
-                ctx.strokeStyle = isThermalAnomaly ? "#EF4444" : "#00F0FF";
+                ctx.strokeStyle = isAnomaly ? "#EF4444" : "#00F0FF";
                 ctx.lineWidth = 2.0;
                 ctx.beginPath();
                 for (let x = 0; x < w; x++) {
-                    const y = (h / 2) + Math.sin((x * 0.02) + (tick * 4)) * (isThermalAnomaly ? 65 : 28);
+                    const y = (h / 2) + Math.sin((x * 0.02) + (tick * 4)) * (isAnomaly ? 65 : 28);
                     if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
                 }
                 ctx.stroke();
             } else {
                 const grad = ctx.createRadialGradient(w / 2, h / 2, 10, w / 2, h / 2, w / 1.5);
-                grad.addColorStop(0, isThermalAnomaly ? "#FF3366" : "#00FFA3");
+                grad.addColorStop(0, isAnomaly ? "#FF3366" : "#00FFA3");
                 grad.addColorStop(1, "#05080C");
                 ctx.fillStyle = grad;
                 ctx.fillRect(0, 0, w, h);
@@ -307,7 +308,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         draw();
     }
-
     // ========================================================================
     // 4. PANE 02: DYNAMIC SENSORY CLUSTER & ISOLATED PER-SENSOR FAULTS
     // ========================================================================
