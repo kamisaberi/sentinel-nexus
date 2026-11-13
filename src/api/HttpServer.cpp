@@ -1571,23 +1571,26 @@ namespace sentinel::nexus::api
         return false;
     }
 
-
     std::string HttpServer::handle_get_lab_telemetry()
     {
         auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
         const fleet::RegisteredNode *found = nullptr;
 
         // Bind to the selected enclave if set, otherwise fallback to first available
-        if (!g_lab_selected_node_id.empty()) {
-            for (const auto &n : nodes) {
+        if (!g_lab_selected_node_id.empty())
+        {
+            for (const auto &n : nodes)
+            {
                 if (n.node_id == g_lab_selected_node_id || n.site_identifier == g_lab_selected_node_id ||
-                    n.identity.hostname() == g_lab_selected_node_id) {
+                    n.identity.hostname() == g_lab_selected_node_id)
+                {
                     found = &n;
                     break;
                 }
             }
         }
-        if (!found && !nodes.empty()) {
+        if (!found && !nodes.empty())
+        {
             found = &nodes[0];
         }
 
@@ -1617,7 +1620,7 @@ namespace sentinel::nexus::api
         double lyapunov_lambda = -0.150;
         double t_crit_ms = 38.4;
 
-        double base_sla_us = 0.840;      // Intel OpenVINO baseline
+        double base_sla_us = 0.840; // Intel OpenVINO baseline
         double base_ipc = 2.42;
         double base_llc_miss = 1.24;
         double base_gumbel_sigma = 0.125;
@@ -1706,15 +1709,18 @@ namespace sentinel::nexus::api
         double total_eps = node_is_disturbed ? 41840000.0 : base_total_eps;
         double q_base = total_eps / 8.0;
         std::vector<double> rss_queues(8);
-        for (int i = 0; i < 8; ++i) {
+        for (int i = 0; i < 8; ++i)
+        {
             double jitter = std::sin((now_ms / 800.0) + (i * 0.8)) * (q_base * 0.04);
             rss_queues[i] = std::max(0.0, q_base + jitter);
         }
 
         // 4. SENSOR FUSION ODE RESIDUAL & CHI-SQUARE DETECTOR
         double predicted_val = baseline + (std::sin(now_ms / 1500.0) * 0.02);
-        if (domain == "reactor") predicted_val = baseline + (std::sin(now_ms / 2000.0) * 1.2);
-        else if (domain == "vision") predicted_val = baseline + (std::sin(now_ms / 1800.0) * 0.6);
+        if (domain == "reactor")
+            predicted_val = baseline + (std::sin(now_ms / 2000.0) * 1.2);
+        else if (domain == "vision")
+            predicted_val = baseline + (std::sin(now_ms / 1800.0) * 0.6);
 
         double residual_r = std::abs(current_val - predicted_val);
         double chi2_threshold = (domain == "grid") ? 0.08 : ((domain == "reactor") ? 8.5 : 5.0);
@@ -1773,8 +1779,6 @@ namespace sentinel::nexus::api
            << "}";
         return ss.str();
     }
-
-
 
     std::string HttpServer::handle_post_lab_inject(const std::string &body)
     {
