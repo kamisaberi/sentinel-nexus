@@ -1542,6 +1542,36 @@ namespace sentinel::nexus::api
 
     static std::string g_lab_selected_node_id = "";
 
+    // =========================================================================
+    // STRICT PER-NODE FAULT ISOLATION STATE
+    // =========================================================================
+    static std::string g_lab_selected_node_id = "";
+    static std::unordered_set<std::string> g_disturbed_nodes;
+
+    static bool is_node_disturbed(const fleet::RegisteredNode *node)
+    {
+        if (!node)
+            return false;
+        std::string s_low = to_lower_str(node->site_identifier);
+        std::string h_low = to_lower_str(node->identity.hostname());
+        std::string id_low = to_lower_str(node->node_id);
+
+        for (const auto &d : g_disturbed_nodes)
+        {
+            std::string d_low = to_lower_str(d);
+            if (d_low.empty())
+                continue;
+            if (d_low == s_low || d_low == h_low || d_low == id_low ||
+                (!s_low.empty() && (s_low.find(d_low) != std::string::npos || d_low.find(s_low) != std::string::npos)) ||
+                (!h_low.empty() && (h_low.find(d_low) != std::string::npos || d_low.find(h_low) != std::string::npos)) ||
+                (!id_low.empty() && (id_low.find(d_low) != std::string::npos || d_low.find(id_low) != std::string::npos)))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     std::string HttpServer::handle_get_lab_telemetry()
     {
         auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
@@ -1552,7 +1582,8 @@ namespace sentinel::nexus::api
         {
             for (const auto &n : nodes)
             {
-                if (n.node_id == g_lab_selected_node_id)
+                if (n.node_id == g_lab_selected_node_id || n.site_identifier == g_lab_selected_node_id ||
+                    n.identity.hostname() == g_lab_selected_node_id)
                 {
                     found = &n;
                     break;
@@ -1568,6 +1599,9 @@ namespace sentinel::nexus::api
         std::string host = found ? found->identity.hostname() : "substation-01.matrix.internal";
         std::string node_id = found ? found->node_id : "NODE-f551515a914dddbc";
         std::string context = to_lower_str(site + " " + host + " " + node_id);
+
+        // STRICT ISOLATION: Check perturbation flag strictly for THIS specific node
+        bool node_is_disturbed = is_node_disturbed(found);
 
         uint64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                               std::chrono::system_clock::now().time_since_epoch())
@@ -1597,7 +1631,7 @@ namespace sentinel::nexus::api
             limit = 150.0;
             min_plot = 80.0;
             max_plot = 170.0;
-            current_val = baseline + (g_sim_disturb_active ? 55.4 : (std::sin(now_ms / 2000.0) * 1.5));
+            current_val = baseline + (node_is_disturbed ? 55.4 : (std::sin(now_ms / 2000.0) * 1.5));
             cbf_h = limit - current_val;
             lyapunov_lambda = (cbf_h < 0.0) ? 0.095 : -0.140;
             t_crit_ms = (cbf_h < 0.0) ? 0.0 : std::max(0.0, 42.0 * (cbf_h / 50.0));
@@ -1612,7 +1646,7 @@ namespace sentinel::nexus::api
             limit = 115.0;
             min_plot = 60.0;
             max_plot = 130.0;
-            current_val = baseline + (g_sim_disturb_active ? 44.0 : (std::sin(now_ms / 1800.0) * 0.8));
+            current_val = baseline + (node_is_disturbed ? 44.0 : (std::sin(now_ms / 1800.0) * 0.8));
             cbf_h = limit - current_val;
             lyapunov_lambda = (cbf_h < 0.0) ? 0.078 : -0.160;
             t_crit_ms = (cbf_h < 0.0) ? 0.0 : std::max(0.0, 35.0 * (cbf_h / 40.5));
@@ -1620,13 +1654,12 @@ namespace sentinel::nexus::api
         else
         {
             // Substation High-Voltage Grid
-            current_val = baseline + (g_sim_disturb_active ? -0.32 : (std::sin(now_ms / 1500.0) * 0.025));
+            current_val = baseline + (node_is_disturbed ? -0.32 : (std::sin(now_ms / 1500.0) * 0.025));
             cbf_h = 0.20 - std::abs(current_val - 50.00);
             lyapunov_lambda = (cbf_h < 0.0) ? 0.082 : -0.150;
             t_crit_ms = (cbf_h < 0.0) ? 0.0 : std::max(0.0, 38.4 * (cbf_h / 0.20));
         }
 
-        // 2. REAL HARDWARE PMU & DRIVER SLA TELEMETRY
         double sla_us = (found && found->latest_metrics.avg_mitigation_latency_us() > 0.0) ? found->latest_metrics.avg_mitigation_latency_us() : 0.840;
         double p99_999_us = sla_us * 2.16;
 
@@ -1683,7 +1716,7 @@ namespace sentinel::nexus::api
                 action = body.substr(start + 1, end - start - 1);
         }
 
-        // Support enclave switching from UI
+        std::string target_node_id = g_lab_selected_node_id;
         size_t node_pos = body.find("\"node_id\"");
         if (node_pos != std::string::npos)
         {
@@ -1691,46 +1724,80 @@ namespace sentinel::nexus::api
             size_t start = body.find('"', colon + 1);
             size_t end = body.find('"', start + 1);
             if (start != std::string::npos && end != std::string::npos)
-                g_lab_selected_node_id = body.substr(start + 1, end - start - 1);
+                target_node_id = body.substr(start + 1, end - start - 1);
         }
 
-        NEXUS_LOG_INFO("[LabCockpit] Dispatched scientific test injection: " + action + " (enclave: " + g_lab_selected_node_id + ")");
+        // If no target provided, resolve to active selected enclave
+        if (target_node_id.empty() && !g_lab_selected_node_id.empty())
+        {
+            target_node_id = g_lab_selected_node_id;
+        }
+
+        NEXUS_LOG_INFO("[LabCockpit] Dispatched scientific test injection: " + action + " (target node: " + target_node_id + ")");
 
         // 1. Enclave Selection Action
         if (action == "select_enclave")
         {
+            g_lab_selected_node_id = target_node_id;
             return "{\"status\": \"selected\", \"node_id\": \"" + g_lab_selected_node_id + "\"}";
         }
 
-        // 2. Dynamic Physical Perturbation Hooks
+        // 2. Strict Per-Node Physical Perturbation Hooks
         if (action == "spike" || action == "heater_spike")
         {
-            g_sim_disturb_active = true;
+            if (!target_node_id.empty())
+            {
+                g_disturbed_nodes.insert(target_node_id);
+            }
             std::ofstream lf("/tmp/sentinel_lab_live.log", std::ios::app);
             lf << "\n==================================================================\n"
-               << "[!] INJECTED: Physical Plant Perturbation Triggered!\n"
+               << "[!] INJECTED: Physical Plant Perturbation Triggered on " << target_node_id << "!\n"
                << "[*] Dynamic state vector x(t) forced toward safety barrier limit h(x)=0\n"
                << "==================================================================\n";
-            return "{\"status\": \"dispatched\", \"action\": \"spike\"}";
+            return "{\"status\": \"dispatched\", \"action\": \"spike\", \"node_id\": \"" + target_node_id + "\"}";
         }
         else if (action == "safe" || action == "heater_normal")
         {
-            g_sim_disturb_active = false;
+            if (!target_node_id.empty())
+            {
+                // Erase by exact match or substring
+                for (auto it = g_disturbed_nodes.begin(); it != g_disturbed_nodes.end();)
+                {
+                    if (*it == target_node_id || it->find(target_node_id) != std::string::npos || target_node_id.find(*it) != std::string::npos)
+                    {
+                        it = g_disturbed_nodes.erase(it);
+                    }
+                    else
+                    {
+                        ++it;
+                    }
+                }
+            }
             std::ofstream lf("/tmp/sentinel_lab_live.log", std::ios::app);
             lf << "\n==================================================================\n"
-               << "[+] RESTORED: Physical Plant Control Restored to Nominal Baseline\n"
+               << "[+] RESTORED: Physical Plant Restored to Baseline on " << target_node_id << "\n"
                << "[*] Closed-loop Lyapunov damping actively stabilizing invariant.\n"
                << "==================================================================\n";
-            return "{\"status\": \"dispatched\", \"action\": \"safe\"}";
+            return "{\"status\": \"dispatched\", \"action\": \"safe\", \"node_id\": \"" + target_node_id + "\"}";
         }
 
-        // 3. Scientific Benchmark Experiments (Logging to Flight Recorder)
+        // 3. Reset Action (Clears all disturbed nodes fleet-wide)
+        if (action == "reset")
+        {
+            g_disturbed_nodes.clear();
+            std::ofstream cr("/tmp/sentinel_lab_live.log", std::ios::trunc);
+            cr << "[*] Flight recorder cleared. All edge enclaves stabilized to nominal baseline.\n";
+            return "{\"status\": \"dispatched\", \"action\": \"reset\"}";
+        }
+
+        // 4. Scientific Benchmark Experiments
         std::ofstream lf("/tmp/sentinel_lab_live.log", std::ios::app);
         lf << "\n==================================================================\n";
 
         if (action == "cbf")
         {
             lf << "  EXPERIMENT 01: FORMAL CONTROL BARRIER FUNCTION (CBF) VERIFIER   \n"
+               << "  Target Node Enclave         : " << target_node_id << "\n"
                << "==================================================================\n"
                << "[+] Theorem 1 Verification  : Forward Invariance of Safe Set C\n"
                << "[+] Nagumo Condition Check  : Infimum dh/dt + alpha(h) >= 0\n"
@@ -1739,6 +1806,7 @@ namespace sentinel::nexus::api
         else if (action == "hil")
         {
             lf << "  EXPERIMENT 02: CLOSED-LOOP PHYSICAL HIL CO-SIMULATION (RK4 ODE) \n"
+               << "  Target Node Enclave         : " << target_node_id << "\n"
                << "==================================================================\n"
                << "[+] Numerical Integration   : Runge-Kutta 4th Order (dt = 100 ms)\n"
                << "[+] Lyapunov Exponent       : lambda = -0.150 (Dissipative Attractor)\n"
@@ -1747,6 +1815,7 @@ namespace sentinel::nexus::api
         else if (action == "fuzzer")
         {
             lf << "  EXPERIMENT 03: DIFFERENTIAL SCADA PROTOCOL FUZZER               \n"
+               << "  Target Node Enclave         : " << target_node_id << "\n"
                << "==================================================================\n"
                << "[*] Mutating APDU payloads against gateway parser boundaries...\n"
                << "[+] Test Vectors Dispatched : 256 frame permutations\n"
@@ -1755,6 +1824,7 @@ namespace sentinel::nexus::api
         else if (action == "blast")
         {
             lf << "  EXPERIMENT 04: WIRE-SPEED AF_XDP RSS HARDWARE BLASTER           \n"
+               << "  Target Node Enclave         : " << target_node_id << "\n"
                << "==================================================================\n"
                << "[*] Blasting AF_XDP Zero-Copy Multi-Queue Driver Ring @ 40M+ EPS\n"
                << "[+] Measured Throughput     : 41,840,200 EPS\n"
@@ -1763,6 +1833,7 @@ namespace sentinel::nexus::api
         else if (action == "evasion")
         {
             lf << "  EXPERIMENT 05: GRAMMAR-CONSTRAINED ADVERSARIAL MUTATOR          \n"
+               << "  Target Node Enclave         : " << target_node_id << "\n"
                << "==================================================================\n"
                << "[*] Testing L_inf bounded feature space perturbation (eps = 0.05)\n"
                << "[+] Classification Recall   : 100.0% (Zero Detection Degradation)\n";
@@ -1770,6 +1841,7 @@ namespace sentinel::nexus::api
         else if (action == "5g_slice_hop")
         {
             lf << "  EXPERIMENT 06: 3GPP 5G GTP-U SLICE ISOLATION DRILL              \n"
+               << "  Target Node Enclave         : " << target_node_id << "\n"
                << "==================================================================\n"
                << "[*] Injecting rogue eMBB TEID packet toward protected URLLC slice\n"
                << "[+] In-Kernel Detection     : XDP_DROP enforced in < 0.84 µs (PASS)\n";
@@ -1777,23 +1849,16 @@ namespace sentinel::nexus::api
         else if (action == "trism_jailbreak")
         {
             lf << "  EXPERIMENT 07: AI TRiSM ADVERSARIAL PROMPT INJECTION BENCHMARK  \n"
+               << "  Target Node Enclave         : " << target_node_id << "\n"
                << "==================================================================\n"
                << "[*] Injecting token-level jailbreak payload into inference route\n"
                << "[+] Token Stream Sentry     : BLOCKED in 120 ns via Aho-Corasick\n";
-        }
-        else if (action == "reset")
-        {
-            g_sim_disturb_active = false;
-            lf.close();
-            std::ofstream cr("/tmp/sentinel_lab_live.log", std::ios::trunc);
-            cr << "[*] Flight recorder cleared. Simulation stabilized to nominal baseline.\n";
-            return "{\"status\": \"dispatched\", \"action\": \"reset\"}";
         }
 
         lf << "==================================================================\n";
         lf.close();
 
-        return "{\"status\": \"dispatched\", \"action\": \"" + action + "\"}";
+        return "{\"status\": \"dispatched\", \"action\": \"" + action + "\", \"node_id\": \"" + target_node_id + "\"}";
     }
 
     std::string HttpServer::handle_get_lab_logs()
