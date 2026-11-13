@@ -487,11 +487,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.getElementById("btn-emergency-all-stop")?.addEventListener("click", () => {
-        isThermalAnomaly = false;
+        for (const k in sentryAnomalyStates) delete sentryAnomalyStates[k];
         for (const k in activeSensorFaults) delete activeSensorFaults[k];
-        logEvent("[EMERGENCY ALL-STOP] Physical plant state stabilized. All chaos hooks cleared.", "text-green");
+        logEvent("[EMERGENCY ALL-STOP] Physical plant state stabilized fleet-wide. All chaos hooks cleared.", "text-green");
     });
-
     // ========================================================================
     // 6. PANE 04: CONTEXTUAL PROTOCOL ATTACK DISPATCH
     // ========================================================================
