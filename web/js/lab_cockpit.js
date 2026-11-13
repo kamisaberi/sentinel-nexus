@@ -409,85 +409,6 @@
     // --------------------------------------------------------------------------
     // 5. TELEMETRY & POLLING LOOP
     // --------------------------------------------------------------------------
-    async function updateTelemetry() {
-        if (!isTabVisible && document.getElementById('tab-lab-cockpit')?.classList.contains('active') === false) {
-            return;
-        }
-
-        try {
-            const url = activeLabNodeId ? `/api/v1/lab/telemetry?node_id=${encodeURIComponent(activeLabNodeId)}` : '/api/v1/lab/telemetry';
-            const resp = await fetch(url);
-            if (resp.ok) {
-                const data = await resp.json();
-
-                if (data.active_enclave) {
-                    currentEnclaveMeta = data.active_enclave;
-                    const invarTitle = document.getElementById('lab-invar-title');
-                    if (invarTitle) invarTitle.textContent = currentEnclaveMeta.invariant_name.toUpperCase();
-                    const lblTemp = document.getElementById('lbl-temp');
-                    if (lblTemp) lblTemp.textContent = currentEnclaveMeta.variable_name;
-                }
-
-                currentPlantState = data.physical_state || currentPlantState;
-
-                const tempEl = document.getElementById('val-temp');
-                if (tempEl) tempEl.innerText = `${currentPlantState.current_val.toFixed(2)} ${currentEnclaveMeta.unit}`;
-
-                const barrierEl = document.getElementById('val-barrier');
-                if (barrierEl) {
-                    barrierEl.innerText = (currentPlantState.cbf_barrier_h >= 0 ? '+' : '') + currentPlantState.cbf_barrier_h.toFixed(3);
-                    barrierEl.style.color = currentPlantState.cbf_barrier_h >= 0 ? 'var(--kernel)' : 'var(--threat)';
-                }
-
-                const lyapEl = document.getElementById('val-lyapunov');
-                if (lyapEl) lyapEl.innerText = currentPlantState.lyapunov_lambda.toFixed(3);
-
-                const tcritEl = document.getElementById('val-tcrit');
-                if (tcritEl) tcritEl.innerText = currentPlantState.t_crit_ms.toFixed(1) + ' ms';
-
-                const badge = document.getElementById('cbf-status-badge');
-                if (badge) {
-                    if (currentPlantState.is_safe) {
-                        badge.className = 'badge badge-green';
-                        badge.innerText = 'h(x) ≥ 0 SAFE';
-                    } else {
-                        badge.className = 'badge badge-red';
-                        badge.innerText = 'SAFETY BARRIER BREACHED';
-                    }
-                }
-
-                // DYNAMIC EVT WCET LATENCY & PMU COUNTERS
-                if (data.evt_wcet) {
-                    const wcetEl = document.getElementById('val-wcet');
-                    if (wcetEl) {
-                        wcetEl.innerText = `${data.evt_wcet.p99_999_us.toFixed(2)} µs`;
-                        wcetEl.style.color = currentPlantState.is_safe ? 'var(--ink)' : 'var(--threat)';
-                    }
-                    const dropEl = document.getElementById('val-drop');
-                    if (dropEl) dropEl.innerText = `${data.evt_wcet.sla_limit_us.toFixed(2)} µs`;
-
-                    updateEVTEchart(data.evt_wcet.gumbel_mu, data.evt_wcet.p99_999_us, data.evt_wcet.gumbel_sigma, currentPlantState.is_safe);
-                }
-
-                if (data.pmu_metrics) {
-                    const ipcEl = document.getElementById('val-ipc');
-                    if (ipcEl) {
-                        ipcEl.innerText = data.pmu_metrics.ipc.toFixed(2);
-                        ipcEl.style.color = (data.pmu_metrics.ipc >= 2.0) ? 'var(--kernel)' : '#f59e0b';
-                    }
-                    const llcEl = document.getElementById('val-llc');
-                    if (llcEl) {
-                        llcEl.innerText = `${data.pmu_metrics.llc_miss_pct.toFixed(2)}%`;
-                        llcEl.style.color = (data.pmu_metrics.llc_miss_pct > 3.0) ? 'var(--threat)' : 'var(--kernel)';
-                    }
-                }
-
-                updateCBFEchart(currentPlantState.current_val, currentPlantState.is_safe);
-            }
-        } catch (e) {
-            updateCBFEchart(currentEnclaveMeta.baseline, true);
-        }
-    }
 
 
 
@@ -576,12 +497,30 @@
                     }
                 }
 
+                // DYNAMIC EVT WCET LATENCY & PMU COUNTERS
                 if (data.evt_wcet) {
                     const wcetEl = document.getElementById('val-wcet');
-                    if (wcetEl) wcetEl.innerText = `${data.evt_wcet.p99_999_us.toFixed(2)} µs`;
+                    if (wcetEl) {
+                        wcetEl.innerText = `${data.evt_wcet.p99_999_us.toFixed(2)} µs`;
+                        wcetEl.style.color = currentPlantState.is_safe ? 'var(--ink)' : 'var(--threat)';
+                    }
                     const dropEl = document.getElementById('val-drop');
                     if (dropEl) dropEl.innerText = `${data.evt_wcet.sla_limit_us.toFixed(2)} µs`;
-                    initEVTEchart(data.evt_wcet.gumbel_mu, data.evt_wcet.p99_999_us);
+
+                    updateEVTEchart(data.evt_wcet.gumbel_mu, data.evt_wcet.p99_999_us, data.evt_wcet.gumbel_sigma, currentPlantState.is_safe);
+                }
+
+                if (data.pmu_metrics) {
+                    const ipcEl = document.getElementById('val-ipc');
+                    if (ipcEl) {
+                        ipcEl.innerText = data.pmu_metrics.ipc.toFixed(2);
+                        ipcEl.style.color = (data.pmu_metrics.ipc >= 2.0) ? 'var(--kernel)' : '#f59e0b';
+                    }
+                    const llcEl = document.getElementById('val-llc');
+                    if (llcEl) {
+                        llcEl.innerText = `${data.pmu_metrics.llc_miss_pct.toFixed(2)}%`;
+                        llcEl.style.color = (data.pmu_metrics.llc_miss_pct > 3.0) ? 'var(--threat)' : 'var(--kernel)';
+                    }
                 }
 
                 updateCBFEchart(currentPlantState.current_val, currentPlantState.is_safe);
