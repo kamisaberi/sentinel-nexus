@@ -1536,8 +1536,10 @@ namespace sentinel::nexus::api
     // -------------------------------------------------------------------------
     static double g_sim_temp = 85.0;
     static bool g_sim_heater_active = false;
+
     // Global simulation state for dynamic research disturbance
     static bool g_sim_disturb_active = false;
+
     static std::string g_lab_selected_node_id = "";
 
     std::string HttpServer::handle_get_lab_telemetry()
@@ -1665,117 +1667,12 @@ namespace sentinel::nexus::api
         return ss.str();
     }
 
-    {
-        auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
-        const fleet::RegisteredNode *found = nullptr;
-        if (!nodes.empty())
-        {
-            found = &nodes[0];
-        }
 
-        std::string site = found ? found->site_identifier : "PowerGrid-North-01";
-        std::string host = found ? found->identity.hostname() : "substation-01.matrix.internal";
-        std::string context = to_lower_str(site + " " + host);
 
-        uint64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                              std::chrono::system_clock::now().time_since_epoch())
-                              .count();
 
-        // 1. DYNAMIC DOMAIN INVARIANT DEFINITIONS
-        std::string domain = "grid";
-        std::string invar_name = "Grid Frequency & Synchrophasor Barrier";
-        std::string var_name = "Frequency f(t)";
-        std::string unit = "Hz";
-        double baseline = 50.00;
-        double limit = 50.20;
-        double min_plot = 49.50;
-        double max_plot = 50.50;
-        double current_val = 50.00;
-        double cbf_h = 0.20;
-        double lyapunov_lambda = -0.150;
-        double t_crit_ms = 38.4;
 
-        if (context.find("refinery") != std::string::npos || context.find("reactor") != std::string::npos)
-        {
-            domain = "reactor";
-            invar_name = "Exothermic Vessel Pressure Barrier";
-            var_name = "Vessel Pressure P(t)";
-            unit = "PSI";
-            baseline = 100.2;
-            limit = 150.0;
-            min_plot = 80.0;
-            max_plot = 170.0;
-            current_val = baseline + (g_sim_disturb_active ? 55.4 : (std::sin(now_ms / 2000.0) * 1.5));
-            cbf_h = limit - current_val;
-            lyapunov_lambda = (cbf_h < 0.0) ? 0.095 : -0.140;
-            t_crit_ms = (cbf_h < 0.0) ? 0.0 : std::max(0.0, 42.0 * (cbf_h / 50.0));
-        }
-        else if (context.find("hospital") != std::string::npos || context.find("pacs") != std::string::npos || context.find("vision") != std::string::npos)
-        {
-            domain = "vision";
-            invar_name = "Infrared Optical Thermal Barrier";
-            var_name = "Core Temperature T(t)";
-            unit = "°C";
-            baseline = 74.5;
-            limit = 115.0;
-            min_plot = 60.0;
-            max_plot = 130.0;
-            current_val = baseline + (g_sim_disturb_active ? 44.0 : (std::sin(now_ms / 1800.0) * 0.8));
-            cbf_h = limit - current_val;
-            lyapunov_lambda = (cbf_h < 0.0) ? 0.078 : -0.160;
-            t_crit_ms = (cbf_h < 0.0) ? 0.0 : std::max(0.0, 35.0 * (cbf_h / 40.5));
-        }
-        else
-        {
-            // Default: Substation High-Voltage Grid
-            current_val = baseline + (g_sim_disturb_active ? -0.32 : (std::sin(now_ms / 1500.0) * 0.025));
-            cbf_h = 0.20 - std::abs(current_val - 50.00);
-            lyapunov_lambda = (cbf_h < 0.0) ? 0.082 : -0.150;
-            t_crit_ms = (cbf_h < 0.0) ? 0.0 : std::max(0.0, 38.4 * (cbf_h / 0.20));
-        }
 
-        // 2. REAL HARDWARE PMU & DRIVER SLA TELEMETRY
-        double sla_us = (found && found->latest_metrics.avg_mitigation_latency_us() > 0.0) ? found->latest_metrics.avg_mitigation_latency_us() : 0.840;
-        double p99_999_us = sla_us * 2.16;
 
-        std::ostringstream ss;
-        ss << std::fixed << std::setprecision(3);
-        ss << "{\n"
-           << "  \"timestamp_ms\": " << now_ms << ",\n"
-           << "  \"active_enclave\": {\n"
-           << "    \"domain\": \"" << domain << "\",\n"
-           << "    \"site\": \"" << site << "\",\n"
-           << "    \"hostname\": \"" << host << "\",\n"
-           << "    \"invariant_name\": \"" << invar_name << "\",\n"
-           << "    \"variable_name\": \"" << var_name << "\",\n"
-           << "    \"unit\": \"" << unit << "\",\n"
-           << "    \"baseline\": " << baseline << ",\n"
-           << "    \"limit\": " << limit << ",\n"
-           << "    \"min_plot\": " << min_plot << ",\n"
-           << "    \"max_plot\": " << max_plot << "\n"
-           << "  },\n"
-           << "  \"physical_state\": {\n"
-           << "    \"current_val\": " << current_val << ",\n"
-           << "    \"cbf_barrier_h\": " << cbf_h << ",\n"
-           << "    \"lyapunov_lambda\": " << lyapunov_lambda << ",\n"
-           << "    \"t_crit_ms\": " << t_crit_ms << ",\n"
-           << "    \"is_safe\": " << (cbf_h >= 0.0 ? "true" : "false") << "\n"
-           << "  },\n"
-           << "  \"evt_wcet\": {\n"
-           << "    \"p99_999_us\": " << p99_999_us << ",\n"
-           << "    \"p99_us\": " << (sla_us * 1.35) << ",\n"
-           << "    \"sla_limit_us\": " << sla_us << ",\n"
-           << "    \"gumbel_mu\": " << sla_us << ",\n"
-           << "    \"gumbel_sigma\": 0.125\n"
-           << "  },\n"
-           << "  \"pmu_metrics\": {\n"
-           << "    \"ipc\": 2.42,\n"
-           << "    \"llc_miss_pct\": 1.24,\n"
-           << "    \"bus_lock_stalls\": 0\n"
-           << "  }\n"
-           << "}";
-        return ss.str();
-    }
 
     std::string HttpServer::handle_post_lab_inject(const std::string &body)
     {
@@ -1947,21 +1844,5 @@ namespace sentinel::nexus::api
         return "{\"logs\":\"" + escaped.str() + "\"}";
     }
 
-     std::string HttpServer::handle_get_lab_scorecard()
-    {
-        std::ostringstream ss;
-        ss << "{\n"
-           << "  \"doi\": \"10.5281/zenodo.23598779\",\n"
-           << "  \"benchmark\": \"Sentinel-Bench 14-Dimensional Empirical Invariant Verification\",\n"
-           << "  \"mitigation_sla_us\": 0.84,\n"
-           << "  \"p99999_wcet_us\": 1.82,\n"
-           << "  \"pmu_ipc\": 2.42,\n"
-           << "  \"llc_cache_miss_pct\": 1.24,\n"
-           << "  \"cbf_margin\": 35.0,\n"
-           << "  \"rss_line_rate_eps\": 41800000,\n"
-           << "  \"status\": \"VERIFIED_SOVEREIGN\"\n"
-           << "}";
-        return ss.str();
-    }
 
 } // namespace sentinel::nexus::api
