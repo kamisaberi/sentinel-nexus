@@ -280,19 +280,12 @@
     // --------------------------------------------------------------------------
     // 3. ECHARTS FACTORY: INSTRUMENT 02 (EVT GUMBEL TAIL & PMU COUNTERS)
     // --------------------------------------------------------------------------
-    function initEVTEchart(mu = 0.84, p999 = 1.82) {
+    function initEVTEchart() {
         const dom = document.getElementById('evtEchart');
         if (!dom || dom.clientWidth === 0) return;
 
         if (!evtChart || evtChart.isDisposed()) {
             evtChart = echarts.init(dom, 'dark', { renderer: 'canvas' });
-        }
-
-        const points = [];
-        for (let i = 0; i <= 60; i++) {
-            let z = (i / 60) * 3.0; // 0.0 to 3.0 µs
-            let y = Math.exp(-(z - mu) - Math.exp(-(z - mu)));
-            points.push([z.toFixed(2), y]);
         }
 
         const option = {
@@ -308,7 +301,7 @@
             xAxis: {
                 type: 'value',
                 min: 0.0,
-                max: 3.0,
+                max: 3.5,
                 interval: 0.5,
                 axisLabel: {
                     color: '#64748B',
@@ -326,7 +319,7 @@
             series: [{
                 name: 'Extreme Value Tail',
                 type: 'line',
-                data: points,
+                data: [],
                 smooth: 0.4,
                 showSymbol: false,
                 lineStyle: {
@@ -344,30 +337,7 @@
                 markLine: {
                     silent: true,
                     symbol: 'none',
-                    data: [
-                        {
-                            xAxis: mu,
-                            lineStyle: { color: '#00E5FF', width: 1.5, type: 'dashed' },
-                            label: {
-                                show: true,
-                                position: 'insideEndTop',
-                                formatter: `SLA: ${mu.toFixed(2)}µs`,
-                                color: '#00E5FF',
-                                fontSize: 9
-                            }
-                        },
-                        {
-                            xAxis: p999,
-                            lineStyle: { color: '#00FFA3', width: 1.8, type: 'dashed' },
-                            label: {
-                                show: true,
-                                position: 'insideStartTop',
-                                formatter: `p99.999%: ${p999.toFixed(2)}µs`,
-                                color: '#00FFA3',
-                                fontSize: 9
-                            }
-                        }
-                    ]
+                    data: []
                 }
             }]
         };
