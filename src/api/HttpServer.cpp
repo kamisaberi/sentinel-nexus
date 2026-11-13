@@ -1572,8 +1572,209 @@ namespace sentinel::nexus::api
     }
 
 
+    std::string HttpServer::handle_get_lab_telemetry()
+    {
+        auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
+        const fleet::RegisteredNode *found = nullptr;
 
-    
+        // Bind to the selected enclave if set, otherwise fallback to first available
+        if (!g_lab_selected_node_id.empty()) {
+            for (const auto &n : nodes) {
+                if (n.node_id == g_lab_selected_node_id || n.site_identifier == g_lab_selected_node_id ||
+                    n.identity.hostname() == g_lab_selected_node_id) {
+                    found = &n;
+                    break;
+                }
+            }
+        }
+        if (!found && !nodes.empty()) {
+            found = &nodes[0];
+        }
+
+        std::string site = found ? found->site_identifier : "PowerGrid-North-01";
+        std::string host = found ? found->identity.hostname() : "substation-01.matrix.internal";
+        std::string node_id = found ? found->node_id : "NODE-f551515a914dddbc";
+        std::string context = to_lower_str(site + " " + host + " " + node_id);
+
+        bool node_is_disturbed = is_node_disturbed(found);
+
+        uint64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                              std::chrono::system_clock::now().time_since_epoch())
+                              .count();
+
+        // 1. DYNAMIC PHYSICAL INVARIANTS & HARDWARE PROFILES
+        std::string domain = "grid";
+        std::string invar_name = "Grid Frequency & Synchrophasor Barrier";
+        std::string var_name = "Frequency f(t)";
+        std::string unit = "Hz";
+        double baseline = 50.00;
+        double limit = 50.20;
+        double min_plot = 49.50;
+        double max_plot = 50.50;
+        double current_val = 50.00;
+        double dx_dt = 0.0;
+        double cbf_h = 0.20;
+        double lyapunov_lambda = -0.150;
+        double t_crit_ms = 38.4;
+
+        double base_sla_us = 0.840;      // Intel OpenVINO baseline
+        double base_ipc = 2.42;
+        double base_llc_miss = 1.24;
+        double base_gumbel_sigma = 0.125;
+        double base_total_eps = 1250000.0;
+
+        if (context.find("refinery") != std::string::npos || context.find("reactor") != std::string::npos || context.find("plc-03") != std::string::npos)
+        {
+            domain = "reactor";
+            invar_name = "Exothermic Vessel Pressure Barrier";
+            var_name = "Vessel Pressure P(t)";
+            unit = "PSI";
+            baseline = 100.2;
+            limit = 150.0;
+            min_plot = 80.0;
+            max_plot = 170.0;
+            current_val = baseline + (node_is_disturbed ? 55.4 : (std::sin(now_ms / 2000.0) * 1.5));
+            dx_dt = node_is_disturbed ? 6.8 : (std::cos(now_ms / 2000.0) * 0.75);
+            cbf_h = limit - current_val;
+            lyapunov_lambda = (cbf_h < 0.0) ? 0.095 : -0.140;
+            t_crit_ms = (cbf_h < 0.0) ? 0.0 : std::max(0.0, 42.0 * (cbf_h / 50.0));
+
+            // Rockchip RKNN ARM NPU Profile
+            base_sla_us = 1.120;
+            base_ipc = 1.78;
+            base_llc_miss = 2.35;
+            base_gumbel_sigma = 0.165;
+            base_total_eps = 850000.0;
+        }
+        else if (context.find("hospital") != std::string::npos || context.find("pacs") != std::string::npos || context.find("vision") != std::string::npos)
+        {
+            domain = "vision";
+            invar_name = "Infrared Optical Thermal Barrier";
+            var_name = "Core Temperature T(t)";
+            unit = "°C";
+            baseline = 74.5;
+            limit = 115.0;
+            min_plot = 60.0;
+            max_plot = 130.0;
+            current_val = baseline + (node_is_disturbed ? 44.0 : (std::sin(now_ms / 1800.0) * 0.8));
+            dx_dt = node_is_disturbed ? 5.2 : (std::cos(now_ms / 1800.0) * 0.44);
+            cbf_h = limit - current_val;
+            lyapunov_lambda = (cbf_h < 0.0) ? 0.078 : -0.160;
+            t_crit_ms = (cbf_h < 0.0) ? 0.0 : std::max(0.0, 35.0 * (cbf_h / 40.5));
+
+            // NVIDIA TensorRT GPU Profile
+            base_sla_us = 0.620;
+            base_ipc = 3.15;
+            base_llc_miss = 0.88;
+            base_gumbel_sigma = 0.095;
+            base_total_eps = 2400000.0;
+        }
+        else
+        {
+            // Substation Grid (Intel OpenVINO)
+            current_val = baseline + (node_is_disturbed ? -0.32 : (std::sin(now_ms / 1500.0) * 0.025));
+            dx_dt = node_is_disturbed ? -0.08 : (std::cos(now_ms / 1500.0) * 0.016); // RoCoF [Hz/s]
+            cbf_h = 0.20 - std::abs(current_val - 50.00);
+            lyapunov_lambda = (cbf_h < 0.0) ? 0.082 : -0.150;
+            t_crit_ms = (cbf_h < 0.0) ? 0.0 : std::max(0.0, 38.4 * (cbf_h / 0.20));
+        }
+
+        // 2. TIMING & HARDWARE PMU INVARIANTS
+        double live_sla_us = base_sla_us;
+        double live_ipc = base_ipc;
+        double live_llc_miss = base_llc_miss;
+        double live_sigma = base_gumbel_sigma;
+        int bus_lock_stalls = 0;
+
+        if (node_is_disturbed)
+        {
+            live_sla_us += 0.380;
+            live_sigma += 0.085;
+            live_ipc = std::max(0.85, base_ipc - 0.68);
+            live_llc_miss += 4.35;
+            bus_lock_stalls = 14;
+        }
+        else
+        {
+            live_sla_us += (std::sin(now_ms / 1000.0) * 0.015);
+        }
+
+        double p99_999_us = live_sla_us + (live_sigma * 7.8);
+        double p99_us = live_sla_us + (live_sigma * 4.6);
+
+        // 3. MULTI-QUEUE AF_XDP RSS QUEUES (8 Hardware Queues)
+        double total_eps = node_is_disturbed ? 41840000.0 : base_total_eps;
+        double q_base = total_eps / 8.0;
+        std::vector<double> rss_queues(8);
+        for (int i = 0; i < 8; ++i) {
+            double jitter = std::sin((now_ms / 800.0) + (i * 0.8)) * (q_base * 0.04);
+            rss_queues[i] = std::max(0.0, q_base + jitter);
+        }
+
+        // 4. SENSOR FUSION ODE RESIDUAL & CHI-SQUARE DETECTOR
+        double predicted_val = baseline + (std::sin(now_ms / 1500.0) * 0.02);
+        if (domain == "reactor") predicted_val = baseline + (std::sin(now_ms / 2000.0) * 1.2);
+        else if (domain == "vision") predicted_val = baseline + (std::sin(now_ms / 1800.0) * 0.6);
+
+        double residual_r = std::abs(current_val - predicted_val);
+        double chi2_threshold = (domain == "grid") ? 0.08 : ((domain == "reactor") ? 8.5 : 5.0);
+        bool chi2_alarm = (residual_r > chi2_threshold);
+
+        std::ostringstream ss;
+        ss << std::fixed << std::setprecision(3);
+        ss << "{\n"
+           << "  \"timestamp_ms\": " << now_ms << ",\n"
+           << "  \"active_enclave\": {\n"
+           << "    \"node_id\": \"" << node_id << "\",\n"
+           << "    \"domain\": \"" << domain << "\",\n"
+           << "    \"site\": \"" << site << "\",\n"
+           << "    \"hostname\": \"" << host << "\",\n"
+           << "    \"invariant_name\": \"" << invar_name << "\",\n"
+           << "    \"variable_name\": \"" << var_name << "\",\n"
+           << "    \"unit\": \"" << unit << "\",\n"
+           << "    \"baseline\": " << baseline << ",\n"
+           << "    \"limit\": " << limit << ",\n"
+           << "    \"min_plot\": " << min_plot << ",\n"
+           << "    \"max_plot\": " << max_plot << "\n"
+           << "  },\n"
+           << "  \"physical_state\": {\n"
+           << "    \"current_val\": " << current_val << ",\n"
+           << "    \"dx_dt\": " << dx_dt << ",\n"
+           << "    \"cbf_barrier_h\": " << cbf_h << ",\n"
+           << "    \"lyapunov_lambda\": " << lyapunov_lambda << ",\n"
+           << "    \"t_crit_ms\": " << t_crit_ms << ",\n"
+           << "    \"is_safe\": " << (cbf_h >= 0.0 ? "true" : "false") << "\n"
+           << "  },\n"
+           << "  \"evt_wcet\": {\n"
+           << "    \"p99_999_us\": " << p99_999_us << ",\n"
+           << "    \"p99_us\": " << p99_us << ",\n"
+           << "    \"sla_limit_us\": " << live_sla_us << ",\n"
+           << "    \"gumbel_mu\": " << live_sla_us << ",\n"
+           << "    \"gumbel_sigma\": " << live_sigma << "\n"
+           << "  },\n"
+           << "  \"pmu_metrics\": {\n"
+           << "    \"ipc\": " << live_ipc << ",\n"
+           << "    \"llc_miss_pct\": " << live_llc_miss << ",\n"
+           << "    \"bus_lock_stalls\": " << bus_lock_stalls << "\n"
+           << "  },\n"
+           << "  \"rss_multi_queue\": {\n"
+           << "    \"total_eps\": " << total_eps << ",\n"
+           << "    \"queues\": ["
+           << rss_queues[0] << "," << rss_queues[1] << "," << rss_queues[2] << "," << rss_queues[3] << ","
+           << rss_queues[4] << "," << rss_queues[5] << "," << rss_queues[6] << "," << rss_queues[7] << "]\n"
+           << "  },\n"
+           << "  \"sensor_fusion\": {\n"
+           << "    \"measured\": " << current_val << ",\n"
+           << "    \"predicted\": " << predicted_val << ",\n"
+           << "    \"residual_r\": " << residual_r << ",\n"
+           << "    \"chi2_threshold\": " << chi2_threshold << ",\n"
+           << "    \"chi2_alarm\": " << (chi2_alarm ? "true" : "false") << "\n"
+           << "  }\n"
+           << "}";
+        return ss.str();
+    }
+
+
 
     std::string HttpServer::handle_post_lab_inject(const std::string &body)
     {
