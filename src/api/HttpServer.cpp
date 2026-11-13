@@ -1548,15 +1548,19 @@ namespace sentinel::nexus::api
         const fleet::RegisteredNode *found = nullptr;
 
         // Bind to the selected enclave if set, otherwise fallback to first available
-        if (!g_lab_selected_node_id.empty()) {
-            for (const auto &n : nodes) {
-                if (n.node_id == g_lab_selected_node_id) {
+        if (!g_lab_selected_node_id.empty())
+        {
+            for (const auto &n : nodes)
+            {
+                if (n.node_id == g_lab_selected_node_id)
+                {
                     found = &n;
                     break;
                 }
             }
         }
-        if (!found && !nodes.empty()) {
+        if (!found && !nodes.empty())
+        {
             found = &nodes[0];
         }
 
@@ -1623,8 +1627,7 @@ namespace sentinel::nexus::api
         }
 
         // 2. REAL HARDWARE PMU & DRIVER SLA TELEMETRY
-        double sla_us = (found && found->latest_metrics.avg_mitigation_latency_us() > 0.0) ?
-                         found->latest_metrics.avg_mitigation_latency_us() : 0.840;
+        double sla_us = (found && found->latest_metrics.avg_mitigation_latency_us() > 0.0) ? found->latest_metrics.avg_mitigation_latency_us() : 0.840;
         double p99_999_us = sla_us * 2.16;
 
         std::ostringstream ss;
@@ -1667,13 +1670,6 @@ namespace sentinel::nexus::api
         return ss.str();
     }
 
-
-
-
-
-
-
-
     std::string HttpServer::handle_post_lab_inject(const std::string &body)
     {
         std::string action = "cbf";
@@ -1687,9 +1683,26 @@ namespace sentinel::nexus::api
                 action = body.substr(start + 1, end - start - 1);
         }
 
-        NEXUS_LOG_INFO("[LabCockpit] Dispatched scientific test injection: " + action);
+        // Support enclave switching from UI
+        size_t node_pos = body.find("\"node_id\"");
+        if (node_pos != std::string::npos)
+        {
+            size_t colon = body.find(':', node_pos);
+            size_t start = body.find('"', colon + 1);
+            size_t end = body.find('"', start + 1);
+            if (start != std::string::npos && end != std::string::npos)
+                g_lab_selected_node_id = body.substr(start + 1, end - start - 1);
+        }
 
-        // 1. Dynamic Physical Perturbation Hooks
+        NEXUS_LOG_INFO("[LabCockpit] Dispatched scientific test injection: " + action + " (enclave: " + g_lab_selected_node_id + ")");
+
+        // 1. Enclave Selection Action
+        if (action == "select_enclave")
+        {
+            return "{\"status\": \"selected\", \"node_id\": \"" + g_lab_selected_node_id + "\"}";
+        }
+
+        // 2. Dynamic Physical Perturbation Hooks
         if (action == "spike" || action == "heater_spike")
         {
             g_sim_disturb_active = true;
@@ -1711,7 +1724,7 @@ namespace sentinel::nexus::api
             return "{\"status\": \"dispatched\", \"action\": \"safe\"}";
         }
 
-        // 2. Scientific Benchmark Experiments (Logging to Flight Recorder)
+        // 3. Scientific Benchmark Experiments (Logging to Flight Recorder)
         std::ofstream lf("/tmp/sentinel_lab_live.log", std::ios::app);
         lf << "\n==================================================================\n";
 
@@ -1843,6 +1856,5 @@ namespace sentinel::nexus::api
 
         return "{\"logs\":\"" + escaped.str() + "\"}";
     }
-
 
 } // namespace sentinel::nexus::api
