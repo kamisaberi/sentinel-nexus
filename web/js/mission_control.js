@@ -148,8 +148,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
                 // Check if a registered plugin matches this node
-                const adapter = (window.SentinelUI && window.SentinelUI.getNodeAdapter) ? 
-                                window.SentinelUI.getNodeAdapter(activeNodeData) : null;
+                const adapter = (window.SentinelUI && window.SentinelUI.getNodeAdapter) ?
+                    window.SentinelUI.getNodeAdapter(activeNodeData) : null;
 
                 // 1. Render Pane 1 (Primary Apparatus)
                 if (adapter && adapter.renderPrimaryInstrument) {
@@ -159,13 +159,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 }
 
                 // 2. Render Pane 2 (Field Sensors)
-                activeSensors = (adapter && adapter.getSensors) ? 
-                                adapter.getSensors(activeNodeData) : (activeNodeData.sensors || []);
+                activeSensors = (adapter && adapter.getSensors) ?
+                    adapter.getSensors(activeNodeData) : (activeNodeData.sensors || []);
                 renderDynamicSensorCards();
 
                 // 3. Render Pane 4 (Target Protocol Exploits)
-                const attacks = (adapter && adapter.getAttacks) ? 
-                                adapter.getAttacks(activeNodeData) : (activeNodeData.attacks || []);
+                const attacks = (adapter && adapter.getAttacks) ?
+                    adapter.getAttacks(activeNodeData) : (activeNodeData.attacks || []);
                 renderContextualAttacks(attacks);
 
 
@@ -183,6 +183,33 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         } catch (e) {
             console.error("Failed to load node detail for " + nodeId, e);
+        }
+    }
+
+    function updatePrimaryInstrumentCustom(adapter, node) {
+        const titleEl = document.getElementById("mc-frame1-title");
+        const tagEl = document.getElementById("mc-frame1-tag");
+        const actionsEl = document.getElementById("mc-frame1-actions");
+        const canvasEl = document.getElementById("thermal-canvas");
+        const videoEl = document.getElementById("thermal-video");
+
+        if (titleEl) titleEl.textContent = adapter.instrumentTitle || "PRIMARY PHYSICAL APPARATUS";
+        if (tagEl) tagEl.textContent = adapter.instrumentTag || "TACTICAL";
+
+        if (actionsEl && adapter.getPrimaryActions) {
+            actionsEl.innerHTML = adapter.getPrimaryActions(node);
+            if (adapter.bindPrimaryActions) adapter.bindPrimaryActions(actionsEl, logEvent);
+        }
+
+        if (canvasAnimId) cancelAnimationFrame(canvasAnimId);
+        if (canvasEl) {
+            if (videoEl) videoEl.style.display = "none";
+            canvasEl.style.display = "block";
+            function runAnim() {
+                adapter.renderPrimaryInstrument(canvasEl, node, isThermalAnomaly);
+                canvasAnimId = requestAnimationFrame(runAnim);
+            }
+            runAnim();
         }
     }
     // ========================================================================
