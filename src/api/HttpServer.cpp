@@ -560,8 +560,7 @@ namespace sentinel::nexus::api
             return true;
         }
 
-        // Locate matching node YAML file on disk
-        static std::filesystem::path locate_node_yaml(const std::string &site, const std::string &host, const std::string &id)
+static std::filesystem::path locate_node_yaml(const std::string &site, const std::string &host, const std::string &id)
         {
             const std::vector<std::string> node_dirs = {
                 "/opt/sentinel-nexus/configs/nodes",
@@ -574,35 +573,80 @@ namespace sentinel::nexus::api
             std::string h_low = to_lower_str(host);
             std::string id_low = to_lower_str(id);
 
+            std::filesystem::path site_fallback;
+
             for (const auto &dir : node_dirs)
             {
                 if (!std::filesystem::exists(dir))
                     continue;
+
                 for (const auto &entry : std::filesystem::directory_iterator(dir))
                 {
                     if (entry.is_regular_file() && (entry.path().extension() == ".yaml" || entry.path().extension() == ".yml"))
                     {
                         std::ifstream f(entry.path());
                         std::string line;
+                        std::string stem_low = to_lower_str(entry.path().stem().string());
+
                         while (std::getline(f, line))
                         {
                             std::string l_low = to_lower_str(line);
-                            if (l_low.find("identifier:") != std::string::npos || l_low.find("site_identifier:") != std::string::npos)
+
+                            // ---------------------------------------------------------
+                            // PRIORITY 1: Specific Hostname or Node Identifier Match
+                            // ---------------------------------------------------------
+                            if (!id_low.empty() && l_low.find("identifier:") != std::string::npos && l_low.find(id_low) != std::string::npos)
                             {
-                                if ((!s_low.empty() && l_low.find(s_low) != std::string::npos) ||
-                                    (!h_low.empty() && l_low.find(h_low) != std::string::npos) ||
-                                    (!id_low.empty() && l_low.find(id_low) != std::string::npos))
-                                {
+                                return entry.path();
+                            }
+
+                            if (!h_low.empty() && l_low.find("hostname:") != std::string::npos && l_low.find(h_low) != std::string::npos)
+                            {
+                                return entry.path();
+                            }
+
+                            // Match specific node tokens between hostname and identifier/filename
+                            if (!h_low.empty())
+                            {
+                                if (h_low.find("alpha") != std::string::npos && (l_low.find("alpha") != std::string::npos || stem_low.find("alpha") != std::string::npos))
                                     return entry.path();
+
+                                if (h_low.find("bravo") != std::string::npos && (l_low.find("bravo") != std::string::npos || stem_low.find("bravo") != std::string::npos))
+                                    return entry.path();
+
+                                if (h_low.find("charlie") != std::string::npos && (l_low.find("charlie") != std::string::npos || stem_low.find("charlie") != std::string::npos))
+                                    return entry.path();
+
+                                // Legacy Substation / Hospital / Refinery matching
+                                if (h_low.find("substation") != std::string::npos && (l_low.find("substation") != std::string::npos || stem_low.find("substation") != std::string::npos))
+                                    return entry.path();
+
+                                if (h_low.find("hospital") != std::string::npos && (l_low.find("hospital") != std::string::npos || stem_low.find("hospital") != std::string::npos))
+                                    return entry.path();
+
+                                if (h_low.find("refinery") != std::string::npos && (l_low.find("refinery") != std::string::npos || stem_low.find("refinery") != std::string::npos))
+                                    return entry.path();
+                            }
+
+                            // ---------------------------------------------------------
+                            // PRIORITY 2: Site Fallback (only used if Priority 1 fails)
+                            // ---------------------------------------------------------
+                            if (site_fallback.empty() && !s_low.empty() && l_low.find("site_identifier:") != std::string::npos)
+                            {
+                                if (l_low.find(s_low) != std::string::npos)
+                                {
+                                    site_fallback = entry.path();
                                 }
                             }
                         }
                     }
                 }
             }
-            return {};
+
+            return site_fallback;
         }
 
+        
         // Parse strictly the real sensors connected in this node's routes: section
         static std::vector<DynamicSensorItem> parse_node_yaml_sensors(const std::filesystem::path &yaml_path)
         {
