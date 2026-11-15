@@ -1,0 +1,16 @@
+# File: /home/kami/sentinel-nexus/configs/ui_templates/aerospace_uav.yaml
+
+primary_instrument:
+  title: "TACTICAL 360° UAV SWARM RADAR & WAYPOINT ENVELOPE"
+  protocol: "STANAG 4586 / UDP :50050"
+  type: "radar"
+
+attacks:
+  - id: "stanag_replay"
+    name: "[!] STANAG 4586 Replay Blast"
+  - id: "gps_teleport"
+    name: "[!] GPS Teleportation Jump"
+  - id: "timestamp_desync"
+    name: "[!] Telemetry Clock Desync"
+  - id: "ccsds_tamper"
+    name: "[!] CCSDS 133 Frame Tampering"
