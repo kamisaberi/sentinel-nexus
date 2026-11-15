@@ -201,8 +201,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const canvasEl = document.getElementById("thermal-canvas");
         const videoEl = document.getElementById("thermal-video");
 
-        if (titleEl) titleEl.textContent = adapter.instrumentTitle || "PRIMARY PHYSICAL APPARATUS";
-        if (tagEl) tagEl.textContent = adapter.instrumentTag || "TACTICAL";
+        if (titleEl) titleEl.textContent = (node.primary_instrument && node.primary_instrument.title) ?
+            node.primary_instrument.title : (adapter.instrumentTitle || "PRIMARY PHYSICAL APPARATUS"); if (tagEl) tagEl.textContent = adapter.instrumentTag || "TACTICAL";
 
         if (actionsEl && adapter.getPrimaryActions) {
             actionsEl.innerHTML = adapter.getPrimaryActions(node);
