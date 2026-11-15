@@ -199,6 +199,367 @@ namespace sentinel::nexus::api
             }
         }
 
+        // ---------------------------------------------------------------------
+        // DECLARATIVE UI TEMPLATE & DELTA OVERRIDE ENGINE
+        // ---------------------------------------------------------------------
+        struct NodeUiProfile
+        {
+            std::string template_name;
+            std::string override_title;
+            std::string override_proto;
+            std::string override_type;
+            std::vector<DynamicSensorItem> sensors_add;
+            std::set<std::string> sensors_remove;
+            std::vector<DynamicAttackItem> attacks_add;
+        };
+
+        static std::filesystem::path locate_ui_template(const std::string &tmpl_name)
+        {
+            const std::vector<std::string> tmpl_dirs = {
+                "/opt/sentinel-nexus/configs/ui_templates",
+                "configs/ui_templates",
+                "../configs/ui_templates",
+                "/home/kami/sentinel-matrix/configs/ui_templates",
+                "/home/kami/sentinel-nexus/configs/ui_templates"};
+
+            for (const auto &d : tmpl_dirs)
+            {
+                std::filesystem::path p_yaml = std::filesystem::path(d) / (tmpl_name + ".yaml");
+                if (std::filesystem::exists(p_yaml))
+                    return p_yaml;
+                std::filesystem::path p_yml = std::filesystem::path(d) / (tmpl_name + ".yml");
+                if (std::filesystem::exists(p_yml))
+                    return p_yml;
+            }
+            return {};
+        }
+
+        static NodeUiProfile parse_node_ui_profile(const std::filesystem::path &yaml_path)
+        {
+            NodeUiProfile prof;
+            std::ifstream f(yaml_path);
+            if (!f.is_open())
+                return prof;
+
+            std::string line;
+            bool in_profile = false;
+            std::string current_section;
+            DynamicSensorItem cur_s;
+            bool has_cur_s = false;
+            DynamicAttackItem cur_a;
+            bool has_cur_a = false;
+
+            auto push_cur_s = [&]()
+            {
+                if (has_cur_s && !cur_s.sensor_id.empty())
+                {
+                    prof.sensors_add.push_back(cur_s);
+                    cur_s = DynamicSensorItem();
+                    has_cur_s = false;
+                }
+            };
+            auto push_cur_a = [&]()
+            {
+                if (has_cur_a && !cur_a.id.empty())
+                {
+                    prof.attacks_add.push_back(cur_a);
+                    cur_a = DynamicAttackItem();
+                    has_cur_a = false;
+                }
+            };
+
+            while (std::getline(f, line))
+            {
+                std::string trimmed = trim_str(line);
+                if (trimmed == "ui_profile:")
+                {
+                    in_profile = true;
+                    continue;
+                }
+                if (!in_profile)
+                    continue;
+                if (!trimmed.empty() && line.find_first_not_of(" \t") == 0 && trimmed.back() == ':')
+                {
+                    break; // Exited ui_profile: block
+                }
+
+                if (trimmed.rfind("template:", 0) == 0)
+                {
+                    std::string val = trim_str(trimmed.substr(9));
+                    if (!val.empty() && (val.front() == '"' || val.front() == '\''))
+                        val = val.substr(1, val.size() - 2);
+                    prof.template_name = val;
+                }
+                else if (trimmed.rfind("instrument_title:", 0) == 0)
+                {
+                    std::string val = trim_str(trimmed.substr(17));
+                    if (!val.empty() && (val.front() == '"' || val.front() == '\''))
+                        val = val.substr(1, val.size() - 2);
+                    prof.override_title = val;
+                }
+                else if (trimmed.rfind("instrument_type:", 0) == 0)
+                {
+                    prof.override_type = trim_str(trimmed.substr(16));
+                }
+                else if (trimmed == "sensors_add:")
+                {
+                    current_section = "sensors_add";
+                }
+                else if (trimmed == "sensors_remove:")
+                {
+                    current_section = "sensors_remove";
+                }
+                else if (trimmed == "attacks_add:")
+                {
+                    current_section = "attacks_add";
+                }
+                else if (current_section == "sensors_remove" && trimmed.rfind("-", 0) == 0)
+                {
+                    std::string s_id = trim_str(trimmed.substr(1));
+                    if (!s_id.empty() && (s_id.front() == '"' || s_id.front() == '\''))
+                        s_id = s_id.substr(1, s_id.size() - 2);
+                    prof.sensors_remove.insert(s_id);
+                }
+                else if (current_section == "sensors_add")
+                {
+                    if (trimmed.rfind("- sensor_id:", 0) == 0)
+                    {
+                        push_cur_s();
+                        cur_s.sensor_id = trim_str(trimmed.substr(12));
+                        cur_s.name = cur_s.sensor_id;
+                        has_cur_s = true;
+                    }
+                    else if (has_cur_s && trimmed.rfind("name:", 0) == 0)
+                    {
+                        cur_s.name = trim_str(trimmed.substr(5));
+                    }
+                    else if (has_cur_s && trimmed.rfind("category:", 0) == 0)
+                    {
+                        cur_s.category = trim_str(trimmed.substr(9));
+                    }
+                    else if (has_cur_s && trimmed.rfind("port:", 0) == 0)
+                    {
+                        try
+                        {
+                            cur_s.port = std::stoi(trim_str(trimmed.substr(5)));
+                        }
+                        catch (...)
+                        {
+                        }
+                    }
+                    else if (has_cur_s && trimmed.rfind("unit:", 0) == 0)
+                    {
+                        cur_s.unit = trim_str(trimmed.substr(5));
+                    }
+                    else if (has_cur_s && trimmed.rfind("baseline:", 0) == 0)
+                    {
+                        try
+                        {
+                            cur_s.baseline = std::stof(trim_str(trimmed.substr(9)));
+                        }
+                        catch (...)
+                        {
+                        }
+                    }
+                }
+                else if (current_section == "attacks_add")
+                {
+                    if (trimmed.rfind("- id:", 0) == 0)
+                    {
+                        push_cur_a();
+                        cur_a.id = trim_str(trimmed.substr(5));
+                        has_cur_a = true;
+                    }
+                    else if (has_cur_a && trimmed.rfind("name:", 0) == 0)
+                    {
+                        cur_a.name = trim_str(trimmed.substr(5));
+                    }
+                }
+            }
+            push_cur_s();
+            push_cur_a();
+            return prof;
+        }
+
+        static bool load_ui_template_file(const std::filesystem::path &tmpl_path,
+                                          std::string &inst_title,
+                                          std::string &inst_proto,
+                                          std::string &inst_type,
+                                          std::vector<DynamicSensorItem> &sensors,
+                                          std::vector<DynamicAttackItem> &attacks)
+        {
+            std::ifstream f(tmpl_path);
+            if (!f.is_open())
+                return false;
+
+            std::string line;
+            std::string cur_sec;
+            DynamicSensorItem cur_s;
+            bool has_cur_s = false;
+            DynamicAttackItem cur_a;
+            bool has_cur_a = false;
+
+            auto push_cur_s = [&]()
+            {
+                if (has_cur_s && !cur_s.sensor_id.empty())
+                {
+                    sensors.push_back(cur_s);
+                    cur_s = DynamicSensorItem();
+                    has_cur_s = false;
+                }
+            };
+            auto push_cur_a = [&]()
+            {
+                if (has_cur_a && !cur_a.id.empty())
+                {
+                    attacks.push_back(cur_a);
+                    cur_a = DynamicAttackItem();
+                    has_cur_a = false;
+                }
+            };
+
+            while (std::getline(f, line))
+            {
+                std::string trimmed = trim_str(line);
+                if (trimmed == "primary_instrument:")
+                {
+                    cur_sec = "primary_instrument";
+                    continue;
+                }
+                if (trimmed == "sensors:")
+                {
+                    push_cur_s();
+                    cur_sec = "sensors";
+                    continue;
+                }
+                if (trimmed == "attacks:")
+                {
+                    push_cur_s();
+                    push_cur_a();
+                    cur_sec = "attacks";
+                    continue;
+                }
+
+                if (cur_sec == "primary_instrument")
+                {
+                    if (trimmed.rfind("title:", 0) == 0)
+                    {
+                        std::string val = trim_str(trimmed.substr(6));
+                        if (!val.empty() && (val.front() == '"' || val.front() == '\''))
+                            val = val.substr(1, val.size() - 2);
+                        inst_title = val;
+                    }
+                    else if (trimmed.rfind("protocol:", 0) == 0)
+                    {
+                        std::string val = trim_str(trimmed.substr(9));
+                        if (!val.empty() && (val.front() == '"' || val.front() == '\''))
+                            val = val.substr(1, val.size() - 2);
+                        inst_proto = val;
+                    }
+                    else if (trimmed.rfind("type:", 0) == 0)
+                    {
+                        inst_type = trim_str(trimmed.substr(5));
+                    }
+                }
+                else if (cur_sec == "sensors")
+                {
+                    if (trimmed.rfind("- sensor_id:", 0) == 0)
+                    {
+                        push_cur_s();
+                        cur_s.sensor_id = trim_str(trimmed.substr(12));
+                        cur_s.name = cur_s.sensor_id;
+                        cur_s.min_val = 0.0f;
+                        cur_s.max_val = 100.0f;
+                        has_cur_s = true;
+                    }
+                    else if (has_cur_s && trimmed.rfind("name:", 0) == 0)
+                    {
+                        std::string val = trim_str(trimmed.substr(5));
+                        if (!val.empty() && (val.front() == '"' || val.front() == '\''))
+                            val = val.substr(1, val.size() - 2);
+                        cur_s.name = val;
+                    }
+                    else if (has_cur_s && trimmed.rfind("category:", 0) == 0)
+                    {
+                        cur_s.category = trim_str(trimmed.substr(9));
+                    }
+                    else if (has_cur_s && trimmed.rfind("port:", 0) == 0)
+                    {
+                        try
+                        {
+                            cur_s.port = std::stoi(trim_str(trimmed.substr(5)));
+                        }
+                        catch (...)
+                        {
+                        }
+                    }
+                    else if (has_cur_s && trimmed.rfind("unit:", 0) == 0)
+                    {
+                        std::string val = trim_str(trimmed.substr(5));
+                        if (!val.empty() && (val.front() == '"' || val.front() == '\''))
+                            val = val.substr(1, val.size() - 2);
+                        cur_s.unit = val;
+                    }
+                    else if (has_cur_s && trimmed.rfind("baseline:", 0) == 0)
+                    {
+                        try
+                        {
+                            cur_s.baseline = std::stof(trim_str(trimmed.substr(9)));
+                        }
+                        catch (...)
+                        {
+                        }
+                    }
+                    else if (has_cur_s && trimmed.rfind("min_val:", 0) == 0)
+                    {
+                        try
+                        {
+                            cur_s.min_val = std::stof(trim_str(trimmed.substr(8)));
+                        }
+                        catch (...)
+                        {
+                        }
+                    }
+                    else if (has_cur_s && trimmed.rfind("max_val:", 0) == 0)
+                    {
+                        try
+                        {
+                            cur_s.max_val = std::stof(trim_str(trimmed.substr(8)));
+                        }
+                        catch (...)
+                        {
+                        }
+                    }
+                    else if (has_cur_s && trimmed.rfind("interface:", 0) == 0)
+                    {
+                        cur_s.interface = trim_str(trimmed.substr(10));
+                    }
+                }
+                else if (cur_sec == "attacks")
+                {
+                    if (trimmed.rfind("- id:", 0) == 0)
+                    {
+                        push_cur_a();
+                        std::string val = trim_str(trimmed.substr(5));
+                        if (!val.empty() && (val.front() == '"' || val.front() == '\''))
+                            val = val.substr(1, val.size() - 2);
+                        cur_a.id = val;
+                        has_cur_a = true;
+                    }
+                    else if (has_cur_a && trimmed.rfind("name:", 0) == 0)
+                    {
+                        std::string val = trim_str(trimmed.substr(5));
+                        if (!val.empty() && (val.front() == '"' || val.front() == '\''))
+                            val = val.substr(1, val.size() - 2);
+                        cur_a.name = val;
+                    }
+                }
+            }
+            push_cur_s();
+            push_cur_a();
+            return true;
+        }
+
         // Locate matching node YAML file on disk
         static std::filesystem::path locate_node_yaml(const std::string &site, const std::string &host, const std::string &id)
         {
