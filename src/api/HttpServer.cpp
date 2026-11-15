@@ -1451,57 +1451,112 @@ namespace sentinel::nexus::api
         // 1. DYNAMICALLY RESOLVE NODE YAML ON DISK
         auto yaml_path = locate_node_yaml(site, host, found->node_id);
 
-        // 2. PARSE STRICTLY THE EXACT SENSORS BOUND TO THIS SPECIFIC EDGE APPLIANCE
+        // 2. CHECK DECLARATIVE UI TEMPLATE & OVERRIDES (Kustomize/Prefab Pattern)
         std::vector<DynamicSensorItem> active_sensors;
-        if (!yaml_path.empty())
-        {
-            active_sensors = parse_node_yaml_sensors(yaml_path);
-        }
-
-        // If YAML had no routes, read real sensors reported over protobuf heartbeat
-        if (active_sensors.empty() && !found->sensors.empty())
-        {
-            for (const auto &s : found->sensors)
-            {
-                DynamicSensorItem item;
-                item.sensor_id = s.sensor_id();
-                item.name = s.name().empty() ? s.sensor_id() : s.name();
-                enrich_sensor_physics(item, s.type() + " " + s.protocol(), "tcp");
-                active_sensors.push_back(item);
-            }
-        }
-
-        // 3. DYNAMIC PRIMARY INSTRUMENT DETERMINATION (Inferred from actual sensors on this node)
-        std::string sensor_context = to_lower_str(site + " " + host);
-        for (const auto &s : active_sensors)
-        {
-            sensor_context += " " + to_lower_str(s.sensor_id + " " + s.category + " " + s.interface);
-        }
-
         std::string inst_title = "POWER QUALITY & SYNCHROPHASOR SCOPE";
         std::string inst_proto = "IEEE C37.118 / MODBUS :15501";
         std::string inst_type = "grid";
+        std::vector<DynamicAttackItem> attacks;
+        bool template_resolved = false;
 
-        if (sensor_context.find("thermal") != std::string::npos || sensor_context.find("camera") != std::string::npos ||
-            sensor_context.find("rtsp") != std::string::npos || sensor_context.find("lidar") != std::string::npos ||
-            sensor_context.find("optical") != std::string::npos)
+        if (!yaml_path.empty())
         {
-            inst_title = "RADIOMETRIC THERMAL VISION";
-            inst_proto = "WHEP / RTSP :8554";
-            inst_type = "video";
+            auto prof = parse_node_ui_profile(yaml_path);
+            if (!prof.template_name.empty())
+            {
+                auto tmpl_path = locate_ui_template(prof.template_name);
+                if (!tmpl_path.empty())
+                {
+                    if (load_ui_template_file(tmpl_path, inst_title, inst_proto, inst_type, active_sensors, attacks))
+                    {
+                        template_resolved = true;
+
+                        // 2a. Overrides for Primary Instrument
+                        if (!prof.override_title.empty())
+                            inst_title = prof.override_title;
+                        if (!prof.override_proto.empty())
+                            inst_proto = prof.override_proto;
+                        if (!prof.override_type.empty())
+                            inst_type = prof.override_type;
+
+                        // 2b. Overrides for Sensors (Removal by ID)
+                        if (!prof.sensors_remove.empty())
+                        {
+                            std::vector<DynamicSensorItem> filtered;
+                            for (const auto &s : active_sensors)
+                            {
+                                if (prof.sensors_remove.find(s.sensor_id) == prof.sensors_remove.end())
+                                {
+                                    filtered.push_back(s);
+                                }
+                            }
+                            active_sensors = std::move(filtered);
+                        }
+
+                        // 2c. Overrides for Sensors (Addition)
+                        for (const auto &s : prof.sensors_add)
+                        {
+                            active_sensors.push_back(s);
+                        }
+
+                        // 2d. Overrides for Attacks (Addition)
+                        for (const auto &a : prof.attacks_add)
+                        {
+                            attacks.push_back(a);
+                        }
+                    }
+                }
+            }
         }
-        else if (sensor_context.find("reactor") != std::string::npos || sensor_context.find("refinery") != std::string::npos ||
-                 sensor_context.find("vibration") != std::string::npos || sensor_context.find("s7comm") != std::string::npos)
+
+        // 3. FALLBACK TO 100% UNTOUCHED LEGACY PIPELINE IF NO UI_PROFILE FOUND
+        if (!template_resolved)
         {
-            inst_title = "EXOTHERMIC REACTION VESSEL CORE";
-            inst_proto = "S7COMM :102 / HART-IP";
-            inst_type = "reactor";
+            if (!yaml_path.empty())
+            {
+                active_sensors = parse_node_yaml_sensors(yaml_path);
+            }
+
+            // If YAML had no routes, read real sensors reported over protobuf heartbeat
+            if (active_sensors.empty() && !found->sensors.empty())
+            {
+                for (const auto &s : found->sensors)
+                {
+                    DynamicSensorItem item;
+                    item.sensor_id = s.sensor_id();
+                    item.name = s.name().empty() ? s.sensor_id() : s.name();
+                    enrich_sensor_physics(item, s.type() + " " + s.protocol(), "tcp");
+                    active_sensors.push_back(item);
+                }
+            }
+
+            // Inferred from actual sensors on this node
+            std::string sensor_context = to_lower_str(site + " " + host);
+            for (const auto &s : active_sensors)
+            {
+                sensor_context += " " + to_lower_str(s.sensor_id + " " + s.category + " " + s.interface);
+            }
+
+            if (sensor_context.find("thermal") != std::string::npos || sensor_context.find("camera") != std::string::npos ||
+                sensor_context.find("rtsp") != std::string::npos || sensor_context.find("lidar") != std::string::npos ||
+                sensor_context.find("optical") != std::string::npos)
+            {
+                inst_title = "RADIOMETRIC THERMAL VISION";
+                inst_proto = "WHEP / RTSP :8554";
+                inst_type = "video";
+            }
+            else if (sensor_context.find("reactor") != std::string::npos || sensor_context.find("refinery") != std::string::npos ||
+                     sensor_context.find("vibration") != std::string::npos || sensor_context.find("s7comm") != std::string::npos)
+            {
+                inst_title = "EXOTHERMIC REACTION VESSEL CORE";
+                inst_proto = "S7COMM :102 / HART-IP";
+                inst_type = "reactor";
+            }
+
+            attacks = resolve_attacks_from_sensors(active_sensors);
         }
 
-        // 4. DYNAMIC ATTACK DISCOVERY FROM STANDALONE EXTERNAL JSON DATA FILE
-        auto attacks = resolve_attacks_from_sensors(active_sensors);
-
-        // 5. SERIALIZE TO IDENTICAL JSON SPEC FOR MISSION CONTROL
+        // 4. SERIALIZE TO IDENTICAL JSON SPEC FOR MISSION CONTROL (UNCHANGED)
         std::ostringstream ss;
         ss << std::fixed << std::setprecision(2);
         ss << "{\n"
