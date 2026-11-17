@@ -437,45 +437,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    function updateSensorEChart(sid, s, val, history) {
-        const chartDom = document.getElementById(`echart-${sid}`);
-        if (!chartDom || chartDom.clientWidth === 0) return;
-
-        if (!echartsInstances[sid] || echartsInstances[sid].isDisposed()) {
-            echartsInstances[sid] = echarts.init(chartDom, 'dark', { renderer: 'canvas' });
-        }
-        const chart = echartsInstances[sid];
-
-        const faultKey = `${activeNodeId}::${sid}`;
-        const isFaulted = (activeSensorFaults[faultKey] && activeSensorFaults[faultKey].active);
-        const lineColor = isFaulted ? "#FF3366" : (s.category === "VIBRATION" || s.category === "CYBER" ? "#00FFA3" : "#00E5FF");
-        const minV = (s.min_val !== undefined) ? s.min_val : 0;
-        const maxV = (s.max_val !== undefined) ? s.max_val : 100;
-
-        const option = {
-            backgroundColor: 'transparent',
-            grid: { left: 0, right: 0, top: 4, bottom: 0, containLabel: false },
-            xAxis: { type: 'category', boundaryGap: false, show: false },
-            yAxis: { type: 'value', min: minV, max: maxV, show: false },
-            series: [{
-                data: history,
-                type: 'line',
-                smooth: 0.35,
-                showSymbol: false,
-                lineStyle: { width: 2.2, color: lineColor, shadowColor: lineColor, shadowBlur: 8 },
-                areaStyle: {
-                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                        { offset: 0, color: lineColor + "44" },
-                        { offset: 1, color: lineColor + "00" }
-                    ])
-                }
-            }],
-            animationDurationUpdate: 300,
-            animationEasingUpdate: 'linear'
-        };
-
-        chart.setOption(option, false);
-    }
 
     // Live Telemetry Stepper Loop (300ms) - Scoped per Active Node
     setInterval(() => {
