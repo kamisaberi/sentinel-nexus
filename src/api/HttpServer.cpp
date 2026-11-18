@@ -1689,6 +1689,272 @@ namespace sentinel::nexus::api
             return ss.str();
         }
 
+
+        struct BlueprintFusionRule
+        {
+            std::string correlation_id;
+            std::string cyber_sensor_id;
+            double cyber_max_score{0.20};
+            std::string physical_sensor_id;
+            double physical_min_temp{45.0};
+            std::string action{"KERNEL_DROP_AND_ISOLATE"};
+        };
+
+        struct BlueprintNodeDetail
+        {
+            std::string identifier;
+            std::string site_identifier;
+            std::string primary_backend{"INTEL_OPENVINO"};
+            std::string xdp_driver_mode{"SKB"};
+            std::vector<ScenarioRouteArtifact> routes;
+            std::vector<BlueprintFusionRule> fusion_rules;
+        };
+
+        static BlueprintNodeDetail parse_blueprint_yaml_detail(const std::filesystem::path &yaml_path)
+        {
+            BlueprintNodeDetail detail;
+            std::set<std::string> dummy_models;
+            parse_routes_from_yaml(yaml_path, detail.routes, dummy_models);
+
+            std::ifstream f(yaml_path);
+            if (!f.is_open())
+                return detail;
+
+            std::string line;
+            bool in_fusion = false;
+            BlueprintFusionRule cur_f;
+            bool has_f = false;
+
+            auto flush_f = [&]()
+            {
+                if (has_f && !cur_f.correlation_id.empty())
+                    detail.fusion_rules.push_back(cur_f);
+                cur_f = BlueprintFusionRule();
+                has_f = false;
+            };
+
+            while (std::getline(f, line))
+            {
+                size_t cpos = line.find('#');
+                if (cpos != std::string::npos)
+                    line = line.substr(0, cpos);
+                std::string trimmed = trim_str(line);
+                if (trimmed.empty())
+                    continue;
+
+                if (trimmed.rfind("identifier:", 0) == 0 && detail.identifier.empty())
+                    detail.identifier = trim_str(trimmed.substr(11));
+                else if (trimmed.rfind("site_identifier:", 0) == 0 && detail.site_identifier.empty())
+                    detail.site_identifier = trim_str(trimmed.substr(16));
+                else if (trimmed.rfind("primary_backend:", 0) == 0)
+                    detail.primary_backend = trim_str(trimmed.substr(16));
+                else if (trimmed.rfind("xdp_driver_mode:", 0) == 0)
+                    detail.xdp_driver_mode = trim_str(trimmed.substr(16));
+
+                if (trimmed == "fusion_rules:")
+                {
+                    in_fusion = true;
+                    continue;
+                }
+                if (!in_fusion)
+                    continue;
+
+                if (line.find_first_not_of(" \t") == 0 && trimmed.back() == ':')
+                {
+                    flush_f();
+                    in_fusion = false;
+                    continue;
+                }
+
+                if (trimmed.rfind("- correlation_id:", 0) == 0)
+                {
+                    flush_f();
+                    cur_f.correlation_id = trim_str(trimmed.substr(17));
+                    has_f = true;
+                }
+                else if (has_f && trimmed.rfind("cyber_sensor_id:", 0) == 0)
+                    cur_f.cyber_sensor_id = trim_str(trimmed.substr(16));
+                else if (has_f && trimmed.rfind("cyber_max_score:", 0) == 0)
+                {
+                    try { cur_f.cyber_max_score = std::stod(trim_str(trimmed.substr(16))); } catch (...) {}
+                }
+                else if (has_f && trimmed.rfind("physical_sensor_id:", 0) == 0)
+                    cur_f.physical_sensor_id = trim_str(trimmed.substr(19));
+                else if (has_f && trimmed.rfind("physical_min_temp:", 0) == 0)
+                {
+                    try { cur_f.physical_min_temp = std::stod(trim_str(trimmed.substr(18))); } catch (...) {}
+                }
+                else if (has_f && trimmed.rfind("action:", 0) == 0)
+                    cur_f.action = trim_str(trimmed.substr(7));
+            }
+            flush_f();
+            return detail;
+        }
+
+        static std::string build_blueprint_context_json()
+        {
+            std::error_code ec;
+
+            // 1. Discover real network interfaces from /sys/class/net
+            std::vector<std::string> nics;
+            if (std::filesystem::exists("/sys/class/net", ec) && !ec)
+            {
+                for (const auto &e : std::filesystem::directory_iterator("/sys/class/net", ec))
+                {
+                    if (ec)
+                        break;
+                    nics.push_back(e.path().filename().string());
+                }
+            }
+
+            // 2. Discover real models & routes from active scenario
+            std::vector<ScenarioRouteArtifact> all_routes;
+            std::set<std::string> active_models;
+            collect_scenario_routes(all_routes, active_models);
+            auto disk_models = scan_scenario_models_on_disk(all_routes, active_models);
+
+            std::set<std::string> packages;
+            std::set<std::string> plugins;
+            for (const auto &r : all_routes)
+            {
+                if (!r.package_id.empty())
+                    packages.insert(r.package_id);
+                if (!r.plugin_id.empty())
+                    plugins.insert(r.plugin_id);
+            }
+
+            // 3. Hydrate per-node blueprint profiles from registered sentries + active node YAMLs
+            auto reg_nodes = fleet::NodeRegistry::instance().get_all_nodes();
+            std::ostringstream nodes_ss;
+            nodes_ss << "[\n";
+            for (size_t i = 0; i < reg_nodes.size(); ++i)
+            {
+                const auto &rn = reg_nodes[i];
+                auto yaml_path = locate_node_yaml(rn.site_identifier, rn.identity.hostname(), rn.node_id);
+                BlueprintNodeDetail detail;
+                if (!yaml_path.empty())
+                    detail = parse_blueprint_yaml_detail(yaml_path);
+                if (detail.identifier.empty())
+                    detail.identifier = rn.identity.hostname().empty() ? rn.node_id : rn.identity.hostname();
+                if (detail.site_identifier.empty())
+                    detail.site_identifier = rn.site_identifier;
+
+                nodes_ss << "    {\n"
+                         << "      \"node_id\": \"" << json_escape_str(rn.node_id) << "\",\n"
+                         << "      \"identifier\": \"" << json_escape_str(detail.identifier) << "\",\n"
+                         << "      \"hostname\": \"" << json_escape_str(rn.identity.hostname()) << "\",\n"
+                         << "      \"site\": \"" << json_escape_str(detail.site_identifier) << "\",\n"
+                         << "      \"primary_backend\": \"" << json_escape_str(detail.primary_backend) << "\",\n"
+                         << "      \"xdp_driver_mode\": \"" << json_escape_str(detail.xdp_driver_mode) << "\",\n"
+                         << "      \"routes\": [\n";
+                for (size_t ri = 0; ri < detail.routes.size(); ++ri)
+                {
+                    const auto &r = detail.routes[ri];
+                    nodes_ss << "        {\n"
+                             << "          \"sensor_id\": \"" << json_escape_str(r.sensor_id) << "\",\n"
+                             << "          \"port\": " << r.port << ",\n"
+                             << "          \"transport\": \"" << json_escape_str(r.transport) << "\",\n"
+                             << "          \"package_id\": \"" << json_escape_str(r.package_id) << "\",\n"
+                             << "          \"plugin_id\": \"" << json_escape_str(r.plugin_id) << "\",\n"
+                             << "          \"model_id\": \"" << json_escape_str(r.model_id) << "\",\n"
+                             << "          \"silicon_target\": \"" << json_escape_str(r.silicon_target) << "\",\n"
+                             << "          \"precision\": \"" << json_escape_str(r.precision) << "\",\n"
+                             << "          \"latency_budget_ns\": " << r.latency_budget_ns << "\n"
+                             << "        }" << (ri + 1 < detail.routes.size() ? ",\n" : "\n");
+                }
+                nodes_ss << "      ],\n"
+                         << "      \"fusion_rules\": [\n";
+                for (size_t fi = 0; fi < detail.fusion_rules.size(); ++fi)
+                {
+                    const auto &fr = detail.fusion_rules[fi];
+                    nodes_ss << "        {\n"
+                             << "          \"correlation_id\": \"" << json_escape_str(fr.correlation_id) << "\",\n"
+                             << "          \"cyber_sensor_id\": \"" << json_escape_str(fr.cyber_sensor_id) << "\",\n"
+                             << "          \"cyber_max_score\": " << fr.cyber_max_score << ",\n"
+                             << "          \"physical_sensor_id\": \"" << json_escape_str(fr.physical_sensor_id) << "\",\n"
+                             << "          \"physical_min_temp\": " << fr.physical_min_temp << ",\n"
+                             << "          \"action\": \"" << json_escape_str(fr.action) << "\"\n"
+                             << "        }" << (fi + 1 < detail.fusion_rules.size() ? ",\n" : "\n");
+                }
+                nodes_ss << "      ]\n"
+                         << "    }" << (i + 1 < reg_nodes.size() ? ",\n" : "\n");
+            }
+            nodes_ss << "  ]";
+
+            std::ostringstream ss;
+            ss << "{\n"
+               << "  \"nics\": [";
+            for (size_t i = 0; i < nics.size(); ++i)
+                ss << "\"" << json_escape_str(nics[i]) << "\"" << (i + 1 < nics.size() ? ", " : "");
+            ss << "],\n"
+               << "  \"models\": [";
+            for (size_t i = 0; i < disk_models.size(); ++i)
+                ss << "\"" << json_escape_str(disk_models[i].id) << "\"" << (i + 1 < disk_models.size() ? ", " : "");
+            ss << "],\n"
+               << "  \"packages\": [";
+            size_t pk_i = 0;
+            for (const auto &p : packages)
+                ss << "\"" << json_escape_str(p) << "\"" << (++pk_i < packages.size() ? ", " : "");
+            ss << "],\n"
+               << "  \"plugins\": [";
+            size_t pl_i = 0;
+            for (const auto &p : plugins)
+                ss << "\"" << json_escape_str(p) << "\"" << (++pl_i < plugins.size() ? ", " : "");
+            ss << "],\n"
+               << "  \"nodes\": " << nodes_ss.str() << "\n"
+               << "}";
+            return ss.str();
+        }
+
+        static std::string handle_post_blueprint_deploy(const std::string &body)
+        {
+            if (body.empty())
+                return "{\"status\": \"error\", \"message\": \"Empty model_routes.yaml payload\"}";
+
+            const std::filesystem::path stage_path("/tmp/sentinel_staged_model_routes.yaml");
+            const std::filesystem::path backup_path("/tmp/sentinel_staged_model_routes.yaml.bak");
+            std::error_code ec;
+            if (std::filesystem::exists(stage_path, ec) && !ec)
+            {
+                std::filesystem::copy_file(stage_path, backup_path, std::filesystem::copy_options::overwrite_existing, ec);
+            }
+
+            std::ofstream out(stage_path, std::ios::binary);
+            if (!out.is_open())
+                return "{\"status\": \"error\", \"message\": \"Cannot write staged blueprint YAML\"}";
+            out << body;
+            out.close();
+
+            NEXUS_LOG_INFO("[BlueprintStudio] Staged compiled model_routes.yaml (" + std::to_string(body.size()) + " bytes) to " + stage_path.string());
+
+            std::ostringstream ss;
+            ss << "{\n"
+               << "  \"status\": \"staged\",\n"
+               << "  \"path\": \"" << json_escape_str(stage_path.string()) << "\",\n"
+               << "  \"bytes\": " << body.size() << ",\n"
+               << "  \"backup_available\": " << (std::filesystem::exists(backup_path, ec) ? "true" : "false") << "\n"
+               << "}";
+            return ss.str();
+        }
+
+        static std::string handle_post_blueprint_rollback()
+        {
+            const std::filesystem::path stage_path("/tmp/sentinel_staged_model_routes.yaml");
+            const std::filesystem::path backup_path("/tmp/sentinel_staged_model_routes.yaml.bak");
+            std::error_code ec;
+            if (!std::filesystem::exists(backup_path, ec) || ec)
+            {
+                return "{\"status\": \"no_backup\", \"message\": \"No previous staged blueprint backup found.\"}";
+            }
+            std::filesystem::copy_file(backup_path, stage_path, std::filesystem::copy_options::overwrite_existing, ec);
+            NEXUS_LOG_WARN("[BlueprintStudio] Rolled back staged model_routes.yaml from backup.");
+            return "{\"status\": \"rolled_back\", \"path\": \"/tmp/sentinel_staged_model_routes.yaml\"}";
+        }
+
+
+
+
+
     } // anonymous namespace
 
     // --- INSERT HANDLERS IN HttpServer.cpp ---
