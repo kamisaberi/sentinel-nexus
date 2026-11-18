@@ -1689,7 +1689,6 @@ namespace sentinel::nexus::api
             return ss.str();
         }
 
-
         struct BlueprintFusionRule
         {
             std::string correlation_id;
@@ -1776,13 +1775,25 @@ namespace sentinel::nexus::api
                     cur_f.cyber_sensor_id = trim_str(trimmed.substr(16));
                 else if (has_f && trimmed.rfind("cyber_max_score:", 0) == 0)
                 {
-                    try { cur_f.cyber_max_score = std::stod(trim_str(trimmed.substr(16))); } catch (...) {}
+                    try
+                    {
+                        cur_f.cyber_max_score = std::stod(trim_str(trimmed.substr(16)));
+                    }
+                    catch (...)
+                    {
+                    }
                 }
                 else if (has_f && trimmed.rfind("physical_sensor_id:", 0) == 0)
                     cur_f.physical_sensor_id = trim_str(trimmed.substr(19));
                 else if (has_f && trimmed.rfind("physical_min_temp:", 0) == 0)
                 {
-                    try { cur_f.physical_min_temp = std::stod(trim_str(trimmed.substr(18))); } catch (...) {}
+                    try
+                    {
+                        cur_f.physical_min_temp = std::stod(trim_str(trimmed.substr(18)));
+                    }
+                    catch (...)
+                    {
+                    }
                 }
                 else if (has_f && trimmed.rfind("action:", 0) == 0)
                     cur_f.action = trim_str(trimmed.substr(7));
@@ -1950,10 +1961,6 @@ namespace sentinel::nexus::api
             NEXUS_LOG_WARN("[BlueprintStudio] Rolled back staged model_routes.yaml from backup.");
             return "{\"status\": \"rolled_back\", \"path\": \"/tmp/sentinel_staged_model_routes.yaml\"}";
         }
-
-
-
-
 
     } // anonymous namespace
 
@@ -2516,6 +2523,22 @@ namespace sentinel::nexus::api
         {
             content_type = "application/json";
             return handle_post_extension_deploy(body);
+        }
+
+        if (route_path == "/api/v1/blueprints/context")
+        {
+            content_type = "application/json";
+            return build_blueprint_context_json();
+        }
+        if (route_path == "/api/v1/blueprints/deploy" && method == "POST")
+        {
+            content_type = "application/json";
+            return handle_post_blueprint_deploy(body);
+        }
+        if (route_path == "/api/v1/blueprints/rollback" && method == "POST")
+        {
+            content_type = "application/json";
+            return handle_post_blueprint_rollback();
         }
 
         return serve_static_file(route_path, content_type, status_code);
