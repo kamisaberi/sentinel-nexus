@@ -2359,7 +2359,7 @@ namespace sentinel::nexus::api
         return ss.str();
     }
 
-    
+
     std::string HttpServer::handle_post_broadcast(const std::string &body)
     {
         const char *env_p = std::getenv("NEXUS_ENV");
@@ -2402,14 +2402,62 @@ namespace sentinel::nexus::api
 
         return "{\"status\": \"error\", \"message\": \"invalid IP\"}";
     }
-    std::string HttpServer::handle_post_ota_stage(const std::string &body)
+
+
+std::string HttpServer::handle_post_ota_stage(const std::string &body)
     {
-        (void)body;
-        ota::CanaryOrchestrator::instance().stage_candidate_model(
-            "network_threat_v2.onnx", "8fa9c89b3f4618e47f5255470d9a690e7da3c6046e297893a776", "/models/v2.onnx");
-        return "{\"status\": \"candidate_staged\", \"stage\": \"SHADOW_MODE\"}";
+        std::string model_id = extract_json_string_field(body, "model_id");
+        if (model_id.empty())
+            model_id = extract_json_string_field(body, "version");
+        if (model_id.empty())
+            model_id = extract_json_string_field(body, "candidate_version");
+
+        // Strip directory prefix if passed
+        if (!model_id.empty())
+            model_id = std::filesystem::path(model_id).filename().string();
+
+        // If caller omitted model_id, select first STAGED (or available) model from the active scenario
+        if (model_id.empty())
+        {
+            std::vector<ScenarioRouteArtifact> routes;
+            std::set<std::string> active_models;
+            collect_scenario_routes(routes, active_models);
+            auto disk_models = scan_scenario_models_on_disk(routes, active_models);
+            for (const auto &m : disk_models)
+            {
+                if (m.status == "STAGED")
+                {
+                    model_id = m.id;
+                    break;
+                }
+            }
+            if (model_id.empty() && !disk_models.empty())
+                model_id = disk_models.front().id;
+        }
+
+        if (model_id.empty())
+        {
+            return "{\"status\": \"error\", \"message\": \"No model_id provided and no .onnx models found in active scenario\"}";
+        }
+
+        std::filesystem::path model_path = resolve_scenario_model_path(model_id);
+        std::string sha256 = compute_file_sha256_hex(model_path);
+        std::string download_url = "/models/" + model_id;
+
+        ota::CanaryOrchestrator::instance().stage_candidate_model(model_id, sha256, download_url);
+
+        std::ostringstream ss;
+        ss << "{\n"
+           << "  \"status\": \"candidate_staged\",\n"
+           << "  \"stage\": \"SHADOW_MODE\",\n"
+           << "  \"model_id\": \"" << json_escape_str(model_id) << "\",\n"
+           << "  \"sha256\": \"" << json_escape_str(sha256) << "\",\n"
+           << "  \"download_url\": \"" << json_escape_str(download_url) << "\"\n"
+           << "}";
+        return ss.str();
     }
 
+    
     std::string HttpServer::handle_post_ota_advance()
     {
         auto &ota = ota::CanaryOrchestrator::instance();
