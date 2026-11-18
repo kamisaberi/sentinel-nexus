@@ -61,6 +61,13 @@ namespace sentinel::nexus::api
             std::string name;
         };
 
+        struct MitreTechniqueInfo
+        {
+            std::string technique_id;
+            std::string name;
+            std::string tactic;
+        };
+
         static std::string trim_str(const std::string &s)
         {
             size_t first = s.find_first_not_of(" \t\r\n\"'");
@@ -1514,6 +1521,174 @@ namespace sentinel::nexus::api
             return hex;
         }
 
+        static MitreTechniqueInfo map_attack_slug_to_mitre(const std::string &attack_id, const std::string &attack_name)
+        {
+            std::string key = to_lower_str(attack_id + " " + attack_name);
+
+            if (key.find("replay") != std::string::npos)
+                return {"T0856", "Spoof Reporting / Telecommand Replay", "Impair Process Control"};
+            if (key.find("gps") != std::string::npos || key.find("teleport") != std::string::npos || key.find("terrain") != std::string::npos)
+                return {"T0836", "Modify Parameter / Kinematic Spoof", "Impair Process Control"};
+            if (key.find("desync") != std::string::npos || key.find("clock") != std::string::npos || key.find("jitter") != std::string::npos)
+                return {"T1124", "Telemetry Clock Desynchronization", "Impact"};
+            if (key.find("ccsds") != std::string::npos || key.find("tamper") != std::string::npos || key.find("crc") != std::string::npos || key.find("spi") != std::string::npos)
+                return {"T1565.002", "Transmitted Data Manipulation", "Impact"};
+            if (key.find("dazzle") != std::string::npos || key.find("laser") != std::string::npos || key.find("optical") != std::string::npos || key.find("blinding") != std::string::npos || key.find("thermal") != std::string::npos)
+                return {"T0828", "Loss of Productivity & Optical Safety", "Inhibit Response Function"};
+            if (key.find("modbus") != std::string::npos || key.find("fc05") != std::string::npos || key.find("coil") != std::string::npos || key.find("setpoint") != std::string::npos)
+                return {"T0855", "Unauthorized Command Message", "Impair Process Control"};
+            if (key.find("s7") != std::string::npos || key.find("cpu_stop") != std::string::npos || key.find("stop") != std::string::npos)
+                return {"T0816", "Device Restart / Shutdown", "Inhibit Response Function"};
+            if (key.find("iec104") != std::string::npos || key.find("breaker") != std::string::npos || key.find("trip") != std::string::npos || key.find("grid") != std::string::npos)
+                return {"T0831", "Manipulation of Control", "Impair Process Control"};
+            if (key.find("5g") != std::string::npos || key.find("gtpu") != std::string::npos || key.find("teid") != std::string::npos || key.find("slice") != std::string::npos)
+                return {"T1599", "Network Boundary Bridging (5G Slice)", "Defense Evasion"};
+            if (key.find("prompt") != std::string::npos || key.find("jailbreak") != std::string::npos || key.find("trism") != std::string::npos || key.find("ai") != std::string::npos)
+                return {"T1190", "Exploit AI / Edge Inference Pipeline", "Initial Access"};
+            if (key.find("brute") != std::string::npos || key.find("auth") != std::string::npos)
+                return {"T1110", "Brute Force", "Credential Access"};
+            if (key.find("scan") != std::string::npos || key.find("sweep") != std::string::npos)
+                return {"T1046", "Network Service Discovery", "Discovery"};
+            if (key.find("c2") != std::string::npos || key.find("beacon") != std::string::npos)
+                return {"T1071", "Application Layer Protocol", "Command & Control"};
+
+            return {"T0800", "Cyber-Physical Protocol Anomaly", "Impair Process Control"};
+        }
+
+        static std::string build_dynamic_mitre_json()
+        {
+            struct MitreAggBucket
+            {
+                std::string technique_id;
+                std::string name;
+                std::string tactic;
+                uint64_t live_detections{0};
+                uint64_t node_drops{0};
+                std::set<std::string> targets;
+                std::set<std::string> attacks;
+            };
+
+            std::unordered_map<std::string, MitreAggBucket> buckets;
+            std::vector<std::string> order;
+
+            auto ensure_bucket = [&](const std::string &tid, const std::string &name, const std::string &tactic) -> MitreAggBucket &
+            {
+                auto it = buckets.find(tid);
+                if (it == buckets.end())
+                {
+                    MitreAggBucket b;
+                    b.technique_id = tid;
+                    b.name = name;
+                    b.tactic = tactic;
+                    buckets[tid] = b;
+                    order.push_back(tid);
+                }
+                return buckets[tid];
+            };
+
+            // 1. Merge live gRPC recorded threats from GlobalThreatCache
+            auto recent = intelligence::GlobalThreatCache::instance().get_recent_threats(500);
+            for (const auto &t : recent)
+            {
+                std::string tid = t.mitre_technique_id.empty() ? "T0800" : t.mitre_technique_id;
+                MitreTechniqueInfo info = map_attack_slug_to_mitre(tid, t.mitre_technique_name);
+                if (tid == "T1110" || tid == "T1071" || tid == "T0855" || tid == "T1046" || tid == "T1190")
+                {
+                    info.technique_id = tid;
+                    info.name = t.mitre_technique_name;
+                }
+                auto &b = ensure_bucket(tid, info.name, info.tactic);
+                b.live_detections++;
+                if (!t.origin_node_id.empty())
+                    b.targets.insert(t.origin_node_id);
+            }
+
+            // 2. Derive active MITRE coverage dynamically from every registered node's scenario profile
+            auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
+            for (const auto &n : nodes)
+            {
+                std::string site = n.site_identifier;
+                std::string host = n.identity.hostname();
+                uint64_t drops = n.latest_metrics.ebpf_packets_dropped();
+                auto yaml_path = locate_node_yaml(site, host, n.node_id);
+
+                std::vector<DynamicSensorItem> active_sensors;
+                std::vector<DynamicAttackItem> attacks;
+                std::string inst_title, inst_proto, inst_type;
+                bool template_resolved = false;
+
+                if (!yaml_path.empty())
+                {
+                    auto prof = parse_node_ui_profile(yaml_path);
+                    if (!prof.template_name.empty())
+                    {
+                        auto tmpl_path = locate_ui_template(prof.template_name);
+                        if (!tmpl_path.empty() && load_ui_template_file(tmpl_path, inst_title, inst_proto, inst_type, active_sensors, attacks))
+                        {
+                            template_resolved = true;
+                            for (const auto &s : prof.sensors_add)
+                                active_sensors.push_back(s);
+                            for (const auto &a : prof.attacks_add)
+                                attacks.push_back(a);
+                        }
+                    }
+                }
+
+                if (!template_resolved)
+                {
+                    if (!yaml_path.empty())
+                        active_sensors = parse_node_yaml_sensors(yaml_path);
+                    attacks = resolve_attacks_from_sensors(active_sensors);
+                }
+
+                for (const auto &atk : attacks)
+                {
+                    MitreTechniqueInfo info = map_attack_slug_to_mitre(atk.id, atk.name);
+                    auto &b = ensure_bucket(info.technique_id, info.name, info.tactic);
+                    b.targets.insert(host.empty() ? n.node_id : host);
+                    b.attacks.insert(atk.name.empty() ? atk.id : atk.name);
+                    b.node_drops += drops;
+                }
+            }
+
+            std::ostringstream ss;
+            ss << "[\n";
+            for (size_t i = 0; i < order.size(); ++i)
+            {
+                const auto &b = buckets[order[i]];
+                std::string status = (b.live_detections > 0) ? "MITIGATED_LIVE"
+                                     : (b.node_drops > 0)    ? "KERNEL_GUARDED"
+                                                             : "ARMED";
+                uint64_t display_count = (b.live_detections > 0) ? b.live_detections : b.node_drops;
+
+                ss << "  {\n"
+                   << "    \"technique_id\": \"" << json_escape_str(b.technique_id) << "\",\n"
+                   << "    \"name\": \"" << json_escape_str(b.name) << "\",\n"
+                   << "    \"tactic\": \"" << json_escape_str(b.tactic) << "\",\n"
+                   << "    \"count\": " << display_count << ",\n"
+                   << "    \"live_detections\": " << b.live_detections << ",\n"
+                   << "    \"node_drops\": " << b.node_drops << ",\n"
+                   << "    \"status\": \"" << status << "\",\n"
+                   << "    \"targets\": [";
+                size_t ti = 0;
+                for (const auto &tgt : b.targets)
+                {
+                    ss << "\"" << json_escape_str(tgt) << "\"" << (++ti < b.targets.size() ? ", " : "");
+                }
+                ss << "],\n"
+                   << "    \"attacks\": [";
+                size_t ai = 0;
+                for (const auto &ak : b.attacks)
+                {
+                    ss << "\"" << json_escape_str(ak) << "\"" << (++ai < b.attacks.size() ? ", " : "");
+                }
+                ss << "]\n"
+                   << "  }" << (i + 1 < order.size() ? ",\n" : "\n");
+            }
+            ss << "]";
+            return ss.str();
+        }
+
     } // anonymous namespace
 
     // --- INSERT HANDLERS IN HttpServer.cpp ---
@@ -2359,7 +2534,6 @@ namespace sentinel::nexus::api
         return ss.str();
     }
 
-
     std::string HttpServer::handle_post_broadcast(const std::string &body)
     {
         const char *env_p = std::getenv("NEXUS_ENV");
@@ -2403,8 +2577,7 @@ namespace sentinel::nexus::api
         return "{\"status\": \"error\", \"message\": \"invalid IP\"}";
     }
 
-
-std::string HttpServer::handle_post_ota_stage(const std::string &body)
+    std::string HttpServer::handle_post_ota_stage(const std::string &body)
     {
         std::string model_id = extract_json_string_field(body, "model_id");
         if (model_id.empty())
@@ -2457,7 +2630,6 @@ std::string HttpServer::handle_post_ota_stage(const std::string &body)
         return ss.str();
     }
 
-    
     std::string HttpServer::handle_post_ota_advance()
     {
         auto &ota = ota::CanaryOrchestrator::instance();
