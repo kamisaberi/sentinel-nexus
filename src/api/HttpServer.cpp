@@ -1962,8 +1962,6 @@ namespace sentinel::nexus::api
             return "{\"status\": \"rolled_back\", \"path\": \"/tmp/sentinel_staged_model_routes.yaml\"}";
         }
 
-
-
         static std::string parse_yaml_nexus_host(const std::filesystem::path &yaml_path)
         {
             std::ifstream f(yaml_path);
@@ -2739,6 +2737,12 @@ namespace sentinel::nexus::api
         {
             content_type = "application/json";
             return handle_post_extension_deploy(body);
+        }
+
+        if (route_path == "/api/v1/scenarios/context")
+        {
+            content_type = "application/json";
+            return build_scenario_context_json();
         }
 
         if (route_path == "/api/v1/blueprints/context")
