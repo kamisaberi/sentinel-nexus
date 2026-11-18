@@ -2301,15 +2301,65 @@ namespace sentinel::nexus::api
     std::string HttpServer::handle_get_ota()
     {
         auto &ota = ota::CanaryOrchestrator::instance();
+        std::string stable_ver = ota.get_stable_version();
+        std::string cand_ver = ota.get_candidate_version();
+        int stage_val = static_cast<int>(ota.get_current_stage());
+
+        // Resolve true deployed model(s) from the active scenario if orchestrator still holds startup default
+        std::vector<ScenarioRouteArtifact> routes;
+        std::set<std::string> active_models;
+        collect_scenario_routes(routes, active_models);
+        if ((stable_ver.empty() || stable_ver == "network_threat_v1.onnx") && !active_models.empty())
+        {
+            std::ostringstream joined;
+            size_t idx = 0;
+            for (const auto &m : active_models)
+            {
+                if (idx++ > 0)
+                    joined << ", ";
+                joined << m;
+            }
+            stable_ver = joined.str();
+        }
+
+        std::string cand_sha;
+        if (!cand_ver.empty() && cand_ver != "None")
+        {
+            cand_sha = compute_file_sha256_hex(resolve_scenario_model_path(cand_ver));
+        }
+
+        auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
+        size_t online_count = 0;
+        uint64_t total_drops = 0;
+        double lat_sum = 0.0;
+        for (const auto &n : nodes)
+        {
+            if (n.status == fleet::NodeHealthStatus::ONLINE)
+                online_count++;
+            total_drops += n.latest_metrics.ebpf_packets_dropped();
+            lat_sum += n.latest_metrics.avg_mitigation_latency_us();
+        }
+        double avg_lat = nodes.empty() ? 0.0 : (lat_sum / static_cast<double>(nodes.size()));
+
         std::ostringstream ss;
+        ss << std::fixed << std::setprecision(2);
         ss << "{\n"
-           << "  \"stable_version\": \"" << ota.get_stable_version() << "\",\n"
-           << "  \"candidate_version\": \"" << ota.get_candidate_version() << "\",\n"
-           << "  \"stage\": " << static_cast<int>(ota.get_current_stage()) << "\n"
+           << "  \"stable_version\": \"" << json_escape_str(stable_ver) << "\",\n"
+           << "  \"candidate_version\": \"" << json_escape_str(cand_ver) << "\",\n"
+           << "  \"candidate_sha256\": \"" << json_escape_str(cand_sha) << "\",\n"
+           << "  \"stage\": " << stage_val << ",\n"
+           << "  \"rollback_guard\": {\n"
+           << "    \"max_sla_latency_us\": 1000.0,\n"
+           << "    \"avg_fleet_latency_us\": " << avg_lat << ",\n"
+           << "    \"total_drops\": " << total_drops << ",\n"
+           << "    \"online_nodes\": " << online_count << ",\n"
+           << "    \"total_nodes\": " << nodes.size() << "\n"
+           << "  }\n"
            << "}";
         return ss.str();
     }
 
+    
     std::string HttpServer::handle_post_broadcast(const std::string &body)
     {
         const char *env_p = std::getenv("NEXUS_ENV");
