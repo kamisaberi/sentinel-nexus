@@ -578,7 +578,7 @@
     function resizeCharts() {
         [cbfChart, phaseChart, evtChart, pmuChart, rssChart, fusionChart].forEach(c => {
             if (c) {
-                try { c.resize(); } catch (_) {}
+                try { c.resize(); } catch (_) { }
             }
         });
     }
