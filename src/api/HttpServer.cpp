@@ -26,6 +26,8 @@
 #include <iomanip>
 #include <vector>
 
+#include <openssl/evp.h>
+
 namespace sentinel::nexus::api
 {
 
@@ -1430,6 +1432,86 @@ namespace sentinel::nexus::api
             }
             ss << "]";
             return ss.str();
+        }
+
+        static std::string extract_json_string_field(const std::string &body, const std::string &key)
+        {
+            std::string quoted = "\"" + key + "\"";
+            size_t pos = body.find(quoted);
+            if (pos == std::string::npos)
+                return "";
+            size_t colon = body.find(':', pos + quoted.size());
+            if (colon == std::string::npos)
+                return "";
+            size_t start = body.find('"', colon + 1);
+            if (start == std::string::npos)
+                return "";
+            size_t end = body.find('"', start + 1);
+            if (end == std::string::npos)
+                return "";
+            return body.substr(start + 1, end - start - 1);
+        }
+
+        static std::filesystem::path resolve_scenario_model_path(const std::string &model_id)
+        {
+            if (model_id.empty())
+                return {};
+            std::error_code ec;
+            const std::vector<std::string> model_dirs = {
+                "/opt/sentinel-nexus/models",
+                "models",
+                "../models",
+                "/etc/sentinel/models",
+                "/opt/sentinel/models"};
+            for (const auto &d : model_dirs)
+            {
+                std::filesystem::path candidate = std::filesystem::path(d) / model_id;
+                if (std::filesystem::exists(candidate, ec) && !ec && std::filesystem::is_regular_file(candidate, ec) && !ec)
+                    return candidate;
+            }
+            return {};
+        }
+
+        static std::string compute_file_sha256_hex(const std::filesystem::path &file_path)
+        {
+            if (file_path.empty())
+                return "";
+            std::ifstream f(file_path, std::ios::binary);
+            if (!f.is_open())
+                return "";
+
+            EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+            if (!ctx)
+                return "";
+
+            if (EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr) != 1)
+            {
+                EVP_MD_CTX_free(ctx);
+                return "";
+            }
+
+            char buf[8192];
+            while (f.good())
+            {
+                f.read(buf, sizeof(buf));
+                std::streamsize n = f.gcount();
+                if (n > 0)
+                    EVP_DigestUpdate(ctx, buf, static_cast<size_t>(n));
+            }
+
+            unsigned char digest[EVP_MAX_MD_SIZE];
+            unsigned int digest_len = 0;
+            std::string hex;
+            if (EVP_DigestFinal_ex(ctx, digest, &digest_len) == 1)
+            {
+                std::ostringstream ss;
+                ss << std::hex << std::setfill('0');
+                for (unsigned int i = 0; i < digest_len; ++i)
+                    ss << std::setw(2) << static_cast<unsigned int>(digest[i]);
+                hex = ss.str();
+            }
+            EVP_MD_CTX_free(ctx);
+            return hex;
         }
 
     } // anonymous namespace
