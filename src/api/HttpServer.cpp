@@ -2204,8 +2204,9 @@ namespace sentinel::nexus::api
 
         if (route_path == "/api/v1/threats/mitre")
         {
+
             content_type = "application/json";
-            return intelligence::GlobalThreatCache::instance().generate_mitre_summary_json();
+            return build_dynamic_mitre_json();
         }
 
         if (route_path == "/api/v1/threats/broadcast" && method == "POST")
