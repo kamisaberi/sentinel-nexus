@@ -2363,60 +2363,7 @@ namespace sentinel::nexus::api
 
     std::string HttpServer::handle_get_extensions_status()
     {
-        auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
-        uint64_t total_packets = 0;
-        uint64_t total_drops = 0;
-        for (const auto &n : nodes)
-        {
-            total_packets += n.latest_metrics.packets_inspected();
-            total_drops += n.latest_metrics.ebpf_packets_dropped();
-        }
-
-        if (total_packets == 0)
-            total_packets = 56800;
-        if (total_drops == 0)
-            total_drops = 106;
-
-        std::ostringstream ss;
-        ss << "[\n"
-           << "  {\n"
-           << "    \"id\": \"org.aryorithm.package.modbus_actuator_guard\",\n"
-           << "    \"tier\": \"Native C++20\",\n"
-           << "    \"proto\": \"MODBUS_TCP\",\n"
-           << "    \"latency\": \"88 ns\",\n"
-           << "    \"frames\": " << (total_packets / 4) << ",\n"
-           << "    \"drops\": " << (total_drops / 4) << ",\n"
-           << "    \"status\": \"ACTIVE\"\n"
-           << "  },\n"
-           << "  {\n"
-           << "    \"id\": \"org.aryorithm.package.s7comm_safety_interlock\",\n"
-           << "    \"tier\": \"Rust Wasm3\",\n"
-           << "    \"proto\": \"S7COMM\",\n"
-           << "    \"latency\": \"1,240 ns\",\n"
-           << "    \"frames\": " << (total_packets / 6) << ",\n"
-           << "    \"drops\": " << (total_drops / 6) << ",\n"
-           << "    \"status\": \"ACTIVE\"\n"
-           << "  },\n"
-           << "  {\n"
-           << "    \"id\": \"org.aryorithm.package.log4j_jndi_fastdrop\",\n"
-           << "    \"tier\": \"LuaJIT C-FFI\",\n"
-           << "    \"proto\": \"RAW_TCP\",\n"
-           << "    \"latency\": \"350 ns\",\n"
-           << "    \"frames\": " << (total_packets / 2) << ",\n"
-           << "    \"drops\": " << (total_drops / 2) << ",\n"
-           << "    \"status\": \"ACTIVE\"\n"
-           << "  },\n"
-           << "  {\n"
-           << "    \"id\": \"org.aryorithm.package.iec104_grid_shield\",\n"
-           << "    \"tier\": \"Native C++20\",\n"
-           << "    \"proto\": \"IEC_60870\",\n"
-           << "    \"latency\": \"112 ns\",\n"
-           << "    \"frames\": " << (total_packets / 12) << ",\n"
-           << "    \"drops\": " << (total_drops / 12) << ",\n"
-           << "    \"status\": \"ACTIVE\"\n"
-           << "  }\n"
-           << "]";
-        return ss.str();
+        return build_dynamic_extensions_json();
     }
 
     std::string HttpServer::handle_post_extension_deploy(const std::string &body)
