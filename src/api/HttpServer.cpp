@@ -1962,6 +1962,222 @@ namespace sentinel::nexus::api
             return "{\"status\": \"rolled_back\", \"path\": \"/tmp/sentinel_staged_model_routes.yaml\"}";
         }
 
+
+
+        static std::string parse_yaml_nexus_host(const std::filesystem::path &yaml_path)
+        {
+            std::ifstream f(yaml_path);
+            if (!f.is_open())
+                return "";
+            std::string line;
+            bool in_nexus = false;
+            while (std::getline(f, line))
+            {
+                size_t cpos = line.find('#');
+                if (cpos != std::string::npos)
+                    line = line.substr(0, cpos);
+                std::string trimmed = trim_str(line);
+                if (trimmed.empty())
+                    continue;
+                if (trimmed == "nexus:")
+                {
+                    in_nexus = true;
+                    continue;
+                }
+                if (!in_nexus)
+                    continue;
+                if (line.find_first_not_of(" \t") == 0 && trimmed.back() == ':')
+                    break;
+                if (trimmed.rfind("host:", 0) == 0)
+                    return trim_str(trimmed.substr(5));
+            }
+            return "";
+        }
+
+        static std::string build_scenario_context_json()
+        {
+            std::error_code ec;
+
+            std::vector<ScenarioRouteArtifact> all_routes;
+            std::set<std::string> active_models;
+            collect_scenario_routes(all_routes, active_models);
+            auto disk_models = scan_scenario_models_on_disk(all_routes, active_models);
+
+            // Scan real PCAP captures if mounted in active scenario
+            std::vector<std::string> pcaps;
+            const std::vector<std::string> pcap_dirs = {
+                "/opt/sentinel-nexus/pcaps",
+                "/etc/sentinel/pcaps",
+                "/var/cache/sentinel/pcaps"};
+            for (const auto &d : pcap_dirs)
+            {
+                std::filesystem::path p(d);
+                if (!std::filesystem::exists(p, ec) || ec || !std::filesystem::is_directory(p, ec) || ec)
+                    continue;
+                for (const auto &e : std::filesystem::directory_iterator(p, ec))
+                {
+                    if (ec)
+                        break;
+                    if (!e.is_regular_file(ec))
+                        continue;
+                    std::string ext = e.path().extension().string();
+                    if (ext == ".pcap" || ext == ".pcapng" || ext == ".spcap")
+                        pcaps.push_back(e.path().filename().string());
+                }
+            }
+
+            // Determine scenario name & C2 host/subnet from manifest or node YAMLs
+            std::string scenario_name;
+            std::string nexus_host;
+            std::filesystem::path man_path("/opt/sentinel-nexus/configs/manifest.json");
+            if (std::filesystem::exists(man_path, ec) && !ec)
+            {
+                std::ifstream mf(man_path);
+                std::string content((std::istreambuf_iterator<char>(mf)), std::istreambuf_iterator<char>());
+                scenario_name = extract_json_string_field(content, "name");
+                if (scenario_name.empty())
+                    scenario_name = extract_json_string_field(content, "slug");
+            }
+
+            auto reg_nodes = fleet::NodeRegistry::instance().get_all_nodes();
+            std::ostringstream nodes_ss;
+            nodes_ss << "[\n";
+
+            for (size_t i = 0; i < reg_nodes.size(); ++i)
+            {
+                const auto &rn = reg_nodes[i];
+                std::string site = rn.site_identifier;
+                std::string host = rn.identity.hostname();
+                auto yaml_path = locate_node_yaml(site, host, rn.node_id);
+
+                BlueprintNodeDetail bp;
+                std::vector<DynamicSensorItem> active_sensors;
+                std::vector<DynamicAttackItem> attacks;
+                std::string inst_title, inst_proto, inst_type;
+                bool template_resolved = false;
+
+                if (!yaml_path.empty())
+                {
+                    bp = parse_blueprint_yaml_detail(yaml_path);
+                    if (nexus_host.empty())
+                        nexus_host = parse_yaml_nexus_host(yaml_path);
+
+                    auto prof = parse_node_ui_profile(yaml_path);
+                    if (!prof.template_name.empty())
+                    {
+                        auto tmpl_path = locate_ui_template(prof.template_name);
+                        if (!tmpl_path.empty() && load_ui_template_file(tmpl_path, inst_title, inst_proto, inst_type, active_sensors, attacks))
+                        {
+                            template_resolved = true;
+                            if (!prof.override_title.empty())
+                                inst_title = prof.override_title;
+                            if (!prof.override_proto.empty())
+                                inst_proto = prof.override_proto;
+                            if (!prof.override_type.empty())
+                                inst_type = prof.override_type;
+                            for (const auto &s : prof.sensors_add)
+                                active_sensors.push_back(s);
+                            for (const auto &a : prof.attacks_add)
+                                attacks.push_back(a);
+                        }
+                    }
+                }
+
+                if (!template_resolved)
+                {
+                    if (!yaml_path.empty())
+                        active_sensors = parse_node_yaml_sensors(yaml_path);
+                    attacks = resolve_attacks_from_sensors(active_sensors);
+                }
+
+                if (scenario_name.empty() && !site.empty())
+                    scenario_name = site;
+
+                std::string active_model = !bp.routes.empty() ? bp.routes[0].model_id : "";
+
+                nodes_ss << "    {\n"
+                         << "      \"node_id\": \"" << json_escape_str(rn.node_id) << "\",\n"
+                         << "      \"identifier\": \"" << json_escape_str(bp.identifier.empty() ? host : bp.identifier) << "\",\n"
+                         << "      \"hostname\": \"" << json_escape_str(host) << "\",\n"
+                         << "      \"site\": \"" << json_escape_str(site) << "\",\n"
+                         << "      \"status\": \"" << (rn.status == fleet::NodeHealthStatus::ONLINE ? "ONLINE" : "OFFLINE") << "\",\n"
+                         << "      \"primary_backend\": \"" << json_escape_str(bp.primary_backend) << "\",\n"
+                         << "      \"active_model\": \"" << json_escape_str(active_model) << "\",\n"
+                         << "      \"ebpf_drops\": " << rn.latest_metrics.ebpf_packets_dropped() << ",\n"
+                         << "      \"primary_instrument\": {\n"
+                         << "        \"title\": \"" << json_escape_str(inst_title) << "\",\n"
+                         << "        \"protocol\": \"" << json_escape_str(inst_proto) << "\",\n"
+                         << "        \"type\": \"" << json_escape_str(inst_type) << "\"\n"
+                         << "      },\n"
+                         << "      \"routes\": [\n";
+                for (size_t ri = 0; ri < bp.routes.size(); ++ri)
+                {
+                    const auto &r = bp.routes[ri];
+                    nodes_ss << "        {\"sensor_id\": \"" << json_escape_str(r.sensor_id)
+                             << "\", \"port\": " << r.port
+                             << ", \"transport\": \"" << json_escape_str(r.transport)
+                             << "\", \"model_id\": \"" << json_escape_str(r.model_id)
+                             << "\", \"plugin_id\": \"" << json_escape_str(r.plugin_id) << "\"}"
+                             << (ri + 1 < bp.routes.size() ? ",\n" : "\n");
+                }
+                nodes_ss << "      ],\n"
+                         << "      \"sensors\": [\n";
+                for (size_t si = 0; si < active_sensors.size(); ++si)
+                {
+                    const auto &s = active_sensors[si];
+                    nodes_ss << "        {\"sensor_id\": \"" << json_escape_str(s.sensor_id)
+                             << "\", \"name\": \"" << json_escape_str(s.name)
+                             << "\", \"category\": \"" << json_escape_str(to_upper_str(s.category))
+                             << "\", \"port\": " << s.port
+                             << ", \"unit\": \"" << json_escape_str(s.unit)
+                             << "\", \"baseline\": " << s.baseline << "}"
+                             << (si + 1 < active_sensors.size() ? ",\n" : "\n");
+                }
+                nodes_ss << "      ],\n"
+                         << "      \"attacks\": [\n";
+                for (size_t ai = 0; ai < attacks.size(); ++ai)
+                {
+                    nodes_ss << "        {\"id\": \"" << json_escape_str(attacks[ai].id)
+                             << "\", \"name\": \"" << json_escape_str(attacks[ai].name) << "\"}"
+                             << (ai + 1 < attacks.size() ? ",\n" : "\n");
+                }
+                nodes_ss << "      ]\n"
+                         << "    }" << (i + 1 < reg_nodes.size() ? ",\n" : "\n");
+            }
+            nodes_ss << "  ]";
+
+            // Derive /24 subnet & gateway from nexus_host if present
+            std::string subnet = "auto-discovered";
+            std::string gateway = "";
+            if (!nexus_host.empty())
+            {
+                size_t last_dot = nexus_host.rfind('.');
+                if (last_dot != std::string::npos)
+                {
+                    std::string prefix = nexus_host.substr(0, last_dot);
+                    subnet = prefix + ".0/24";
+                    gateway = prefix + ".1";
+                }
+            }
+
+            std::ostringstream ss;
+            ss << "{\n"
+               << "  \"scenario_name\": \"" << json_escape_str(scenario_name.empty() ? "active_scenario" : scenario_name) << "\",\n"
+               << "  \"nexus_host\": \"" << json_escape_str(nexus_host) << "\",\n"
+               << "  \"subnet\": \"" << json_escape_str(subnet) << "\",\n"
+               << "  \"gateway\": \"" << json_escape_str(gateway) << "\",\n"
+               << "  \"models\": [";
+            for (size_t i = 0; i < disk_models.size(); ++i)
+                ss << "\"" << json_escape_str(disk_models[i].id) << "\"" << (i + 1 < disk_models.size() ? ", " : "");
+            ss << "],\n"
+               << "  \"pcaps\": [";
+            for (size_t i = 0; i < pcaps.size(); ++i)
+                ss << "\"" << json_escape_str(pcaps[i]) << "\"" << (i + 1 < pcaps.size() ? ", " : "");
+            ss << "],\n"
+               << "  \"nodes\": " << nodes_ss.str() << "\n"
+               << "}";
+            return ss.str();
+        }
     } // anonymous namespace
 
     // --- INSERT HANDLERS IN HttpServer.cpp ---
