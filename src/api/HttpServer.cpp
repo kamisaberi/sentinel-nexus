@@ -1886,7 +1886,12 @@ namespace sentinel::nexus::api
         if (route_path == "/api/v1/models")
         {
             content_type = "application/json";
-            return ota::ModelRepository::instance().generate_models_json();
+            return build_dynamic_models_json();
+        }
+        if (route_path == "/api/v1/vault/inventory")
+        {
+            content_type = "application/json";
+            return build_vault_inventory_json();
         }
         if (route_path.rfind("/models/", 0) == 0)
         {
