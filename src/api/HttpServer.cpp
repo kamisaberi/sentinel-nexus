@@ -560,7 +560,7 @@ namespace sentinel::nexus::api
             return true;
         }
 
-static std::filesystem::path locate_node_yaml(const std::string &site, const std::string &host, const std::string &id)
+        static std::filesystem::path locate_node_yaml(const std::string &site, const std::string &host, const std::string &id)
         {
             const std::vector<std::string> node_dirs = {
                 "/opt/sentinel-nexus/configs/nodes",
@@ -646,7 +646,6 @@ static std::filesystem::path locate_node_yaml(const std::string &site, const std
             return site_fallback;
         }
 
-        
         // Parse strictly the real sensors connected in this node's routes: section
         static std::vector<DynamicSensorItem> parse_node_yaml_sensors(const std::filesystem::path &yaml_path)
         {
@@ -877,6 +876,560 @@ static std::filesystem::path locate_node_yaml(const std::string &site, const std
                 }
             }
             return result;
+        }
+
+        static std::string json_escape_str(const std::string &in)
+        {
+            std::ostringstream out;
+            for (unsigned char c : in)
+            {
+                if (c == '"')
+                    out << "\\\"";
+                else if (c == '\\')
+                    out << "\\\\";
+                else if (c == '\n')
+                    out << "\\n";
+                else if (c == '\r')
+                    out << "\\r";
+                else if (c == '\t')
+                    out << "\\t";
+                else if (c < 0x20)
+                    continue;
+                else
+                    out << static_cast<char>(c);
+            }
+            return out.str();
+        }
+
+        static std::string format_bytes_human(uintmax_t bytes)
+        {
+            std::ostringstream ss;
+            ss << std::fixed << std::setprecision(1);
+            if (bytes >= 1024ULL * 1024ULL * 1024ULL)
+                ss << (static_cast<double>(bytes) / (1024.0 * 1024.0 * 1024.0)) << " GB";
+            else if (bytes >= 1024ULL * 1024ULL)
+                ss << (static_cast<double>(bytes) / (1024.0 * 1024.0)) << " MB";
+            else if (bytes >= 1024ULL)
+                ss << (static_cast<double>(bytes) / 1024.0) << " KB";
+            else
+                return std::to_string(bytes) + " B";
+            return ss.str();
+        }
+
+        static std::filesystem::path find_first_existing_dir(const std::vector<std::string> &candidates, bool require_non_empty = true)
+        {
+            std::error_code ec;
+            for (const auto &d : candidates)
+            {
+                std::filesystem::path p(d);
+                if (!std::filesystem::exists(p, ec) || ec || !std::filesystem::is_directory(p, ec) || ec)
+                    continue;
+                if (!require_non_empty)
+                    return p;
+                auto it = std::filesystem::directory_iterator(p, ec);
+                if (!ec && it != std::filesystem::directory_iterator())
+                    return p;
+            }
+            return {};
+        }
+
+        struct ScenarioRouteArtifact
+        {
+            std::string sensor_id;
+            std::string package_id;
+            std::string plugin_id;
+            std::string model_id;
+            std::string silicon_target;
+            std::string transport{"any"};
+            std::string precision;
+            int port{0};
+            uint64_t latency_budget_ns{0};
+            std::string source_file;
+        };
+
+        static void parse_routes_from_yaml(const std::filesystem::path &yaml_path,
+                                           std::vector<ScenarioRouteArtifact> &out_routes,
+                                           std::set<std::string> &out_active_models)
+        {
+            std::ifstream f(yaml_path);
+            if (!f.is_open())
+                return;
+
+            std::string line;
+            bool in_routes = false;
+            ScenarioRouteArtifact cur;
+            bool has_cur = false;
+
+            auto flush_cur = [&]()
+            {
+                if (has_cur && (!cur.package_id.empty() || !cur.plugin_id.empty() || !cur.model_id.empty()))
+                {
+                    cur.source_file = yaml_path.filename().string();
+                    out_routes.push_back(cur);
+                    if (!cur.model_id.empty())
+                        out_active_models.insert(cur.model_id);
+                }
+                cur = ScenarioRouteArtifact();
+                has_cur = false;
+            };
+
+            while (std::getline(f, line))
+            {
+                size_t cpos = line.find('#');
+                if (cpos != std::string::npos)
+                    line = line.substr(0, cpos);
+
+                std::string trimmed = trim_str(line);
+                if (trimmed.empty())
+                    continue;
+
+                if (trimmed.rfind("active_model_name:", 0) == 0)
+                {
+                    std::string m = trim_str(trimmed.substr(18));
+                    if (!m.empty())
+                        out_active_models.insert(m);
+                }
+
+                if (trimmed == "routes:" || trimmed == "pipeline:")
+                {
+                    in_routes = true;
+                    continue;
+                }
+                if (!in_routes)
+                    continue;
+
+                if (line.find_first_not_of(" \t") == 0 && trimmed.back() == ':')
+                {
+                    flush_cur();
+                    in_routes = false;
+                    continue;
+                }
+
+                if (trimmed.rfind("- sensor_id:", 0) == 0)
+                {
+                    flush_cur();
+                    cur.sensor_id = trim_str(trimmed.substr(12));
+                    has_cur = true;
+                }
+                else if (trimmed.rfind("package_id:", 0) == 0)
+                {
+                    cur.package_id = trim_str(trimmed.substr(11));
+                    has_cur = true;
+                }
+                else if (trimmed.rfind("plugin_id:", 0) == 0)
+                {
+                    cur.plugin_id = trim_str(trimmed.substr(10));
+                    has_cur = true;
+                }
+                else if (trimmed.rfind("model_id:", 0) == 0)
+                {
+                    cur.model_id = trim_str(trimmed.substr(9));
+                    has_cur = true;
+                }
+                else if (trimmed.rfind("silicon_target:", 0) == 0)
+                {
+                    cur.silicon_target = trim_str(trimmed.substr(15));
+                }
+                else if (trimmed.rfind("transport:", 0) == 0)
+                {
+                    cur.transport = trim_str(trimmed.substr(10));
+                }
+                else if (trimmed.rfind("precision:", 0) == 0)
+                {
+                    cur.precision = trim_str(trimmed.substr(10));
+                }
+                else if (trimmed.rfind("port:", 0) == 0)
+                {
+                    try
+                    {
+                        cur.port = std::stoi(trim_str(trimmed.substr(5)));
+                    }
+                    catch (...)
+                    {
+                    }
+                }
+                else if (trimmed.rfind("latency_budget_ns:", 0) == 0)
+                {
+                    try
+                    {
+                        cur.latency_budget_ns = std::stoull(trim_str(trimmed.substr(18)));
+                    }
+                    catch (...)
+                    {
+                    }
+                }
+            }
+            flush_cur();
+        }
+
+        static void collect_scenario_routes(std::vector<ScenarioRouteArtifact> &out_routes,
+                                            std::set<std::string> &out_active_models)
+        {
+            const std::vector<std::string> node_dirs = {
+                "/opt/sentinel-nexus/configs/nodes",
+                "configs/nodes",
+                "../configs/nodes",
+                "/etc/sentinel/configs/nodes"};
+
+            std::error_code ec;
+            auto active_node_dir = find_first_existing_dir(node_dirs, true);
+            if (!active_node_dir.empty())
+            {
+                for (const auto &entry : std::filesystem::directory_iterator(active_node_dir, ec))
+                {
+                    if (ec)
+                        break;
+                    if (entry.is_regular_file(ec) && (entry.path().extension() == ".yaml" || entry.path().extension() == ".yml"))
+                    {
+                        parse_routes_from_yaml(entry.path(), out_routes, out_active_models);
+                    }
+                }
+            }
+
+            const std::vector<std::string> route_files = {
+                "/opt/sentinel-nexus/configs/model_routes.yaml",
+                "configs/model_routes.yaml",
+                "../configs/model_routes.yaml",
+                "/etc/sentinel/model_routes.yaml"};
+            for (const auto &rf : route_files)
+            {
+                std::filesystem::path p(rf);
+                if (std::filesystem::exists(p, ec) && !ec)
+                {
+                    parse_routes_from_yaml(p, out_routes, out_active_models);
+                    break;
+                }
+            }
+        }
+
+        struct DiscoveredDiskArtifact
+        {
+            std::string id;
+            std::string type;
+            std::string format;
+            std::string target;
+            uintmax_t size_bytes{0};
+            std::string status{"STAGED"};
+            bool has_external_data{false};
+        };
+
+        static std::vector<DiscoveredDiskArtifact> scan_scenario_models_on_disk(
+            const std::vector<ScenarioRouteArtifact> &routes,
+            const std::set<std::string> &active_models)
+        {
+            std::vector<DiscoveredDiskArtifact> models;
+            const std::vector<std::string> model_dirs = {
+                "/opt/sentinel-nexus/models",
+                "models",
+                "../models",
+                "/etc/sentinel/models",
+                "/opt/sentinel/models"};
+
+            std::error_code ec;
+            auto dir = find_first_existing_dir(model_dirs, true);
+            if (dir.empty())
+                return models;
+
+            for (const auto &entry : std::filesystem::directory_iterator(dir, ec))
+            {
+                if (ec)
+                    break;
+                if (!entry.is_regular_file(ec) || entry.path().extension() != ".onnx")
+                    continue;
+
+                DiscoveredDiskArtifact item;
+                item.id = entry.path().filename().string();
+                item.type = "model";
+                item.size_bytes = entry.file_size(ec);
+                if (ec)
+                    item.size_bytes = 0;
+
+                std::filesystem::path sidecar = entry.path();
+                sidecar += ".data";
+                if (std::filesystem::exists(sidecar, ec) && !ec)
+                {
+                    item.has_external_data = true;
+                    uintmax_t side_sz = std::filesystem::file_size(sidecar, ec);
+                    if (!ec)
+                        item.size_bytes += side_sz;
+                }
+
+                std::string silicon = "ONNX Runtime";
+                std::string prec = (item.id.find("int8") != std::string::npos) ? "INT8" : "FP32";
+                std::vector<std::string> owners;
+                for (const auto &r : routes)
+                {
+                    if (r.model_id == item.id)
+                    {
+                        if (!r.silicon_target.empty())
+                            silicon = r.silicon_target;
+                        if (!r.precision.empty())
+                            prec = r.precision;
+                        if (!r.source_file.empty())
+                            owners.push_back(r.source_file);
+                    }
+                }
+
+                item.format = prec + " ONNX" + (item.has_external_data ? " (+data)" : "");
+                item.target = dir.string() + " [" + silicon + "]";
+                item.status = (active_models.count(item.id) || !owners.empty()) ? "ACTIVE" : "STAGED";
+                models.push_back(item);
+            }
+            return models;
+        }
+
+        static std::string build_dynamic_models_json()
+        {
+            std::string repo_json = ota::ModelRepository::instance().generate_models_json();
+            std::vector<ScenarioRouteArtifact> routes;
+            std::set<std::string> active_models;
+            collect_scenario_routes(routes, active_models);
+            auto disk_models = scan_scenario_models_on_disk(routes, active_models);
+
+            if (disk_models.empty())
+                return repo_json;
+
+            std::ostringstream ss;
+            ss << "[\n";
+            for (size_t i = 0; i < disk_models.size(); ++i)
+            {
+                const auto &m = disk_models[i];
+                ss << "  {\n"
+                   << "    \"model_id\": \"" << json_escape_str(m.id) << "\",\n"
+                   << "    \"filename\": \"" << json_escape_str(m.id) << "\",\n"
+                   << "    \"format\": \"" << json_escape_str(m.format) << "\",\n"
+                   << "    \"target\": \"" << json_escape_str(m.target) << "\",\n"
+                   << "    \"size_bytes\": " << m.size_bytes << ",\n"
+                   << "    \"size\": \"" << format_bytes_human(m.size_bytes) << "\",\n"
+                   << "    \"has_external_data\": " << (m.has_external_data ? "true" : "false") << ",\n"
+                   << "    \"status\": \"" << m.status << "\"\n"
+                   << "  }" << (i + 1 < disk_models.size() ? ",\n" : "\n");
+            }
+            ss << "]";
+            return ss.str();
+        }
+
+        static std::string build_dynamic_extensions_json()
+        {
+            auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
+            uint64_t total_packets = 0;
+            uint64_t total_drops = 0;
+            double latency_sum = 0.0;
+            size_t latency_cnt = 0;
+
+            for (const auto &n : nodes)
+            {
+                total_packets += n.latest_metrics.packets_inspected();
+                total_drops += n.latest_metrics.ebpf_packets_dropped();
+                if (n.latest_metrics.avg_mitigation_latency_us() > 0.0)
+                {
+                    latency_sum += n.latest_metrics.avg_mitigation_latency_us();
+                    latency_cnt++;
+                }
+            }
+
+            std::vector<ScenarioRouteArtifact> routes;
+            std::set<std::string> active_models;
+            collect_scenario_routes(routes, active_models);
+
+            struct ExtEntry
+            {
+                std::string id;
+                std::string tier;
+                std::string proto;
+                std::string latency;
+                std::string status;
+            };
+            std::vector<ExtEntry> entries;
+            std::set<std::string> seen_ids;
+
+            for (const auto &r : routes)
+            {
+                std::string proto_str = to_upper_str(r.transport);
+                if (r.port > 0)
+                    proto_str += ":" + std::to_string(r.port);
+
+                std::string lat_str = (r.latency_budget_ns > 0)
+                                          ? (std::to_string(r.latency_budget_ns) + " ns budget")
+                                          : (latency_cnt > 0 ? (std::to_string(latency_sum / static_cast<double>(latency_cnt)) + " us") : "wire-rate");
+
+                if (!r.plugin_id.empty() && !seen_ids.count(r.plugin_id))
+                {
+                    seen_ids.insert(r.plugin_id);
+                    std::string tier = (r.plugin_id.find(".lua") != std::string::npos)    ? "LuaJIT C-FFI"
+                                       : (r.plugin_id.find(".wasm") != std::string::npos) ? "Rust Wasm3"
+                                                                                          : "Native C++20";
+                    entries.push_back({r.plugin_id, tier, proto_str, lat_str, "ACTIVE"});
+                }
+                if (!r.package_id.empty() && !seen_ids.count(r.package_id))
+                {
+                    seen_ids.insert(r.package_id);
+                    entries.push_back({r.package_id, "Native C++20", proto_str, lat_str, "ACTIVE"});
+                }
+            }
+
+            // Also inspect physical runtime plugin/rule directories if present
+            const std::vector<std::pair<std::string, std::string>> ext_dirs = {
+                {"/etc/sentinel/plugins.d", "Native C++20"},
+                {"/etc/sentinel/rules.d", "LuaJIT C-FFI"},
+                {"/etc/sentinel/wasm.d", "Rust Wasm3"}};
+            std::error_code ec;
+            for (const auto &[dir_str, tier_label] : ext_dirs)
+            {
+                std::filesystem::path p(dir_str);
+                if (!std::filesystem::exists(p, ec) || ec || !std::filesystem::is_directory(p, ec) || ec)
+                    continue;
+                for (const auto &e : std::filesystem::directory_iterator(p, ec))
+                {
+                    if (ec)
+                        break;
+                    if (!e.is_regular_file(ec))
+                        continue;
+                    std::string fname = e.path().filename().string();
+                    if (!seen_ids.count(fname))
+                    {
+                        seen_ids.insert(fname);
+                        entries.push_back({fname, tier_label, "RUNTIME", "mounted", "ACTIVE"});
+                    }
+                }
+            }
+
+            std::ostringstream ss;
+            ss << "[\n";
+            size_t denom = entries.empty() ? 1 : entries.size();
+            for (size_t i = 0; i < entries.size(); ++i)
+            {
+                const auto &e = entries[i];
+                ss << "  {\n"
+                   << "    \"id\": \"" << json_escape_str(e.id) << "\",\n"
+                   << "    \"tier\": \"" << json_escape_str(e.tier) << "\",\n"
+                   << "    \"proto\": \"" << json_escape_str(e.proto) << "\",\n"
+                   << "    \"latency\": \"" << json_escape_str(e.latency) << "\",\n"
+                   << "    \"frames\": " << (total_packets / denom) << ",\n"
+                   << "    \"drops\": " << (total_drops / denom) << ",\n"
+                   << "    \"status\": \"" << e.status << "\"\n"
+                   << "  }" << (i + 1 < entries.size() ? ",\n" : "\n");
+            }
+            ss << "]";
+            return ss.str();
+        }
+
+        static std::string build_vault_inventory_json()
+        {
+            std::vector<ScenarioRouteArtifact> routes;
+            std::set<std::string> active_models;
+            collect_scenario_routes(routes, active_models);
+
+            std::vector<DiscoveredDiskArtifact> items;
+            std::set<std::string> seen;
+            auto add_unique = [&](const DiscoveredDiskArtifact &a)
+            {
+                std::string k = a.type + "::" + a.id;
+                if (seen.count(k))
+                    return;
+                seen.insert(k);
+                items.push_back(a);
+            };
+
+            // 1. Models (.onnx + .onnx.data)
+            for (const auto &m : scan_scenario_models_on_disk(routes, active_models))
+            {
+                add_unique(m);
+            }
+
+            // 2. Packages / Native Dissectors from active scenario routes
+            for (const auto &r : routes)
+            {
+                std::string proto = to_upper_str(r.transport) + (r.port > 0 ? " :" + std::to_string(r.port) : "");
+                if (!r.plugin_id.empty())
+                {
+                    add_unique({r.plugin_id, "package", "Native C++20 Dissector (" + proto + ")", "/etc/sentinel/plugins.d/", 0, "ACTIVE", false});
+                }
+                if (!r.package_id.empty())
+                {
+                    add_unique({r.package_id, "package", "SPKG Policy (" + proto + ")", r.source_file, 0, "ACTIVE", false});
+                }
+            }
+
+            // 3. Scan real filesystem directories for all 7 asset categories
+            struct ScanDirRule
+            {
+                std::string path;
+                std::string type;
+                std::string ext;
+                std::string fmt;
+                std::string status;
+            };
+            const std::vector<ScanDirRule> scan_rules = {
+                {"/etc/sentinel/plugins.d", "package", ".so", "Native C++20 Plugin", "ACTIVE"},
+                {"/etc/sentinel/rules.d", "package", ".spkg", "SPKG Reflex Package", "ACTIVE"},
+                {"/etc/sentinel/rules.d", "package", ".lua", "LuaJIT Rule", "ACTIVE"},
+                {"/etc/sentinel/wasm.d", "package", ".wasm", "Wasm3 Sandbox Module", "ACTIVE"},
+                {"/var/lib/sentinel-nexus/forge_datasets", "dataset", ".slab", "0x534C4142 Zero-Copy", "READY"},
+                {"/var/lib/sentinel-nexus/forge_datasets", "dataset", ".csv", "Tabular Telemetry", "READY"},
+                {"/var/cache/sentinel/datasets", "dataset", ".slab", "0x534C4142 Zero-Copy", "CACHED"},
+                {"/etc/sentinel/pcaps", "pcap", ".pcap", "Wire Capture", "STAGED"},
+                {"/opt/sentinel-nexus/pcaps", "pcap", ".pcap", "Scenario PCAP", "STAGED"},
+                {"/var/cache/sentinel/pcaps", "pcap", ".pcap", "Cached PCAP", "CACHED"},
+                {"/opt/sentinel-nexus/configs", "scenario", ".json", "Scenario Manifest", "ACTIVE"},
+                {"/var/cache/sentinel/scenarios", "scenario", ".tar.gz", "Scenario Archive", "CACHED"},
+                {"/opt/sentinel-nexus/configs", "blueprint", ".yaml", "Node / Route Spec", "ACTIVE"},
+                {"/etc/sentinel", "blueprint", ".blueprint", "Compiled Blueprint", "ACTIVE"},
+                {"/var/cache/sentinel", "appliance", ".aryopack", "Sovereign Bootstrap", "SEALED"}};
+
+            std::error_code ec;
+            for (const auto &rule : scan_rules)
+            {
+                std::filesystem::path dir(rule.path);
+                if (!std::filesystem::exists(dir, ec) || ec || !std::filesystem::is_directory(dir, ec) || ec)
+                    continue;
+
+                for (const auto &e : std::filesystem::recursive_directory_iterator(
+                         dir, std::filesystem::directory_options::skip_permission_denied, ec))
+                {
+                    if (ec)
+                        break;
+                    if (!e.is_regular_file(ec))
+                        continue;
+
+                    std::string fname = e.path().filename().string();
+                    if (fname.size() < rule.ext.size() ||
+                        fname.compare(fname.size() - rule.ext.size(), rule.ext.size(), rule.ext) != 0)
+                        continue;
+
+                    uintmax_t sz = e.file_size(ec);
+                    if (ec)
+                        sz = 0;
+
+                    add_unique({fname, rule.type, rule.fmt, e.path().parent_path().string(), sz, rule.status, false});
+                }
+            }
+
+            // 4. Web micro-frontend plugin manifest if mounted
+            std::filesystem::path plugin_manifest("/opt/sentinel-nexus/web/plugins/manifest.json");
+            if (std::filesystem::exists(plugin_manifest, ec) && !ec)
+            {
+                uintmax_t sz = std::filesystem::file_size(plugin_manifest, ec);
+                add_unique({"web/plugins/manifest.json", "package", "Micro-Frontend UI Plugin", "/opt/sentinel-nexus/web/plugins/", ec ? 0 : sz, "ACTIVE", false});
+            }
+
+            std::ostringstream ss;
+            ss << "[\n";
+            for (size_t i = 0; i < items.size(); ++i)
+            {
+                const auto &a = items[i];
+                ss << "  {\n"
+                   << "    \"id\": \"" << json_escape_str(a.id) << "\",\n"
+                   << "    \"type\": \"" << json_escape_str(a.type) << "\",\n"
+                   << "    \"format\": \"" << json_escape_str(a.format) << "\",\n"
+                   << "    \"target\": \"" << json_escape_str(a.target) << "\",\n"
+                   << "    \"size_bytes\": " << a.size_bytes << ",\n"
+                   << "    \"size\": \"" << (a.size_bytes > 0 ? format_bytes_human(a.size_bytes) : "Config Ref") << "\",\n"
+                   << "    \"status\": \"" << json_escape_str(a.status) << "\"\n"
+                   << "  }" << (i + 1 < items.size() ? ",\n" : "\n");
+            }
+            ss << "]";
+            return ss.str();
         }
 
     } // anonymous namespace
