@@ -558,13 +558,13 @@ document.addEventListener("DOMContentLoaded", () => {
                 <div style="color:#F8FAFC; font-weight:700; margin-bottom:6px; font-size:10px;">ACTIVE IN-KERNEL DEFENSE GUARDS (${attacks.length}):</div>
                 <div style="display:flex; flex-direction:column; gap:4px; max-height:100px; overflow-y:auto;">
                     ${attacks.length > 0
-                        ? attacks.map(a => `
+                ? attacks.map(a => `
                             <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); padding:3px 6px; border-radius:2px;">
                                 <span style="color:#CBD5E1; font-size:9.5px;">🛡️ ${escapeHtml(a.name || a.id)}</span>
                                 <span style="color:#00FFA3; font-size:8.5px; font-weight:700;">ACTIVE</span>
                             </div>
                         `).join("")
-                        : `<div style="color:#64748B; font-size:9.5px;">Standard protocol invariant filters active on ${escapeHtml(proto)}.</div>`}
+                : `<div style="color:#64748B; font-size:9.5px;">Standard protocol invariant filters active on ${escapeHtml(proto)}.</div>`}
                 </div>
             </div>
 
