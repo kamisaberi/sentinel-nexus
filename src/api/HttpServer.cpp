@@ -33,7 +33,6 @@
 #include <mutex>
 #include <sys/wait.h>
 
-
 namespace sentinel::nexus::api
 {
 
@@ -769,94 +768,418 @@ namespace sentinel::nexus::api
             return tokens;
         }
 
-        // Load attack taxonomy strictly from external JSON data file on disk
-        static void load_external_attack_matrix(
-            std::unordered_map<std::string, DynamicAttackItem> &out_attack_defs,
-            std::unordered_map<std::string, std::vector<std::string>> &out_category_map)
+        // ---------------------------------------------------------------------
+        // ZERO-DEPENDENCY RECURSIVE-DESCENT JSON PARSER (C++20)
+        // ---------------------------------------------------------------------
+        struct MiniJson
         {
+            enum class Kind
+            {
+                Null,
+                Bool,
+                Number,
+                String,
+                Array,
+                Object
+            };
+            Kind kind{Kind::Null};
+            bool bool_val{false};
+            double num_val{0.0};
+            std::string str_val;
+            std::vector<MiniJson> arr_val;
+            std::unordered_map<std::string, MiniJson> obj_val;
 
-            const std::vector<std::string> search_paths = {
+            bool is_obj() const { return kind == Kind::Object; }
+            bool is_arr() const { return kind == Kind::Array; }
+            bool is_str() const { return kind == Kind::String; }
+            bool is_num() const { return kind == Kind::Number; }
+
+            const MiniJson *get(const std::string &k) const
+            {
+                if (kind != Kind::Object)
+                    return nullptr;
+                auto it = obj_val.find(k);
+                return (it != obj_val.end()) ? &it->second : nullptr;
+            }
+            std::string str(const std::string &k, const std::string &def = "") const
+            {
+                const auto *v = get(k);
+                return (v && v->is_str()) ? v->str_val : def;
+            }
+            double num(const std::string &k, double def = 0.0) const
+            {
+                const auto *v = get(k);
+                return (v && v->is_num()) ? v->num_val : def;
+            }
+
+            static void skip_ws(const std::string &s, size_t &i)
+            {
+                while (i < s.size() && std::isspace(static_cast<unsigned char>(s[i])))
+                    ++i;
+            }
+
+            static std::string parse_string(const std::string &s, size_t &i)
+            {
+                std::string out;
+                if (i >= s.size() || s[i] != '"')
+                    return out;
+                ++i;
+                while (i < s.size())
+                {
+                    char c = s[i++];
+                    if (c == '"')
+                        break;
+                    if (c == '\\' && i < s.size())
+                    {
+                        char esc = s[i++];
+                        if (esc == 'n')
+                            out += '\n';
+                        else if (esc == 'r')
+                            out += '\r';
+                        else if (esc == 't')
+                            out += '\t';
+                        else
+                            out += esc;
+                    }
+                    else
+                    {
+                        out += c;
+                    }
+                }
+                return out;
+            }
+
+            static MiniJson parse_value(const std::string &s, size_t &i)
+            {
+                skip_ws(s, i);
+                MiniJson v;
+                if (i >= s.size())
+                    return v;
+                char c = s[i];
+                if (c == '"')
+                {
+                    v.kind = Kind::String;
+                    v.str_val = parse_string(s, i);
+                }
+                else if (c == '{')
+                {
+                    v.kind = Kind::Object;
+                    ++i;
+                    skip_ws(s, i);
+                    if (i < s.size() && s[i] == '}')
+                    {
+                        ++i;
+                        return v;
+                    }
+                    while (i < s.size())
+                    {
+                        skip_ws(s, i);
+                        std::string key = parse_string(s, i);
+                        skip_ws(s, i);
+                        if (i < s.size() && s[i] == ':')
+                            ++i;
+                        v.obj_val[key] = parse_value(s, i);
+                        skip_ws(s, i);
+                        if (i < s.size() && s[i] == ',')
+                        {
+                            ++i;
+                            continue;
+                        }
+                        if (i < s.size() && s[i] == '}')
+                        {
+                            ++i;
+                            break;
+                        }
+                        break;
+                    }
+                }
+                else if (c == '[')
+                {
+                    v.kind = Kind::Array;
+                    ++i;
+                    skip_ws(s, i);
+                    if (i < s.size() && s[i] == ']')
+                    {
+                        ++i;
+                        return v;
+                    }
+                    while (i < s.size())
+                    {
+                        v.arr_val.push_back(parse_value(s, i));
+                        skip_ws(s, i);
+                        if (i < s.size() && s[i] == ',')
+                        {
+                            ++i;
+                            continue;
+                        }
+                        if (i < s.size() && s[i] == ']')
+                        {
+                            ++i;
+                            break;
+                        }
+                        break;
+                    }
+                }
+                else if (s.compare(i, 4, "true") == 0)
+                {
+                    v.kind = Kind::Bool;
+                    v.bool_val = true;
+                    i += 4;
+                }
+                else if (s.compare(i, 5, "false") == 0)
+                {
+                    v.kind = Kind::Bool;
+                    v.bool_val = false;
+                    i += 5;
+                }
+                else if (s.compare(i, 4, "null") == 0)
+                {
+                    v.kind = Kind::Null;
+                    i += 4;
+                }
+                else
+                {
+                    size_t start = i;
+                    while (i < s.size() && (std::isdigit(static_cast<unsigned char>(s[i])) ||
+                                            s[i] == '-' || s[i] == '+' || s[i] == '.' || s[i] == 'e' || s[i] == 'E'))
+                        ++i;
+                    if (i > start)
+                    {
+                        v.kind = Kind::Number;
+                        try
+                        {
+                            v.num_val = std::stod(s.substr(start, i - start));
+                        }
+                        catch (...)
+                        {
+                        }
+                    }
+                }
+                return v;
+            }
+
+            static MiniJson parse(const std::string &text)
+            {
+                size_t i = 0;
+                return parse_value(text, i);
+            }
+        };
+
+        // ---------------------------------------------------------------------
+        // THREAD-SAFE LAB CATALOG & PLUGIN LOADER (sensor_attack_matrix + plugins)
+        // ---------------------------------------------------------------------
+        struct LabAttackDef
+        {
+            std::string slug;
+            std::string id;
+            std::string name;
+            std::string signal_profile{"impulse_shock"};
+            std::string fault_action{"step_increase"};
+            double fault_value{25.0};
+        };
+
+        struct LabChartConfig
+        {
+            std::string primary_title{"Physical Invariant"};
+            std::string secondary_title{"Secondary Metric"};
+            std::string unit{"units"};
+            double min_val{0.0};
+            double max_val{100.0};
+            double safe_low{0.0};
+            double safe_high{80.0};
+        };
+
+        struct LabCategoryDef
+        {
+            std::string slug;
+            std::string plot_archetype{"discrete_divergence"};
+            std::string lab_module{"fuzzer"};
+            std::string physics_engine{"generic_ode"};
+            LabChartConfig chart;
+            std::vector<std::string> attacks;
+            bool is_plugin{false};
+        };
+
+        struct ActiveLabFault
+        {
+            std::string attack_slug;
+            std::string signal_profile;
+            double fault_value{25.0};
+            uint64_t started_ms{0};
+        };
+
+        static std::mutex g_lab_mutex;
+        static std::unordered_map<std::string, LabAttackDef> g_lab_attacks;
+        static std::unordered_map<std::string, LabCategoryDef> g_lab_categories;
+        static std::vector<std::string> g_lab_category_order;
+        static std::unordered_map<std::string, ActiveLabFault> g_active_lab_faults; // Key: "node_id:category"
+        static std::unordered_map<std::string, std::string> g_node_active_category;
+
+        static bool is_valid_safe_token(const std::string &s)
+        {
+            if (s.empty() || s.size() > 64)
+                return false;
+            for (unsigned char c : s)
+            {
+                if (!std::isalnum(c) && c != '_' && c != '-')
+                    return false;
+            }
+            return true;
+        }
+
+        static void merge_lab_json_file(const std::filesystem::path &fpath, bool from_plugin)
+        {
+            std::ifstream f(fpath);
+            if (!f.is_open())
+                return;
+            std::string raw((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+            MiniJson root = MiniJson::parse(raw);
+            if (!root.is_obj())
+                return;
+
+            const MiniJson *atks = root.get("attacks");
+            if (atks && atks->is_obj())
+            {
+                for (const auto &[slug, obj] : atks->obj_val)
+                {
+                    if (!obj.is_obj())
+                        continue;
+                    LabAttackDef def;
+                    def.slug = slug;
+                    def.id = obj.str("id", to_upper_str(slug));
+                    def.name = obj.str("name", slug);
+                    def.signal_profile = obj.str("signal_profile", "impulse_shock");
+                    const MiniJson *mf = obj.get("multiplexer_fault");
+                    if (mf && mf->is_obj())
+                    {
+                        def.fault_action = mf->str("action", "step_increase");
+                        def.fault_value = mf->num("value", 25.0);
+                    }
+                    g_lab_attacks[slug] = def;
+                }
+            }
+
+            const MiniJson *cats = root.get("categories");
+            if (cats && cats->is_obj())
+            {
+                for (const auto &[raw_cat, val] : cats->obj_val)
+                {
+                    std::string cat = to_lower_str(raw_cat);
+                    LabCategoryDef cdef;
+                    auto existing = g_lab_categories.find(cat);
+                    if (existing != g_lab_categories.end())
+                        cdef = existing->second;
+                    else
+                        g_lab_category_order.push_back(cat);
+
+                    cdef.slug = cat;
+                    cdef.is_plugin = cdef.is_plugin || from_plugin;
+
+                    if (val.is_arr())
+                    {
+                        cdef.attacks.clear();
+                        for (const auto &it : val.arr_val)
+                            if (it.is_str())
+                                cdef.attacks.push_back(it.str_val);
+                    }
+                    else if (val.is_obj())
+                    {
+                        std::string arch = val.str("plot_archetype");
+                        if (!arch.empty())
+                            cdef.plot_archetype = arch;
+                        std::string mod = val.str("lab_module");
+                        if (!mod.empty())
+                            cdef.lab_module = mod;
+                        std::string eng = val.str("physics_engine");
+                        if (!eng.empty())
+                            cdef.physics_engine = eng;
+
+                        const MiniJson *cc = val.get("chart_config");
+                        if (cc && cc->is_obj())
+                        {
+                            cdef.chart.primary_title = cc->str("primary_title", cdef.chart.primary_title);
+                            cdef.chart.secondary_title = cc->str("secondary_title", cdef.chart.secondary_title);
+                            cdef.chart.unit = cc->str("unit", cdef.chart.unit);
+                            cdef.chart.min_val = cc->num("min_val", cdef.chart.min_val);
+                            cdef.chart.max_val = cc->num("max_val", cdef.chart.max_val);
+                            cdef.chart.safe_low = cc->num("safe_low", cdef.chart.safe_low);
+                            cdef.chart.safe_high = cc->num("safe_high", cdef.chart.safe_high);
+                        }
+
+                        const MiniJson *c_atks = val.get("attacks");
+                        if (c_atks && c_atks->is_arr())
+                        {
+                            cdef.attacks.clear();
+                            for (const auto &it : c_atks->arr_val)
+                                if (it.is_str())
+                                    cdef.attacks.push_back(it.str_val);
+                        }
+                    }
+                    g_lab_categories[cat] = cdef;
+                }
+            }
+        }
+
+        static void ensure_lab_catalog_loaded_locked()
+        {
+            g_lab_attacks.clear();
+            g_lab_categories.clear();
+            g_lab_category_order.clear();
+
+            const std::vector<std::string> matrix_paths = {
                 "/opt/sentinel-nexus/configs/sensor_attack_matrix.json",
                 "configs/sensor_attack_matrix.json",
                 "../configs/sensor_attack_matrix.json",
                 "/home/kami/sentinel-matrix/configs/sensor_attack_matrix.json",
                 "/home/kami/sentinel-nexus/configs/sensor_attack_matrix.json"};
 
-            std::ifstream file;
-            std::string resolved_path;
-            for (const auto &p : search_paths)
+            std::error_code ec;
+            for (const auto &p : matrix_paths)
             {
-                if (std::filesystem::exists(p))
+                if (std::filesystem::exists(p, ec) && !ec)
                 {
-                    file.open(p);
-                    if (file.is_open())
-                    {
-                        resolved_path = p;
+                    merge_lab_json_file(p, false);
+                    break;
+                }
+            }
+
+            const std::vector<std::string> plugin_dirs = {
+                "/opt/sentinel-nexus/configs/lab_plugins",
+                "configs/lab_plugins",
+                "../configs/lab_plugins",
+                "/home/kami/sentinel-matrix/configs/lab_plugins"};
+
+            for (const auto &d : plugin_dirs)
+            {
+                if (!std::filesystem::exists(d, ec) || ec || !std::filesystem::is_directory(d, ec) || ec)
+                    continue;
+                for (const auto &e : std::filesystem::directory_iterator(d, ec))
+                {
+                    if (ec)
                         break;
-                    }
+                    if (e.is_regular_file(ec) && e.path().extension() == ".json")
+                        merge_lab_json_file(e.path(), true);
                 }
             }
-
-            if (!file.is_open())
-            {
-                NEXUS_LOG_WARN("[AttackMatrix] sensor_attack_matrix.json not found in search paths!");
-                return;
-            }
-
-            std::string line;
-            std::string current_section;
-
-            while (std::getline(file, line))
-            {
-                auto tokens = extract_json_quoted_tokens(line);
-                if (tokens.empty())
-                    continue;
-
-                if (tokens[0] == "attacks")
-                {
-                    current_section = "attacks";
-                    continue;
-                }
-                else if (tokens[0] == "categories")
-                {
-                    current_section = "categories";
-                    continue;
-                }
-
-                if (current_section == "attacks")
-                {
-                    // Expected line: "slug": { "id": "ID_VAL", "name": "NAME_VAL" }
-                    // tokens: [0] = slug, [1] = "id", [2] = ID_VAL, [3] = "name", [4] = NAME_VAL
-                    if (tokens.size() >= 5 && tokens[1] == "id" && tokens[3] == "name")
-                    {
-                        out_attack_defs[tokens[0]] = DynamicAttackItem{
-                            .id = tokens[2],
-                            .name = tokens[4]};
-                    }
-                }
-                else if (current_section == "categories")
-                {
-                    // Expected line: "category": ["slug1", "slug2", ...]
-                    // tokens: [0] = category, [1..N] = attack slugs
-                    if (tokens.size() >= 2)
-                    {
-                        std::string cat_name = to_lower_str(tokens[0]);
-                        for (size_t i = 1; i < tokens.size(); ++i)
-                        {
-                            out_category_map[cat_name].push_back(tokens[i]);
-                        }
-                    }
-                }
-            }
-
-            NEXUS_LOG_INFO("[AttackMatrix] Loaded " + std::to_string(out_attack_defs.size()) +
-                           " attack definitions across " + std::to_string(out_category_map.size()) +
-                           " categories from " + resolved_path);
         }
 
-        // Dynamically resolve attacks for this node strictly from its active sensor categories
+        static void load_external_attack_matrix(
+            std::unordered_map<std::string, DynamicAttackItem> &out_attack_defs,
+            std::unordered_map<std::string, std::vector<std::string>> &out_category_map)
+        {
+            std::lock_guard<std::mutex> lock(g_lab_mutex);
+            ensure_lab_catalog_loaded_locked();
 
-        // Dynamically resolve attacks for this node strictly from its active sensor categories (UNCAPPED)
+            for (const auto &[slug, def] : g_lab_attacks)
+            {
+                out_attack_defs[slug] = DynamicAttackItem{def.id, def.name};
+            }
+            for (const auto &[cat, cdef] : g_lab_categories)
+            {
+                out_category_map[cat] = cdef.attacks;
+            }
+        }
+
         static std::vector<DynamicAttackItem> resolve_attacks_from_sensors(const std::vector<DynamicSensorItem> &sensors)
         {
             std::unordered_map<std::string, DynamicAttackItem> attack_defs;
@@ -879,13 +1202,9 @@ namespace sentinel::nexus::api
                             seen.insert(slug);
                             auto def_it = attack_defs.find(slug);
                             if (def_it != attack_defs.end())
-                            {
                                 result.push_back(def_it->second);
-                            }
                             else
-                            {
-                                result.push_back(DynamicAttackItem{.id = to_upper_str(slug), .name = slug});
-                            }
+                                result.push_back(DynamicAttackItem{to_upper_str(slug), slug});
                         }
                     }
                 }
