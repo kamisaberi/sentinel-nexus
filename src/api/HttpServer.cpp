@@ -4075,352 +4075,177 @@ namespace sentinel::nexus::api
         return false;
     }
 
-    std::string HttpServer::handle_get_lab_telemetry()
+
+        std::string HttpServer::handle_get_lab_telemetry()
     {
-        auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
-        const fleet::RegisteredNode *found = nullptr;
-
-        // Bind to the selected enclave if set, otherwise fallback to first available
-        if (!g_lab_selected_node_id.empty())
-        {
-            for (const auto &n : nodes)
-            {
-                if (n.node_id == g_lab_selected_node_id || n.site_identifier == g_lab_selected_node_id ||
-                    n.identity.hostname() == g_lab_selected_node_id)
-                {
-                    found = &n;
-                    break;
-                }
-            }
-        }
-        if (!found && !nodes.empty())
-        {
-            found = &nodes[0];
-        }
-
-        std::string site = found ? found->site_identifier : "PowerGrid-North-01";
-        std::string host = found ? found->identity.hostname() : "substation-01.matrix.internal";
-        std::string node_id = found ? found->node_id : "NODE-f551515a914dddbc";
-        std::string context = to_lower_str(site + " " + host + " " + node_id);
-
-        bool node_is_disturbed = is_node_disturbed(found);
-
-        uint64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-                              std::chrono::system_clock::now().time_since_epoch())
-                              .count();
-
-        // 1. DYNAMIC PHYSICAL INVARIANTS & HARDWARE PROFILES
-        std::string domain = "grid";
-        std::string invar_name = "Grid Frequency & Synchrophasor Barrier";
-        std::string var_name = "Frequency f(t)";
-        std::string unit = "Hz";
-        double baseline = 50.00;
-        double limit = 50.20;
-        double min_plot = 49.50;
-        double max_plot = 50.50;
-        double current_val = 50.00;
-        double dx_dt = 0.0;
-        double cbf_h = 0.20;
-        double lyapunov_lambda = -0.150;
-        double t_crit_ms = 38.4;
-
-        double base_sla_us = 0.840; // Intel OpenVINO baseline
-        double base_ipc = 2.42;
-        double base_llc_miss = 1.24;
-        double base_gumbel_sigma = 0.125;
-        double base_total_eps = 1250000.0;
-
-        if (context.find("refinery") != std::string::npos || context.find("reactor") != std::string::npos || context.find("plc-03") != std::string::npos)
-        {
-            domain = "reactor";
-            invar_name = "Exothermic Vessel Pressure Barrier";
-            var_name = "Vessel Pressure P(t)";
-            unit = "PSI";
-            baseline = 100.2;
-            limit = 150.0;
-            min_plot = 80.0;
-            max_plot = 170.0;
-            current_val = baseline + (node_is_disturbed ? 55.4 : (std::sin(now_ms / 2000.0) * 1.5));
-            dx_dt = node_is_disturbed ? 6.8 : (std::cos(now_ms / 2000.0) * 0.75);
-            cbf_h = limit - current_val;
-            lyapunov_lambda = (cbf_h < 0.0) ? 0.095 : -0.140;
-            t_crit_ms = (cbf_h < 0.0) ? 0.0 : std::max(0.0, 42.0 * (cbf_h / 50.0));
-
-            // Rockchip RKNN ARM NPU Profile
-            base_sla_us = 1.120;
-            base_ipc = 1.78;
-            base_llc_miss = 2.35;
-            base_gumbel_sigma = 0.165;
-            base_total_eps = 850000.0;
-        }
-        else if (context.find("hospital") != std::string::npos || context.find("pacs") != std::string::npos || context.find("vision") != std::string::npos)
-        {
-            domain = "vision";
-            invar_name = "Infrared Optical Thermal Barrier";
-            var_name = "Core Temperature T(t)";
-            unit = "°C";
-            baseline = 74.5;
-            limit = 115.0;
-            min_plot = 60.0;
-            max_plot = 130.0;
-            current_val = baseline + (node_is_disturbed ? 44.0 : (std::sin(now_ms / 1800.0) * 0.8));
-            dx_dt = node_is_disturbed ? 5.2 : (std::cos(now_ms / 1800.0) * 0.44);
-            cbf_h = limit - current_val;
-            lyapunov_lambda = (cbf_h < 0.0) ? 0.078 : -0.160;
-            t_crit_ms = (cbf_h < 0.0) ? 0.0 : std::max(0.0, 35.0 * (cbf_h / 40.5));
-
-            // NVIDIA TensorRT GPU Profile
-            base_sla_us = 0.620;
-            base_ipc = 3.15;
-            base_llc_miss = 0.88;
-            base_gumbel_sigma = 0.095;
-            base_total_eps = 2400000.0;
-        }
-        else
-        {
-            // Substation Grid (Intel OpenVINO)
-            current_val = baseline + (node_is_disturbed ? -0.32 : (std::sin(now_ms / 1500.0) * 0.025));
-            dx_dt = node_is_disturbed ? -0.08 : (std::cos(now_ms / 1500.0) * 0.016); // RoCoF [Hz/s]
-            cbf_h = 0.20 - std::abs(current_val - 50.00);
-            lyapunov_lambda = (cbf_h < 0.0) ? 0.082 : -0.150;
-            t_crit_ms = (cbf_h < 0.0) ? 0.0 : std::max(0.0, 38.4 * (cbf_h / 0.20));
-        }
-
-        // 2. TIMING & HARDWARE PMU INVARIANTS
-        double live_sla_us = base_sla_us;
-        double live_ipc = base_ipc;
-        double live_llc_miss = base_llc_miss;
-        double live_sigma = base_gumbel_sigma;
-        int bus_lock_stalls = 0;
-
-        if (node_is_disturbed)
-        {
-            live_sla_us += 0.380;
-            live_sigma += 0.085;
-            live_ipc = std::max(0.85, base_ipc - 0.68);
-            live_llc_miss += 4.35;
-            bus_lock_stalls = 14;
-        }
-        else
-        {
-            live_sla_us += (std::sin(now_ms / 1000.0) * 0.015);
-        }
-
-        double p99_999_us = live_sla_us + (live_sigma * 7.8);
-        double p99_us = live_sla_us + (live_sigma * 4.6);
-
-        // 3. MULTI-QUEUE AF_XDP RSS QUEUES (8 Hardware Queues)
-        double total_eps = node_is_disturbed ? 41840000.0 : base_total_eps;
-        double q_base = total_eps / 8.0;
-        std::vector<double> rss_queues(8);
-        for (int i = 0; i < 8; ++i)
-        {
-            double jitter = std::sin((now_ms / 800.0) + (i * 0.8)) * (q_base * 0.04);
-            rss_queues[i] = std::max(0.0, q_base + jitter);
-        }
-
-        // 4. SENSOR FUSION ODE RESIDUAL & CHI-SQUARE DETECTOR
-        double predicted_val = baseline + (std::sin(now_ms / 1500.0) * 0.02);
-        if (domain == "reactor")
-            predicted_val = baseline + (std::sin(now_ms / 2000.0) * 1.2);
-        else if (domain == "vision")
-            predicted_val = baseline + (std::sin(now_ms / 1800.0) * 0.6);
-
-        double residual_r = std::abs(current_val - predicted_val);
-        double chi2_threshold = (domain == "grid") ? 0.08 : ((domain == "reactor") ? 8.5 : 5.0);
-        bool chi2_alarm = (residual_r > chi2_threshold);
-
-        std::ostringstream ss;
-        ss << std::fixed << std::setprecision(3);
-        ss << "{\n"
-           << "  \"timestamp_ms\": " << now_ms << ",\n"
-           << "  \"active_enclave\": {\n"
-           << "    \"node_id\": \"" << node_id << "\",\n"
-           << "    \"domain\": \"" << domain << "\",\n"
-           << "    \"site\": \"" << site << "\",\n"
-           << "    \"hostname\": \"" << host << "\",\n"
-           << "    \"invariant_name\": \"" << invar_name << "\",\n"
-           << "    \"variable_name\": \"" << var_name << "\",\n"
-           << "    \"unit\": \"" << unit << "\",\n"
-           << "    \"baseline\": " << baseline << ",\n"
-           << "    \"limit\": " << limit << ",\n"
-           << "    \"min_plot\": " << min_plot << ",\n"
-           << "    \"max_plot\": " << max_plot << "\n"
-           << "  },\n"
-           << "  \"physical_state\": {\n"
-           << "    \"current_val\": " << current_val << ",\n"
-           << "    \"dx_dt\": " << dx_dt << ",\n"
-           << "    \"cbf_barrier_h\": " << cbf_h << ",\n"
-           << "    \"lyapunov_lambda\": " << lyapunov_lambda << ",\n"
-           << "    \"t_crit_ms\": " << t_crit_ms << ",\n"
-           << "    \"is_safe\": " << (cbf_h >= 0.0 ? "true" : "false") << "\n"
-           << "  },\n"
-           << "  \"evt_wcet\": {\n"
-           << "    \"p99_999_us\": " << p99_999_us << ",\n"
-           << "    \"p99_us\": " << p99_us << ",\n"
-           << "    \"sla_limit_us\": " << live_sla_us << ",\n"
-           << "    \"gumbel_mu\": " << live_sla_us << ",\n"
-           << "    \"gumbel_sigma\": " << live_sigma << "\n"
-           << "  },\n"
-           << "  \"pmu_metrics\": {\n"
-           << "    \"ipc\": " << live_ipc << ",\n"
-           << "    \"llc_miss_pct\": " << live_llc_miss << ",\n"
-           << "    \"bus_lock_stalls\": " << bus_lock_stalls << "\n"
-           << "  },\n"
-           << "  \"rss_multi_queue\": {\n"
-           << "    \"total_eps\": " << total_eps << ",\n"
-           << "    \"queues\": ["
-           << rss_queues[0] << "," << rss_queues[1] << "," << rss_queues[2] << "," << rss_queues[3] << ","
-           << rss_queues[4] << "," << rss_queues[5] << "," << rss_queues[6] << "," << rss_queues[7] << "]\n"
-           << "  },\n"
-           << "  \"sensor_fusion\": {\n"
-           << "    \"measured\": " << current_val << ",\n"
-           << "    \"predicted\": " << predicted_val << ",\n"
-           << "    \"residual_r\": " << residual_r << ",\n"
-           << "    \"chi2_threshold\": " << chi2_threshold << ",\n"
-           << "    \"chi2_alarm\": " << (chi2_alarm ? "true" : "false") << "\n"
-           << "  }\n"
-           << "}";
-        return ss.str();
+        return build_lab_telemetry_json("", "");
     }
 
     std::string HttpServer::handle_post_lab_inject(const std::string &body)
     {
-        std::string action = "cbf";
-        size_t act_pos = body.find("\"action\"");
-        if (act_pos != std::string::npos)
+        MiniJson req = MiniJson::parse(body);
+        std::string action = req.str("action", "inject");
+        std::string node_id = req.str("node_id");
+        std::string category = to_lower_str(req.str("category"));
+        std::string attack_slug = req.str("attack");
+        std::string sensor_id = req.str("sensor_id");
+
+        if (node_id.empty())
         {
-            size_t colon = body.find(':', act_pos);
-            size_t start = body.find('"', colon + 1);
-            size_t end = body.find('"', start + 1);
-            if (start != std::string::npos && end != std::string::npos)
-                action = body.substr(start + 1, end - start - 1);
+            auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
+            if (!nodes.empty())
+                node_id = nodes[0].node_id;
         }
 
-        std::string target_node_id = g_lab_selected_node_id;
-        size_t node_pos = body.find("\"node_id\"");
-        if (node_pos != std::string::npos)
-        {
-            size_t colon = body.find(':', node_pos);
-            size_t start = body.find('"', colon + 1);
-            size_t end = body.find('"', start + 1);
-            if (start != std::string::npos && end != std::string::npos)
-                target_node_id = body.substr(start + 1, end - start - 1);
-        }
-
-        if (target_node_id.empty() && !g_lab_selected_node_id.empty())
-        {
-            target_node_id = g_lab_selected_node_id;
-        }
-
-        NEXUS_LOG_INFO("[LabCockpit] Dispatched scientific test injection: " + action + " (target: " + target_node_id + ")");
-
-        // 1. Enclave Selection Action
         if (action == "select_enclave")
         {
-            g_lab_selected_node_id = target_node_id;
-            return "{\"status\": \"selected\", \"node_id\": \"" + g_lab_selected_node_id + "\"}";
+            std::lock_guard<std::mutex> lock(g_lab_mutex);
+            g_lab_selected_node_id = node_id;
+            return "{\"status\": \"selected\", \"node_id\": \"" + json_escape_str(node_id) + "\"}";
         }
 
-        // 2. Strict Per-Node Physical & Latency Perturbation Hooks
-        if (action == "spike" || action == "heater_spike" || action == "blast" || action == "fuzzer")
-        {
-            if (!target_node_id.empty())
-            {
-                g_disturbed_nodes.insert(target_node_id);
-            }
-            std::ofstream lf("/tmp/sentinel_lab_live.log", std::ios::app);
-            lf << "\n==================================================================\n"
-               << "[!] INJECTED: " << action << " perturbation active on " << target_node_id << "\n"
-               << "[*] Memory bus contention active: LLC miss rate spiking, EVT tail expanding!\n"
-               << "==================================================================\n";
-            return "{\"status\": \"dispatched\", \"action\": \"" + action + "\", \"node_id\": \"" + target_node_id + "\"}";
-        }
-        else if (action == "safe" || action == "heater_normal")
-        {
-            if (!target_node_id.empty())
-            {
-                for (auto it = g_disturbed_nodes.begin(); it != g_disturbed_nodes.end();)
-                {
-                    if (*it == target_node_id || it->find(target_node_id) != std::string::npos || target_node_id.find(*it) != std::string::npos)
-                    {
-                        it = g_disturbed_nodes.erase(it);
-                    }
-                    else
-                    {
-                        ++it;
-                    }
-                }
-            }
-            std::ofstream lf("/tmp/sentinel_lab_live.log", std::ios::app);
-            lf << "\n==================================================================\n"
-               << "[+] RESTORED: Physical plant and driver SLA normalized on " << target_node_id << "\n"
-               << "[*] Gumbel tail WCET restored to nominal real-time bounds.\n"
-               << "==================================================================\n";
-            return "{\"status\": \"dispatched\", \"action\": \"safe\", \"node_id\": \"" + target_node_id + "\"}";
-        }
-
-        // 3. Reset Action (Clears all disturbed nodes fleet-wide)
         if (action == "reset")
         {
-            g_disturbed_nodes.clear();
+            std::lock_guard<std::mutex> lock(g_lab_mutex);
+            g_active_lab_faults.clear();
             std::ofstream cr("/tmp/sentinel_lab_live.log", std::ios::trunc);
-            cr << "[*] Flight recorder cleared. All edge enclaves stabilized to nominal baseline.\n";
+            cr << "[*] Flight recorder cleared. All node/category invariants stabilized.\n";
             return "{\"status\": \"dispatched\", \"action\": \"reset\"}";
         }
 
-        // 4. Logging for Scientific Benchmark Experiments
-        std::ofstream lf("/tmp/sentinel_lab_live.log", std::ios::app);
-        lf << "\n==================================================================\n";
-
-        if (action == "cbf")
+        if (action == "safe" || action == "heater_normal")
         {
-            lf << "  EXPERIMENT 01: FORMAL CONTROL BARRIER FUNCTION (CBF) VERIFIER   \n"
-               << "  Target Node Enclave         : " << target_node_id << "\n"
-               << "==================================================================\n"
-               << "[+] Theorem 1 Verification  : Forward Invariance of Safe Set C\n"
-               << "[+] Nagumo Condition Check  : Infimum dh/dt + alpha(h) >= 0\n"
-               << "[+] Verification Status     : [VERIFIED SAFE] Zero Boundary Breaches\n";
-        }
-        else if (action == "hil")
-        {
-            lf << "  EXPERIMENT 02: CLOSED-LOOP PHYSICAL HIL CO-SIMULATION (RK4 ODE) \n"
-               << "  Target Node Enclave         : " << target_node_id << "\n"
-               << "==================================================================\n"
-               << "[+] Numerical Integration   : Runge-Kutta 4th Order (dt = 100 ms)\n"
-               << "[+] Lyapunov Exponent       : lambda = -0.150 (Dissipative Attractor)\n"
-               << "[+] Physical Safety Status  : NOMINAL ASYMPTOTIC STABILITY\n";
-        }
-        else if (action == "evasion")
-        {
-            lf << "  EXPERIMENT 05: GRAMMAR-CONSTRAINED ADVERSARIAL MUTATOR          \n"
-               << "  Target Node Enclave         : " << target_node_id << "\n"
-               << "==================================================================\n"
-               << "[*] Testing L_inf bounded feature space perturbation (eps = 0.05)\n"
-               << "[+] Classification Recall   : 100.0% (Zero Detection Degradation)\n";
-        }
-        else if (action == "5g_slice_hop")
-        {
-            lf << "  EXPERIMENT 06: 3GPP 5G GTP-U SLICE ISOLATION DRILL              \n"
-               << "  Target Node Enclave         : " << target_node_id << "\n"
-               << "==================================================================\n"
-               << "[*] Injecting rogue eMBB TEID packet toward protected URLLC slice\n"
-               << "[+] In-Kernel Detection     : XDP_DROP enforced in < 0.84 µs (PASS)\n";
-        }
-        else if (action == "trism_jailbreak")
-        {
-            lf << "  EXPERIMENT 07: AI TRiSM ADVERSARIAL PROMPT INJECTION BENCHMARK  \n"
-               << "  Target Node Enclave         : " << target_node_id << "\n"
-               << "==================================================================\n"
-               << "[*] Injecting token-level jailbreak payload into inference route\n"
-               << "[+] Token Stream Sentry     : BLOCKED in 120 ns via Aho-Corasick\n";
+            std::lock_guard<std::mutex> lock(g_lab_mutex);
+            if (!category.empty())
+            {
+                g_active_lab_faults.erase(node_id + ":" + category);
+            }
+            else
+            {
+                for (auto it = g_active_lab_faults.begin(); it != g_active_lab_faults.end();)
+                {
+                    if (it->first.rfind(node_id + ":", 0) == 0)
+                        it = g_active_lab_faults.erase(it);
+                    else
+                        ++it;
+                }
+            }
+            std::ofstream lf("/tmp/sentinel_lab_live.log", std::ios::app);
+            lf << "[+] STABILIZED [" << node_id << " / " << (category.empty() ? "all" : category) << "] -> Nominal bounds restored.\n";
+            return "{\"status\": \"dispatched\", \"action\": \"safe\", \"node_id\": \"" + json_escape_str(node_id) + "\"}";
         }
 
-        lf << "==================================================================\n";
-        lf.close();
+        // Validate category & attack against loaded catalog (Zero Shell Injection)
+        LabCategoryDef cat_def;
+        LabAttackDef atk_def;
+        bool valid_cat = false;
+        bool valid_atk = false;
 
-        return "{\"status\": \"dispatched\", \"action\": \"" + action + "\", \"node_id\": \"" + target_node_id + "\"}";
+        {
+            std::lock_guard<std::mutex> lock(g_lab_mutex);
+            ensure_lab_catalog_loaded_locked();
+
+            if (!category.empty() && g_lab_categories.count(category))
+            {
+                cat_def = g_lab_categories[category];
+                valid_cat = true;
+                g_node_active_category[node_id] = category;
+            }
+            if (!attack_slug.empty() && g_lab_attacks.count(attack_slug))
+            {
+                atk_def = g_lab_attacks[attack_slug];
+                valid_atk = true;
+            }
+            else if (valid_cat && !cat_def.attacks.empty() && g_lab_attacks.count(cat_def.attacks[0]))
+            {
+                atk_def = g_lab_attacks[cat_def.attacks[0]];
+                attack_slug = atk_def.slug;
+                valid_atk = true;
+            }
+
+            if (valid_cat && valid_atk)
+            {
+                uint64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                      std::chrono::system_clock::now().time_since_epoch())
+                                      .count();
+                g_active_lab_faults[node_id + ":" + category] = ActiveLabFault{
+                    attack_slug, atk_def.signal_profile, atk_def.fault_value, now_ms};
+            }
+        }
+
+        if (!category.empty() && !is_valid_safe_token(category))
+            return "{\"status\": \"error\", \"message\": \"Invalid category token\"}";
+        if (!attack_slug.empty() && !is_valid_safe_token(attack_slug))
+            return "{\"status\": \"error\", \"message\": \"Invalid attack token\"}";
+
+        std::string lab_mod = valid_cat ? cat_def.lab_module : "fuzzer";
+        if (!is_valid_safe_token(lab_mod))
+            lab_mod = "fuzzer";
+
+        // Safe double-fork execvp() invocation of `aryo lab <lab_module> --attack <attack>`
+        std::error_code ec;
+        bool aryo_exists = std::filesystem::exists("/usr/local/bin/aryo", ec);
+        if (aryo_exists)
+        {
+            pid_t pid = fork();
+            if (pid == 0)
+            {
+                pid_t grandchild = fork();
+                if (grandchild == 0)
+                {
+                    int fd = open("/tmp/sentinel_lab_live.log", O_WRONLY | O_CREAT | O_APPEND, 0644);
+                    if (fd >= 0)
+                    {
+                        dup2(fd, STDOUT_FILENO);
+                        dup2(fd, STDERR_FILENO);
+                        close(fd);
+                    }
+                    std::string atk_arg = valid_atk ? atk_def.slug : action;
+                    char *const args[] = {
+                        const_cast<char *>("/usr/local/bin/aryo"),
+                        const_cast<char *>("lab"),
+                        const_cast<char *>(lab_mod.c_str()),
+                        const_cast<char *>("--attack"),
+                        const_cast<char *>(atk_arg.c_str()),
+                        nullptr};
+                    execvp("/usr/local/bin/aryo", args);
+                    _exit(127);
+                }
+                _exit(0);
+            }
+            else if (pid > 0)
+            {
+                int st = 0;
+                waitpid(pid, &st, 0);
+            }
+        }
+        else
+        {
+            std::ofstream lf("/tmp/sentinel_lab_live.log", std::ios::app);
+            lf << "\n==================================================================\n"
+               << "[!] LAB HARNESS DISPATCHED: aryo lab " << lab_mod
+               << " --attack " << (valid_atk ? atk_def.slug : action) << "\n"
+               << "    Node: " << node_id << " | Category: " << (valid_cat ? cat_def.slug : category)
+               << " | Signal Profile: " << (valid_atk ? atk_def.signal_profile : "impulse_shock") << "\n"
+               << "==================================================================\n";
+        }
+
+        // Optional async forward to sensor_multiplexer (:8088) when sensor_id & multiplexer_fault are present
+        if (!sensor_id.empty() && valid_atk)
+        {
+            std::ostringstream fbody;
+            fbody << "{\"sensor_id\":\"" << json_escape_str(sensor_id) << "\","
+                  << "\"action\":\"" << json_escape_str(atk_def.fault_action) << "\","
+                  << "\"value\":" << atk_def.fault_value << "}";
+            handle_post_sensor_fault(fbody.str());
+        }
+
+        return "{\"status\": \"dispatched\", \"action\": \"" + json_escape_str(valid_atk ? atk_def.slug : action) +
+               "\", \"node_id\": \"" + json_escape_str(node_id) +
+               "\", \"category\": \"" + json_escape_str(valid_cat ? cat_def.slug : category) + "\"}";
     }
+
+
 
     std::string HttpServer::handle_get_lab_logs()
     {
