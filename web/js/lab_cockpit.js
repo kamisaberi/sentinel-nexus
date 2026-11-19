@@ -721,7 +721,7 @@
 
             // Update Tab 2 (Node Health) Charts in background
             updateHardwareMetrics(data, isSafe);
-        } catch (_) {}
+        } catch (_) { }
     }
 
     function updateHardwareMetrics(data, isSafe) {
@@ -840,13 +840,13 @@
                 const statusEl = document.getElementById('lab-log-status');
                 if (statusEl) statusEl.textContent = `UPDATED ${new Date().toLocaleTimeString()}`;
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 
     function resizeAllCharts() {
         [plot1Chart, plot2Chart, evtChart, pmuChart, rssChart, fusionChart].forEach(c => {
             if (c && !c.isDisposed()) {
-                try { c.resize(); } catch (_) {}
+                try { c.resize(); } catch (_) { }
             }
         });
     }
