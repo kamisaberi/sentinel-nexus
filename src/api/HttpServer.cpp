@@ -3230,6 +3230,8 @@ namespace sentinel::nexus::api
             content_type = "application/json";
             return build_lab_categories_json(extract_query_param(path, "node_id"));
         }
+
+
         if (route_path == "/api/v1/lab/telemetry")
         {
             content_type = "application/json";
