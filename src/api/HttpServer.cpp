@@ -2629,9 +2629,218 @@ namespace sentinel::nexus::api
 
 
 
+        static std::string build_lab_telemetry_json(const std::string &req_node_id, const std::string &req_cat)
+        {
+            auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
+            const fleet::RegisteredNode *found = nullptr;
+            std::string target_nid = req_node_id;
+
+            for (const auto &n : nodes)
+            {
+                if (!target_nid.empty() &&
+                    (n.node_id == target_nid || n.site_identifier == target_nid || n.identity.hostname() == target_nid))
+                {
+                    found = &n;
+                    break;
+                }
+            }
+            if (!found && !nodes.empty())
+                found = &nodes[0];
+
+            std::string node_id = found ? found->node_id : (target_nid.empty() ? "local-sentry" : target_nid);
+            std::string site = found ? found->site_identifier : "Sovereign-Enclave";
+            std::string host = found ? found->identity.hostname() : "edge-node.local";
+            std::vector<std::string> node_cats = resolve_node_sensor_categories(node_id);
+
+            LabCategoryDef cat_def;
+            ActiveLabFault active_fault;
+            bool has_fault = false;
+
+            {
+                std::lock_guard<std::mutex> lock(g_lab_mutex);
+                ensure_lab_catalog_loaded_locked();
+
+                std::string chosen_cat = to_lower_str(req_cat);
+                if (chosen_cat.empty() && g_node_active_category.count(node_id))
+                    chosen_cat = g_node_active_category[node_id];
+                if (chosen_cat.empty() && !node_cats.empty())
+                    chosen_cat = node_cats[0];
+                if (chosen_cat.empty() && !g_lab_category_order.empty())
+                    chosen_cat = g_lab_category_order[0];
+                if (!chosen_cat.empty())
+                    g_node_active_category[node_id] = chosen_cat;
+
+                if (g_lab_categories.count(chosen_cat))
+                    cat_def = g_lab_categories[chosen_cat];
+                else
+                    cat_def.slug = chosen_cat.empty() ? "network" : chosen_cat;
+
+                std::string fkey = node_id + ":" + cat_def.slug;
+                auto fit = g_active_lab_faults.find(fkey);
+                if (fit != g_active_lab_faults.end())
+                {
+                    active_fault = fit->second;
+                    has_fault = true;
+                }
+            }
+
+            uint64_t now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                  std::chrono::system_clock::now().time_since_epoch())
+                                  .count();
+            double t_sec = static_cast<double>(now_ms % 1000000ULL) / 1000.0;
+
+            double lo = cat_def.chart.safe_low;
+            double hi = cat_def.chart.safe_high;
+            double mid = (lo + hi) * 0.5;
+            double span = std::max(0.1, (hi - lo) * 0.25);
+
+            double ground_truth = mid + std::sin(t_sec * 1.6) * (span * 0.45);
+            double primary_val = ground_truth + std::sin(t_sec * 4.2) * (span * 0.08);
+            double derivative_val = std::cos(t_sec * 1.6) * (span * 0.45);
+
+            std::vector<std::pair<std::string, double>> secondary_series;
+
+            if (has_fault)
+            {
+                double elapsed_s = static_cast<double>(now_ms - active_fault.started_ms) / 1000.0;
+                const std::string &prof = active_fault.signal_profile;
+
+                if (prof == "harmonic_sideband")
+                {
+                    primary_val = hi * 1.12 + std::sin(t_sec * 9.0) * (span * 0.65);
+                    derivative_val = std::cos(t_sec * 9.0) * span * 2.4;
+                    secondary_series = {{"1x", 1.4}, {"2x", 4.85}, {"3x", 4.10}, {"5x", 2.35}};
+                }
+                else if (prof == "impulse_shock")
+                {
+                    double env = std::exp(-std::fmod(elapsed_s, 3.0) * 1.4);
+                    double spike = (cat_def.chart.max_val - mid) * 0.92 * env;
+                    primary_val = mid + spike * std::cos(t_sec * 14.0);
+                    derivative_val = spike * 3.8 * std::sin(t_sec * 14.0);
+                }
+                else if (prof == "flatline_freeze")
+                {
+                    // Visually freeze primary_val while ground_truth continues moving
+                    primary_val = mid - span * 0.2;
+                    derivative_val = 0.0;
+                }
+                else if (prof == "coherence_decay")
+                {
+                    double decay = std::exp(-std::min(elapsed_s, 10.0) * 0.45);
+                    primary_val = cat_def.chart.min_val + (mid - cat_def.chart.min_val) * decay;
+                    derivative_val = -span * decay;
+                }
+                else if (prof == "caustic_ramp")
+                {
+                    double drift = std::min(1.0, elapsed_s * 0.25);
+                    primary_val = hi + (cat_def.chart.max_val - hi) * 0.65 * drift;
+                    derivative_val = span * 1.4;
+                }
+                else // discrete_event
+                {
+                    primary_val = hi * 1.15 + std::abs(std::sin(t_sec * 7.0)) * span;
+                    derivative_val = span * 1.8;
+                    secondary_series = {{"SYN", 18.0}, {"CRC", 42.0}, {"SEQ", 64.0}, {"SPI", 31.0}};
+                }
+            }
+            else
+            {
+                if (cat_def.plot_archetype == "spectral_harmonic")
+                    secondary_series = {{"1x", 1.15}, {"2x", 0.38}, {"3x", 0.22}, {"5x", 0.09}};
+                else if (cat_def.plot_archetype == "discrete_divergence" || cat_def.plot_archetype == "coherence_snr")
+                    secondary_series = {{"SYN", 2.0}, {"CRC", 1.0}, {"SEQ", 1.0}, {"SPI", 0.0}};
+            }
+
+            double cbf_h = std::min(primary_val - lo, hi - primary_val);
+            bool is_safe = (cbf_h >= 0.0) && !(has_fault && active_fault.signal_profile == "flatline_freeze");
+            double lyapunov = is_safe ? -0.150 : 0.145;
+            double t_crit = is_safe ? std::max(0.0, 38.4 * std::min(1.0, cbf_h / std::max(0.1, (hi - lo) * 0.5))) : 0.0;
+
+            double live_sla_us = found ? static_cast<double>(found->latest_metrics.avg_mitigation_latency_us()) : 0.84;
+            if (live_sla_us <= 0.0) live_sla_us = 0.84;
+            double live_sigma = has_fault ? 0.210 : 0.125;
+            double p99_999_us = live_sla_us + (live_sigma * 7.8);
+            double live_ipc = has_fault ? 1.74 : 2.42;
+            double live_llc = has_fault ? 5.59 : 1.24;
+            double total_eps = has_fault ? 41840000.0 : 1250000.0;
+            double residual_r = std::abs(primary_val - ground_truth);
+            double chi2_thresh = std::max(0.08, span * 0.6);
+
+            std::ostringstream ss;
+            ss << std::fixed << std::setprecision(3);
+            ss << "{\n"
+               << "  \"timestamp_ms\": " << now_ms << ",\n"
+               << "  \"active_enclave\": {\n"
+               << "    \"node_id\": \"" << json_escape_str(node_id) << "\",\n"
+               << "    \"site\": \"" << json_escape_str(site) << "\",\n"
+               << "    \"hostname\": \"" << json_escape_str(host) << "\"\n"
+               << "  },\n"
+               << "  \"visualization\": {\n"
+               << "    \"category\": \"" << json_escape_str(cat_def.slug) << "\",\n"
+               << "    \"plot_archetype\": \"" << json_escape_str(cat_def.plot_archetype) << "\",\n"
+               << "    \"lab_module\": \"" << json_escape_str(cat_def.lab_module) << "\",\n"
+               << "    \"active_attack\": \"" << json_escape_str(has_fault ? active_fault.attack_slug : "none") << "\",\n"
+               << "    \"signal_profile\": \"" << json_escape_str(has_fault ? active_fault.signal_profile : "nominal") << "\",\n"
+               << "    \"primary_title\": \"" << json_escape_str(cat_def.chart.primary_title) << "\",\n"
+               << "    \"secondary_title\": \"" << json_escape_str(cat_def.chart.secondary_title) << "\",\n"
+               << "    \"unit\": \"" << json_escape_str(cat_def.chart.unit) << "\",\n"
+               << "    \"min_plot\": " << cat_def.chart.min_val << ",\n"
+               << "    \"max_plot\": " << cat_def.chart.max_val << ",\n"
+               << "    \"safe_low\": " << lo << ",\n"
+               << "    \"safe_high\": " << hi << ",\n"
+               << "    \"primary_val\": " << primary_val << ",\n"
+               << "    \"ground_truth_val\": " << ground_truth << ",\n"
+               << "    \"derivative_val\": " << derivative_val << ",\n"
+               << "    \"secondary_series\": [";
+            for (size_t i = 0; i < secondary_series.size(); ++i)
+            {
+                ss << "{\"label\": \"" << json_escape_str(secondary_series[i].first)
+                   << "\", \"value\": " << secondary_series[i].second << "}"
+                   << (i + 1 < secondary_series.size() ? ", " : "");
+            }
+            ss << "]\n"
+               << "  },\n"
+               << "  \"physical_state\": {\n"
+               << "    \"current_val\": " << primary_val << ",\n"
+               << "    \"dx_dt\": " << derivative_val << ",\n"
+               << "    \"cbf_barrier_h\": " << cbf_h << ",\n"
+               << "    \"lyapunov_lambda\": " << lyapunov << ",\n"
+               << "    \"t_crit_ms\": " << t_crit << ",\n"
+               << "    \"is_safe\": " << (is_safe ? "true" : "false") << "\n"
+               << "  },\n"
+               << "  \"evt_wcet\": {\n"
+               << "    \"p99_999_us\": " << p99_999_us << ",\n"
+               << "    \"sla_limit_us\": " << live_sla_us << ",\n"
+               << "    \"gumbel_mu\": " << live_sla_us << ",\n"
+               << "    \"gumbel_sigma\": " << live_sigma << "\n"
+               << "  },\n"
+               << "  \"pmu_metrics\": {\n"
+               << "    \"ipc\": " << live_ipc << ",\n"
+               << "    \"llc_miss_pct\": " << live_llc << ",\n"
+               << "    \"bus_lock_stalls\": " << (has_fault ? 14 : 0) << "\n"
+               << "  },\n"
+               << "  \"rss_multi_queue\": {\n"
+               << "    \"total_eps\": " << total_eps << ",\n"
+               << "    \"queues\": [";
+            for (int q = 0; q < 8; ++q)
+            {
+                double qv = (total_eps / 8.0) * (1.0 + 0.04 * std::sin(t_sec * 2.0 + q));
+                ss << qv << (q < 7 ? ", " : "");
+            }
+            ss << "]\n  },\n"
+               << "  \"sensor_fusion\": {\n"
+               << "    \"measured\": " << primary_val << ",\n"
+               << "    \"predicted\": " << ground_truth << ",\n"
+               << "    \"residual_r\": " << residual_r << ",\n"
+               << "    \"chi2_threshold\": " << chi2_thresh << ",\n"
+               << "    \"chi2_alarm\": " << ((residual_r > chi2_thresh || !is_safe) ? "true" : "false") << "\n"
+               << "  }\n"
+               << "}";
+            return ss.str();
+        }
 
 
-        
+
 
 
 
