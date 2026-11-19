@@ -2627,8 +2627,6 @@ namespace sentinel::nexus::api
             return ss.str();
         }
 
-
-
         static std::string build_lab_telemetry_json(const std::string &req_node_id, const std::string &req_cat)
         {
             auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
@@ -2757,7 +2755,8 @@ namespace sentinel::nexus::api
             double t_crit = is_safe ? std::max(0.0, 38.4 * std::min(1.0, cbf_h / std::max(0.1, (hi - lo) * 0.5))) : 0.0;
 
             double live_sla_us = found ? static_cast<double>(found->latest_metrics.avg_mitigation_latency_us()) : 0.84;
-            if (live_sla_us <= 0.0) live_sla_us = 0.84;
+            if (live_sla_us <= 0.0)
+                live_sla_us = 0.84;
             double live_sigma = has_fault ? 0.210 : 0.125;
             double p99_999_us = live_sla_us + (live_sigma * 7.8);
             double live_ipc = has_fault ? 1.74 : 2.42;
@@ -2838,14 +2837,6 @@ namespace sentinel::nexus::api
                << "}";
             return ss.str();
         }
-
-
-
-
-
-
-
-
 
     } // anonymous namespace
 
