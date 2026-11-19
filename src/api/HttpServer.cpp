@@ -3014,11 +3014,24 @@ namespace sentinel::nexus::api
         // ---------------------------------------------------------------------
         // SENTINEL-LAB SCIENTIFIC RESEARCH COCKPIT ENDPOINTS
         // ---------------------------------------------------------------------
+        if (route_path == "/api/v1/lab/categories")
+        {
+            content_type = "application/json";
+            return build_lab_categories_json(extract_query_param(path, "node_id"));
+        }
         if (route_path == "/api/v1/lab/telemetry")
         {
             content_type = "application/json";
+            std::string q_node = extract_query_param(path, "node_id");
+            std::string q_cat = extract_query_param(path, "category");
+            {
+                std::lock_guard<std::mutex> lock(g_lab_mutex);
+                if (!q_node.empty() && !q_cat.empty())
+                    g_node_active_category[q_node] = to_lower_str(q_cat);
+            }
             return handle_get_lab_telemetry();
         }
+
         if (route_path == "/api/v1/lab/inject" && method == "POST")
         {
             content_type = "application/json";
