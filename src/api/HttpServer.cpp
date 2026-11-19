@@ -2502,8 +2502,7 @@ namespace sentinel::nexus::api
             return ss.str();
         }
 
-
-                static std::string extract_query_param(const std::string &full_path, const std::string &key)
+        static std::string extract_query_param(const std::string &full_path, const std::string &key)
         {
             size_t qm = full_path.find('?');
             if (qm == std::string::npos)
@@ -2627,10 +2626,6 @@ namespace sentinel::nexus::api
             ss << "  }\n}";
             return ss.str();
         }
-
-
-
-
 
     } // anonymous namespace
 
