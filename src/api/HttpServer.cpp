@@ -2501,6 +2501,137 @@ namespace sentinel::nexus::api
                << "}";
             return ss.str();
         }
+
+
+                static std::string extract_query_param(const std::string &full_path, const std::string &key)
+        {
+            size_t qm = full_path.find('?');
+            if (qm == std::string::npos)
+                return "";
+            std::string qs = full_path.substr(qm + 1);
+            std::istringstream iss(qs);
+            std::string pair;
+            while (std::getline(iss, pair, '&'))
+            {
+                size_t eq = pair.find('=');
+                if (eq != std::string::npos && pair.substr(0, eq) == key)
+                    return pair.substr(eq + 1);
+            }
+            return "";
+        }
+
+        static std::vector<std::string> resolve_node_sensor_categories(const std::string &node_id)
+        {
+            std::vector<std::string> cats;
+            auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
+            const fleet::RegisteredNode *found = nullptr;
+            for (const auto &n : nodes)
+            {
+                if (n.node_id == node_id || n.identity.hostname() == node_id || n.site_identifier == node_id)
+                {
+                    found = &n;
+                    break;
+                }
+            }
+            if (!found && !nodes.empty())
+                found = &nodes[0];
+            if (!found)
+                return cats;
+
+            auto yaml_path = locate_node_yaml(found->site_identifier, found->identity.hostname(), found->node_id);
+            if (yaml_path.empty())
+                return cats;
+
+            std::vector<DynamicSensorItem> active_sensors;
+            std::vector<DynamicAttackItem> attacks;
+            std::string inst_t, inst_p, inst_ty;
+            auto prof = parse_node_ui_profile(yaml_path);
+            if (!prof.template_name.empty())
+            {
+                auto tmpl = locate_ui_template(prof.template_name);
+                if (!tmpl.empty())
+                    load_ui_template_file(tmpl, inst_t, inst_p, inst_ty, active_sensors, attacks);
+                for (const auto &s : prof.sensors_add)
+                    active_sensors.push_back(s);
+            }
+            if (active_sensors.empty())
+                active_sensors = parse_node_yaml_sensors(yaml_path);
+
+            std::set<std::string> seen;
+            for (const auto &s : active_sensors)
+            {
+                std::string c = to_lower_str(s.category);
+                if (!c.empty() && !seen.count(c))
+                {
+                    seen.insert(c);
+                    cats.push_back(c);
+                }
+            }
+            return cats;
+        }
+
+        static std::string build_lab_categories_json(const std::string &node_id)
+        {
+            std::vector<std::string> node_cats = resolve_node_sensor_categories(node_id);
+
+            std::lock_guard<std::mutex> lock(g_lab_mutex);
+            ensure_lab_catalog_loaded_locked();
+
+            // If a lab plugin added aerospace_ccsds and node has avionics/rf_em/kinematic, prioritize plugin categories too
+            if (g_lab_categories.count("aerospace_ccsds") &&
+                (std::find(node_cats.begin(), node_cats.end(), "avionics") != node_cats.end() ||
+                 std::find(node_cats.begin(), node_cats.end(), "rf_em") != node_cats.end()))
+            {
+                if (std::find(node_cats.begin(), node_cats.end(), "aerospace_ccsds") == node_cats.end())
+                    node_cats.insert(node_cats.begin(), "aerospace_ccsds");
+            }
+
+            std::ostringstream ss;
+            ss << "{\n  \"node_categories\": [";
+            for (size_t i = 0; i < node_cats.size(); ++i)
+                ss << "\"" << json_escape_str(node_cats[i]) << "\"" << (i + 1 < node_cats.size() ? ", " : "");
+            ss << "],\n  \"categories\": {\n";
+
+            for (size_t i = 0; i < g_lab_category_order.size(); ++i)
+            {
+                const auto &c = g_lab_categories[g_lab_category_order[i]];
+                ss << "    \"" << json_escape_str(c.slug) << "\": {\n"
+                   << "      \"plot_archetype\": \"" << json_escape_str(c.plot_archetype) << "\",\n"
+                   << "      \"lab_module\": \"" << json_escape_str(c.lab_module) << "\",\n"
+                   << "      \"physics_engine\": \"" << json_escape_str(c.physics_engine) << "\",\n"
+                   << "      \"is_plugin\": " << (c.is_plugin ? "true" : "false") << ",\n"
+                   << "      \"chart_config\": {\n"
+                   << "        \"primary_title\": \"" << json_escape_str(c.chart.primary_title) << "\",\n"
+                   << "        \"secondary_title\": \"" << json_escape_str(c.chart.secondary_title) << "\",\n"
+                   << "        \"unit\": \"" << json_escape_str(c.chart.unit) << "\",\n"
+                   << "        \"min_val\": " << c.chart.min_val << ",\n"
+                   << "        \"max_val\": " << c.chart.max_val << ",\n"
+                   << "        \"safe_low\": " << c.chart.safe_low << ",\n"
+                   << "        \"safe_high\": " << c.chart.safe_high << "\n"
+                   << "      },\n"
+                   << "      \"attacks\": [\n";
+                for (size_t ai = 0; ai < c.attacks.size(); ++ai)
+                {
+                    const std::string &slug = c.attacks[ai];
+                    auto ait = g_lab_attacks.find(slug);
+                    std::string id = (ait != g_lab_attacks.end()) ? ait->second.id : to_upper_str(slug);
+                    std::string name = (ait != g_lab_attacks.end()) ? ait->second.name : slug;
+                    std::string prof = (ait != g_lab_attacks.end()) ? ait->second.signal_profile : "impulse_shock";
+                    ss << "        {\"slug\": \"" << json_escape_str(slug) << "\", \"id\": \"" << json_escape_str(id)
+                       << "\", \"name\": \"" << json_escape_str(name) << "\", \"signal_profile\": \"" << json_escape_str(prof) << "\"}"
+                       << (ai + 1 < c.attacks.size() ? ",\n" : "\n");
+                }
+                ss << "      ]\n"
+                   << "    }" << (i + 1 < g_lab_category_order.size() ? ",\n" : "\n");
+            }
+            ss << "  }\n}";
+            return ss.str();
+        }
+
+
+
+
+
     } // anonymous namespace
 
     // --- INSERT HANDLERS IN HttpServer.cpp ---
