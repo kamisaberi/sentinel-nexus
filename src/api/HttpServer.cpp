@@ -28,6 +28,10 @@
 
 #include <openssl/evp.h>
 
+#include <cctype>
+#include <cmath>
+#include <mutex>
+#include <sys/wait.h>
 
 
 namespace sentinel::nexus::api
