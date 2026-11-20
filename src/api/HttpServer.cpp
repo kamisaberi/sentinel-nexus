@@ -3673,11 +3673,13 @@ namespace sentinel::nexus::api
             content_type = "application/json";
             return reporting::CmmcAuditEngine::instance().generate_cmmc_assessment_json();
         }
+
         if (route_path == "/api/v1/reports/scada")
         {
             content_type = "application/json";
-            return reporting::ScadaAuditEngine::instance().generate_iec62443_assessment_json();
+            return build_dynamic_scada_json();
         }
+
         if (route_path == "/api/v1/extensions/status")
         {
             content_type = "application/json";
