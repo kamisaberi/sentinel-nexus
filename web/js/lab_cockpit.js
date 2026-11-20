@@ -272,13 +272,13 @@
             apparatusStatTimer = null;
         }
         if (labApparatusSpec && labApparatusHandle && typeof labApparatusSpec.unmount === 'function') {
-            try { labApparatusSpec.unmount(labApparatusHandle); } catch (_) {}
+            try { labApparatusSpec.unmount(labApparatusHandle); } catch (_) { }
         }
         labApparatusSpec = null;
         labApparatusHandle = null;
     }
 
-function mountLabApparatusView() {
+    function mountLabApparatusView() {
         unmountLabApparatus();
         const host = document.getElementById('lab-app-canvas-host');
         const pills = document.getElementById('lab-app-pills');
@@ -295,7 +295,7 @@ function mountLabApparatusView() {
         if (matching.length === 0 && window.SentinelUI && typeof window.SentinelUI.getApparatusById === "function") {
             const pType = (activeNodeDetail.primary_instrument?.type || "grid").toLowerCase();
             const fallbackId = pType === "video" ? "industrial_radiometric_vision"
-                             : (pType === "reactor" ? "industrial_exothermic_reactor" : "industrial_synchrophasor_scope");
+                : (pType === "reactor" ? "industrial_exothermic_reactor" : "industrial_synchrophasor_scope");
             const fbApp = window.SentinelUI.getApparatusById(fallbackId);
             if (fbApp) matching = [fbApp];
         }
@@ -341,7 +341,7 @@ function mountLabApparatusView() {
                 if (pcaps.length > 0) {
                     pcapSel.innerHTML = pcaps.map(p => `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
                 }
-            }).catch(() => {});
+            }).catch(() => { });
         }
 
         const pcapCfg = typeof chosen.getPcapConfig === 'function' ? chosen.getPcapConfig() : null;
@@ -413,14 +413,14 @@ function mountLabApparatusView() {
                         modeBadge.style.color = active ? '#FF3366' : '#00FFA3';
                         modeBadge.style.borderColor = active ? '#FF3366' : '#00FFA3';
                     }
-                } catch (_) {}
+                } catch (_) { }
             };
             pollStats();
             apparatusStatTimer = setInterval(pollStats, 500);
         }
     }
 
-    
+
     async function fireApparatusPcapAttack(apiBase, pcap, attackType, mode, durationSec) {
         const fb = document.getElementById('lab-pcap-feedback');
         if (fb) fb.textContent = `[*] Injecting ${pcap || attackType} (${mode.toUpperCase()}, ${durationSec}s) -> ${apiBase}...`;
@@ -891,7 +891,7 @@ function mountLabApparatusView() {
             if (activeMainWorkspaceTab === 'tab_hardware') {
                 updateHardwareMetrics(data, isSafe);
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 
     function updateHardwareMetrics(data, isSafe) {
@@ -973,7 +973,7 @@ function mountLabApparatusView() {
             });
             const data = await res.json();
             if (statusBadge) statusBadge.textContent = `ACTIVE: ${(data.action || action).toUpperCase()}`;
-        } catch (_) {}
+        } catch (_) { }
         await tickTelemetryOnce();
         setTimeout(pollLabLogs, 250);
     }
@@ -990,12 +990,12 @@ function mountLabApparatusView() {
                 const statusEl = document.getElementById('lab-log-status');
                 if (statusEl) statusEl.textContent = `UPDATED ${new Date().toLocaleTimeString()}`;
             }
-        } catch (_) {}
+        } catch (_) { }
     }
 
     function resizeAllCharts() {
         [plot1Chart, plot2Chart, evtChart, pmuChart, rssChart, fusionChart].forEach(c => {
-            if (c && !c.isDisposed()) { try { c.resize(); } catch (_) {} }
+            if (c && !c.isDisposed()) { try { c.resize(); } catch (_) { } }
         });
     }
 
