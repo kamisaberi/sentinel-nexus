@@ -2838,7 +2838,6 @@ namespace sentinel::nexus::api
             return ss.str();
         }
 
-
         static std::set<std::string> collect_active_protocols(const std::vector<ScenarioRouteArtifact> &routes)
         {
             std::set<std::string> protos;
@@ -2985,46 +2984,36 @@ namespace sentinel::nexus::api
             };
             std::vector<Nis2Finding> findings;
 
-            findings.push_back({
-                "NIS2-Art.21(2)(a)",
-                "Risk Analysis & Active Asset Inventory",
-                art21_a,
-                std::to_string(online_nodes) + "/" + std::to_string(nodes.size()) + " registered sentries ONLINE across " +
-                    std::to_string(sites.size()) + " enclave site(s) with " + std::to_string(routes.size()) + " active route policy(ies)."
-            });
+            findings.push_back({"NIS2-Art.21(2)(a)",
+                                "Risk Analysis & Active Asset Inventory",
+                                art21_a,
+                                std::to_string(online_nodes) + "/" + std::to_string(nodes.size()) + " registered sentries ONLINE across " +
+                                    std::to_string(sites.size()) + " enclave site(s) with " + std::to_string(routes.size()) + " active route policy(ies)."});
 
             std::ostringstream lat_ss;
             lat_ss << std::fixed << std::setprecision(2) << peak_lat;
-            findings.push_back({
-                "NIS2-Art.21(2)(b)",
-                "Real-Time Incident Handling & Sub-ms Mitigation",
-                art21_b,
-                "Peak mitigation latency " + lat_ss.str() + " us (SLA <= 1000.00 us); " +
-                    std::to_string(total_drops) + " hostile frames dropped across " + std::to_string(total_inspected) + " inspected packets."
-            });
+            findings.push_back({"NIS2-Art.21(2)(b)",
+                                "Real-Time Incident Handling & Sub-ms Mitigation",
+                                art21_b,
+                                "Peak mitigation latency " + lat_ss.str() + " us (SLA <= 1000.00 us); " +
+                                    std::to_string(total_drops) + " hostile frames dropped across " + std::to_string(total_inspected) + " inspected packets."});
 
-            findings.push_back({
-                "NIS2-Art.21(2)(d)",
-                "Supply-Chain & AI/Plugin Artifact Integrity",
-                art21_d,
-                std::to_string(disk_models.size()) + " ONNX model(s) on disk (" + std::to_string(active_models.size()) +
-                    " active in node routes) with OpenSSL SHA-256 verification enabled."
-            });
+            findings.push_back({"NIS2-Art.21(2)(d)",
+                                "Supply-Chain & AI/Plugin Artifact Integrity",
+                                art21_d,
+                                std::to_string(disk_models.size()) + " ONNX model(s) on disk (" + std::to_string(active_models.size()) +
+                                    " active in node routes) with OpenSSL SHA-256 verification enabled."});
 
-            findings.push_back({
-                "NIS2-Art.21(2)(h)",
-                "Hardware Root-of-Trust & Cryptographic Attestation",
-                art21_h,
-                std::to_string(tpm_runtime_count) + " of " + std::to_string(nodes.size()) +
-                    " nodes attested as TPM 2.0 / vTPM in runtime gRPC registration."
-            });
+            findings.push_back({"NIS2-Art.21(2)(h)",
+                                "Hardware Root-of-Trust & Cryptographic Attestation",
+                                art21_h,
+                                std::to_string(tpm_runtime_count) + " of " + std::to_string(nodes.size()) +
+                                    " nodes attested as TPM 2.0 / vTPM in runtime gRPC registration."});
 
-            findings.push_back({
-                "NIS2-Sovereignty",
-                "Air-Gapped EU Data Residency ($0.00 Cloud Egress)",
-                art_sov,
-                "100% on-premises local telemetry & inference execution; zero external CDN or cloud egress."
-            });
+            findings.push_back({"NIS2-Sovereignty",
+                                "Air-Gapped EU Data Residency ($0.00 Cloud Egress)",
+                                art_sov,
+                                "100% on-premises local telemetry & inference execution; zero external CDN or cloud egress."});
 
             size_t passed_cnt = 0;
             for (const auto &f : findings)
@@ -3503,7 +3492,6 @@ namespace sentinel::nexus::api
             return build_lab_categories_json(extract_query_param(path, "node_id"));
         }
 
-
         // if (route_path == "/api/v1/lab/telemetry")
         // {
         //     content_type = "application/json";
@@ -3524,7 +3512,6 @@ namespace sentinel::nexus::api
             std::string q_cat = extract_query_param(path, "category");
             return build_lab_telemetry_json(q_node, q_cat);
         }
-
 
         if (route_path == "/api/v1/lab/inject" && method == "POST")
         {
@@ -3639,8 +3626,14 @@ namespace sentinel::nexus::api
         if (route_path == "/api/v1/reports/compliance")
         {
             content_type = "application/json";
-            return handle_get_compliance();
+            return build_dynamic_compliance_json();
         }
+        if (route_path == "/api/v1/reports/nis2")
+        {
+            content_type = "application/json";
+            return build_dynamic_nis2_json();
+        }
+
         if (route_path == "/api/v1/ota/status")
         {
             content_type = "application/json";
@@ -4356,8 +4349,7 @@ namespace sentinel::nexus::api
         return false;
     }
 
-
-        std::string HttpServer::handle_get_lab_telemetry()
+    std::string HttpServer::handle_get_lab_telemetry()
     {
         return build_lab_telemetry_json("", "");
     }
@@ -4525,8 +4517,6 @@ namespace sentinel::nexus::api
                "\", \"node_id\": \"" + json_escape_str(node_id) +
                "\", \"category\": \"" + json_escape_str(valid_cat ? cat_def.slug : category) + "\"}";
     }
-
-
 
     std::string HttpServer::handle_get_lab_logs()
     {
