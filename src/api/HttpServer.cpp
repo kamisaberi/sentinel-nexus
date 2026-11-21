@@ -609,49 +609,51 @@ namespace sentinel::nexus::api
                         while (std::getline(f, line))
                         {
                             std::string l_low = to_lower_str(line);
+                            std::string l_trim = trim_str(l_low);
+                            if (l_trim.empty() || l_trim[0] == '#')
+                                continue;
+
+                            const bool is_identity_line =
+                                (l_trim.rfind("identifier:", 0) == 0 ||
+                                 l_trim.rfind("site_identifier:", 0) == 0 ||
+                                 l_trim.rfind("hostname:", 0) == 0);
 
                             // ---------------------------------------------------------
                             // PRIORITY 1: Specific Hostname or Node Identifier Match
                             // ---------------------------------------------------------
-                            if (!id_low.empty() && l_low.find("identifier:") != std::string::npos && l_low.find(id_low) != std::string::npos)
+                            if (!id_low.empty() && l_trim.rfind("identifier:", 0) == 0 && l_trim.find(id_low) != std::string::npos)
                             {
                                 return entry.path();
                             }
 
-                            if (!h_low.empty() && l_low.find("hostname:") != std::string::npos && l_low.find(h_low) != std::string::npos)
+                            if (!h_low.empty() && l_trim.rfind("hostname:", 0) == 0 && l_trim.find(h_low) != std::string::npos)
                             {
                                 return entry.path();
                             }
 
-                            // Match specific node tokens between hostname and identifier/filename
+                            // Match specific node tokens between hostname and identity/filename
                             if (!h_low.empty())
                             {
-                                if (h_low.find("alpha") != std::string::npos && (l_low.find("alpha") != std::string::npos || stem_low.find("alpha") != std::string::npos))
-                                    return entry.path();
+                                auto token_hit = [&](const char *tok) -> bool
+                                {
+                                    return h_low.find(tok) != std::string::npos &&
+                                           (stem_low.find(tok) != std::string::npos ||
+                                            (is_identity_line && l_trim.find(tok) != std::string::npos));
+                                };
 
-                                if (h_low.find("bravo") != std::string::npos && (l_low.find("bravo") != std::string::npos || stem_low.find("bravo") != std::string::npos))
+                                if (token_hit("alpha") || token_hit("bravo") || token_hit("charlie") ||
+                                    token_hit("substation") || token_hit("hospital") || token_hit("refinery"))
+                                {
                                     return entry.path();
-
-                                if (h_low.find("charlie") != std::string::npos && (l_low.find("charlie") != std::string::npos || stem_low.find("charlie") != std::string::npos))
-                                    return entry.path();
-
-                                // Legacy Substation / Hospital / Refinery matching
-                                if (h_low.find("substation") != std::string::npos && (l_low.find("substation") != std::string::npos || stem_low.find("substation") != std::string::npos))
-                                    return entry.path();
-
-                                if (h_low.find("hospital") != std::string::npos && (l_low.find("hospital") != std::string::npos || stem_low.find("hospital") != std::string::npos))
-                                    return entry.path();
-
-                                if (h_low.find("refinery") != std::string::npos && (l_low.find("refinery") != std::string::npos || stem_low.find("refinery") != std::string::npos))
-                                    return entry.path();
+                                }
                             }
 
                             // ---------------------------------------------------------
                             // PRIORITY 2: Site Fallback (only used if Priority 1 fails)
                             // ---------------------------------------------------------
-                            if (site_fallback.empty() && !s_low.empty() && l_low.find("site_identifier:") != std::string::npos)
+                            if (site_fallback.empty() && !s_low.empty() && l_trim.rfind("site_identifier:", 0) == 0)
                             {
-                                if (l_low.find(s_low) != std::string::npos)
+                                if (l_trim.find(s_low) != std::string::npos)
                                 {
                                     site_fallback = entry.path();
                                 }
