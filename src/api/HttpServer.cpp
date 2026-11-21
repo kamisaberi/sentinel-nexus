@@ -602,6 +602,10 @@ namespace sentinel::nexus::api
                         std::string line;
                         std::string stem_low = to_lower_str(entry.path().stem().string());
 
+                        // Skip editor backups and copy files
+                        if (stem_low.find("copy") != std::string::npos || stem_low.find("bak") != std::string::npos || stem_low.back() == '~')
+                            continue;
+
                         while (std::getline(f, line))
                         {
                             std::string l_low = to_lower_str(line);
