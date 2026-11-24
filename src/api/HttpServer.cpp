@@ -1680,7 +1680,130 @@ static void ensure_lab_catalog_loaded_locked()
         }
         
         
+static std::string build_vault_inventory_json()
+        {
+            std::vector<ScenarioRouteArtifact> routes;
+            std::set<std::string> active_models;
+            collect_scenario_routes(routes, active_models);
 
+            std::vector<DiscoveredDiskArtifact> items;
+            std::set<std::string> seen;
+            auto add_unique = [&](const DiscoveredDiskArtifact &a)
+            {
+                std::string k = a.type + "::" + a.id;
+                if (seen.count(k))
+                    return;
+                seen.insert(k);
+                items.push_back(a);
+            };
+
+            for (const auto &m : scan_scenario_models_on_disk(routes, active_models))
+            {
+                add_unique(m);
+            }
+
+            const std::filesystem::path ssfs_spkg = sentinel::fs::PathResolver::resolve_dir(sentinel::fs::ObjectClass::SpkgInstalled);
+            const std::filesystem::path ssfs_dl   = sentinel::fs::PathResolver::resolve_dir(sentinel::fs::ObjectClass::ArtifactDownload);
+            const std::filesystem::path ssfs_pcap = sentinel::fs::PathResolver::resolve_dir(sentinel::fs::ObjectClass::ArtifactPcap);
+            const std::filesystem::path ssfs_scen = sentinel::fs::PathResolver::resolve_dir(sentinel::fs::ObjectClass::ScenarioCatalog);
+            const std::filesystem::path ssfs_bp   = sentinel::fs::PathResolver::resolve_dir(sentinel::fs::ObjectClass::BlueprintHardware);
+            const std::filesystem::path ssfs_cfg  = sentinel::fs::PathResolver::resolve_dir(sentinel::fs::ObjectClass::Config);
+
+            for (const auto &r : routes)
+            {
+                std::string proto = to_upper_str(r.transport) + (r.port > 0 ? " :" + std::to_string(r.port) : "");
+                if (!r.plugin_id.empty())
+                {
+                    add_unique({r.plugin_id, "package", "Native C++20 Dissector (" + proto + ")", (ssfs_spkg / "plugins.d").string(), 0, "ACTIVE", false});
+                }
+                if (!r.package_id.empty())
+                {
+                    add_unique({r.package_id, "package", "SPKG Policy (" + proto + ")", r.source_file, 0, "ACTIVE", false});
+                }
+            }
+
+            struct ScanDirRule
+            {
+                std::string path;
+                std::string type;
+                std::string ext;
+                std::string fmt;
+                std::string status;
+            };
+            const std::vector<ScanDirRule> scan_rules = {
+                {(ssfs_spkg / "plugins.d").string(), "package", ".so", "Native C++20 Plugin", "ACTIVE"},
+                {(ssfs_spkg / "rules.d").string(), "package", ".lua", "LuaJIT Rule", "ACTIVE"},
+                {(ssfs_spkg / "wasm.d").string(), "package", ".wasm", "Wasm3 Sandbox Module", "ACTIVE"},
+                {(ssfs_dl / "packages").string(), "package", ".spkg", "SPKG Reflex Package", "CACHED"},
+                {(ssfs_dl / "datasets").string(), "dataset", ".slab", "0x534C4142 Zero-Copy", "READY"},
+                {ssfs_pcap.string(), "pcap", ".pcap", "Wire Capture (CAS)", "STAGED"},
+                {ssfs_scen.string(), "scenario", ".yaml", "SSFS Scenario Spec", "READY"},
+                {ssfs_bp.string(), "blueprint", ".blueprint", "Compiled Blueprint", "READY"},
+                {ssfs_cfg.string(), "blueprint", ".yaml", "Node / Route Spec", "ACTIVE"},
+                {"/etc/sentinel/plugins.d", "package", ".so", "Native C++20 Plugin", "ACTIVE"},
+                {"/etc/sentinel/rules.d", "package", ".lua", "LuaJIT Rule", "ACTIVE"},
+                {"/etc/sentinel/wasm.d", "package", ".wasm", "Wasm3 Sandbox Module", "ACTIVE"},
+                {"/var/lib/sentinel-nexus/forge_datasets", "dataset", ".slab", "0x534C4142 Zero-Copy", "READY"},
+                {"/var/lib/sentinel-nexus/forge_datasets", "dataset", ".csv", "Tabular Telemetry", "READY"},
+                {"/etc/sentinel/pcaps", "pcap", ".pcap", "Wire Capture", "STAGED"},
+                {"/opt/sentinel-nexus/pcaps", "pcap", ".pcap", "Scenario PCAP", "STAGED"},
+                {"/opt/sentinel-nexus/configs", "scenario", ".json", "Scenario Manifest", "ACTIVE"},
+                {"/opt/sentinel-nexus/configs", "blueprint", ".yaml", "Node / Route Spec", "ACTIVE"}
+            };
+
+            std::error_code ec;
+            for (const auto &rule : scan_rules)
+            {
+                std::filesystem::path dir(rule.path);
+                if (!std::filesystem::exists(dir, ec) || ec || !std::filesystem::is_directory(dir, ec) || ec)
+                    continue;
+
+                for (const auto &e : std::filesystem::recursive_directory_iterator(
+                         dir, std::filesystem::directory_options::skip_permission_denied, ec))
+                {
+                    if (ec)
+                        break;
+                    if (!e.is_regular_file(ec))
+                        continue;
+
+                    std::string fname = e.path().filename().string();
+                    if (fname.size() < rule.ext.size() ||
+                        fname.compare(fname.size() - rule.ext.size(), rule.ext.size(), rule.ext) != 0)
+                        continue;
+
+                    uintmax_t sz = e.file_size(ec);
+                    if (ec)
+                        sz = 0;
+
+                    add_unique({fname, rule.type, rule.fmt, e.path().parent_path().string(), sz, rule.status, false});
+                }
+            }
+
+            std::filesystem::path plugin_manifest("/opt/sentinel-nexus/web/plugins/manifest.json");
+            if (std::filesystem::exists(plugin_manifest, ec) && !ec)
+            {
+                uintmax_t sz = std::filesystem::file_size(plugin_manifest, ec);
+                add_unique({"web/plugins/manifest.json", "package", "Micro-Frontend UI Plugin", "/opt/sentinel-nexus/web/plugins/", ec ? 0 : sz, "ACTIVE", false});
+            }
+
+            std::ostringstream ss;
+            ss << "[\n";
+            for (size_t i = 0; i < items.size(); ++i)
+            {
+                const auto &a = items[i];
+                ss << "  {\n"
+                   << "    \"id\": \"" << json_escape_str(a.id) << "\",\n"
+                   << "    \"type\": \"" << json_escape_str(a.type) << "\",\n"
+                   << "    \"format\": \"" << json_escape_str(a.format) << "\",\n"
+                   << "    \"target\": \"" << json_escape_str(a.target) << "\",\n"
+                   << "    \"size_bytes\": " << a.size_bytes << ",\n"
+                   << "    \"size\": \"" << (a.size_bytes > 0 ? format_bytes_human(a.size_bytes) : "Config Ref") << "\",\n"
+                   << "    \"status\": \"" << json_escape_str(a.status) << "\"\n"
+                   << "  }" << (i + 1 < items.size() ? ",\n" : "\n");
+            }
+            ss << "]";
+            return ss.str();
+        }
         
         
         
