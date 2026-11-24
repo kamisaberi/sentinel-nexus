@@ -35,7 +35,6 @@
 
 #include <sentinel/fs/PathResolver.hpp>
 
-
 namespace sentinel::nexus::api
 {
 
@@ -232,19 +231,19 @@ namespace sentinel::nexus::api
 
         static std::filesystem::path locate_ui_template(const std::string &tmpl_name)
         {
-            const std::vector<std::string> tmpl_dirs = {
+            const std::filesystem::path ssfs_cfg = sentinel::fs::PathResolver::resolve_dir(sentinel::fs::ObjectClass::Config);
+            const std::vector<std::filesystem::path> tmpl_dirs = {
                 "/opt/sentinel-nexus/configs/ui_templates",
+                ssfs_cfg / "ui_templates",
                 "configs/ui_templates",
-                "../configs/ui_templates",
-                "/home/kami/sentinel-matrix/configs/ui_templates",
-                "/home/kami/sentinel-nexus/configs/ui_templates"};
+                "../configs/ui_templates"};
 
             for (const auto &d : tmpl_dirs)
             {
-                std::filesystem::path p_yaml = std::filesystem::path(d) / (tmpl_name + ".yaml");
+                std::filesystem::path p_yaml = d / (tmpl_name + ".yaml");
                 if (std::filesystem::exists(p_yaml))
                     return p_yaml;
-                std::filesystem::path p_yml = std::filesystem::path(d) / (tmpl_name + ".yml");
+                std::filesystem::path p_yml = d / (tmpl_name + ".yml");
                 if (std::filesystem::exists(p_yml))
                     return p_yml;
             }
