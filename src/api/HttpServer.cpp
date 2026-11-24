@@ -1472,71 +1472,8 @@ static void ensure_lab_catalog_loaded_locked()
             bool has_external_data{false};
         };
 
-        static std::vector<DiscoveredDiskArtifact> scan_scenario_models_on_disk(
-            const std::vector<ScenarioRouteArtifact> &routes,
-            const std::set<std::string> &active_models)
-        {
-            std::vector<DiscoveredDiskArtifact> models;
-            const std::vector<std::string> model_dirs = {
-                "/opt/sentinel-nexus/models",
-                "models",
-                "../models",
-                "/etc/sentinel/models",
-                "/opt/sentinel/models"};
-
-            std::error_code ec;
-            auto dir = find_first_existing_dir(model_dirs, true);
-            if (dir.empty())
-                return models;
-
-            for (const auto &entry : std::filesystem::directory_iterator(dir, ec))
-            {
-                if (ec)
-                    break;
-                if (!entry.is_regular_file(ec) || entry.path().extension() != ".onnx")
-                    continue;
-
-                DiscoveredDiskArtifact item;
-                item.id = entry.path().filename().string();
-                item.type = "model";
-                item.size_bytes = entry.file_size(ec);
-                if (ec)
-                    item.size_bytes = 0;
-
-                std::filesystem::path sidecar = entry.path();
-                sidecar += ".data";
-                if (std::filesystem::exists(sidecar, ec) && !ec)
-                {
-                    item.has_external_data = true;
-                    uintmax_t side_sz = std::filesystem::file_size(sidecar, ec);
-                    if (!ec)
-                        item.size_bytes += side_sz;
-                }
-
-                std::string silicon = "ONNX Runtime";
-                std::string prec = (item.id.find("int8") != std::string::npos) ? "INT8" : "FP32";
-                std::vector<std::string> owners;
-                for (const auto &r : routes)
-                {
-                    if (r.model_id == item.id)
-                    {
-                        if (!r.silicon_target.empty())
-                            silicon = r.silicon_target;
-                        if (!r.precision.empty())
-                            prec = r.precision;
-                        if (!r.source_file.empty())
-                            owners.push_back(r.source_file);
-                    }
-                }
-
-                item.format = prec + " ONNX" + (item.has_external_data ? " (+data)" : "");
-                item.target = dir.string() + " [" + silicon + "]";
-                item.status = (active_models.count(item.id) || !owners.empty()) ? "ACTIVE" : "STAGED";
-                models.push_back(item);
-            }
-            return models;
-        }
-
+        
+        
         static std::string build_dynamic_models_json()
         {
             std::string repo_json = ota::ModelRepository::instance().generate_models_json();
