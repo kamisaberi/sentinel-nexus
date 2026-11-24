@@ -1131,9 +1131,52 @@ static std::filesystem::path locate_node_yaml(const std::string &site, const std
 
 
         
+static void ensure_lab_catalog_loaded_locked()
+        {
+            g_lab_attacks.clear();
+            g_lab_categories.clear();
+            g_lab_category_order.clear();
+
+            const std::filesystem::path ssfs_cfg = sentinel::fs::PathResolver::resolve_dir(sentinel::fs::ObjectClass::Config);
+            const std::vector<std::filesystem::path> matrix_paths = {
+                "/opt/sentinel-nexus/configs/sensor_attack_matrix.json",
+                ssfs_cfg / "sensor_attack_matrix.json",
+                "configs/sensor_attack_matrix.json",
+                "../configs/sensor_attack_matrix.json"
+            };
+
+            std::error_code ec;
+            for (const auto &p : matrix_paths)
+            {
+                if (std::filesystem::exists(p, ec) && !ec)
+                {
+                    merge_lab_json_file(p, false);
+                    break;
+                }
+            }
+
+            const std::vector<std::filesystem::path> plugin_dirs = {
+                "/opt/sentinel-nexus/configs/lab_plugins",
+                ssfs_cfg / "lab_plugins",
+                "configs/lab_plugins",
+                "../configs/lab_plugins"
+            };
+
+            for (const auto &d : plugin_dirs)
+            {
+                if (!std::filesystem::exists(d, ec) || ec || !std::filesystem::is_directory(d, ec) || ec)
+                    continue;
+                for (const auto &e : std::filesystem::directory_iterator(d, ec))
+                {
+                    if (ec)
+                        break;
+                    if (e.is_regular_file(ec) && e.path().extension() == ".json")
+                        merge_lab_json_file(e.path(), true);
+                }
+            }
+        }
 
 
-        
         
         
         
