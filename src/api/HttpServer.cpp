@@ -1414,8 +1414,50 @@ static void ensure_lab_catalog_loaded_locked()
         }
 
 
-        
-        
+
+        static void collect_scenario_routes(std::vector<ScenarioRouteArtifact> &out_routes,
+                                            std::set<std::string> &out_active_models)
+        {
+            const std::filesystem::path ssfs_cfg = sentinel::fs::PathResolver::resolve_dir(sentinel::fs::ObjectClass::Config);
+            const std::vector<std::string> node_dirs = {
+                "/opt/sentinel-nexus/configs/nodes",
+                (ssfs_cfg / "nodes").string(),
+                "configs/nodes",
+                "../configs/nodes",
+                "/etc/sentinel/configs/nodes"
+            };
+
+            std::error_code ec;
+            auto active_node_dir = find_first_existing_dir(node_dirs, true);
+            if (!active_node_dir.empty())
+            {
+                for (const auto &entry : std::filesystem::directory_iterator(active_node_dir, ec))
+                {
+                    if (ec)
+                        break;
+                    if (entry.is_regular_file(ec) && (entry.path().extension() == ".yaml" || entry.path().extension() == ".yml"))
+                    {
+                        parse_routes_from_yaml(entry.path(), out_routes, out_active_models);
+                    }
+                }
+            }
+
+            const std::vector<std::filesystem::path> route_files = {
+                "/opt/sentinel-nexus/configs/model_routes.yaml",
+                ssfs_cfg / "model_routes.yaml",
+                "configs/model_routes.yaml",
+                "../configs/model_routes.yaml",
+                "/etc/sentinel/model_routes.yaml"
+            };
+            for (const auto &p : route_files)
+            {
+                if (std::filesystem::exists(p, ec) && !ec)
+                {
+                    parse_routes_from_yaml(p, out_routes, out_active_models);
+                    break;
+                }
+            }
+        }
 
 
 
