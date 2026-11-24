@@ -1571,7 +1571,113 @@ static void ensure_lab_catalog_loaded_locked()
         }
 
         
-        
+        static std::string build_dynamic_extensions_json()
+        {
+            auto nodes = fleet::NodeRegistry::instance().get_all_nodes();
+            uint64_t total_packets = 0;
+            uint64_t total_drops = 0;
+            double latency_sum = 0.0;
+            size_t latency_cnt = 0;
+
+            for (const auto &n : nodes)
+            {
+                total_packets += n.latest_metrics.packets_inspected();
+                total_drops += n.latest_metrics.ebpf_packets_dropped();
+                if (n.latest_metrics.avg_mitigation_latency_us() > 0.0)
+                {
+                    latency_sum += n.latest_metrics.avg_mitigation_latency_us();
+                    latency_cnt++;
+                }
+            }
+
+            std::vector<ScenarioRouteArtifact> routes;
+            std::set<std::string> active_models;
+            collect_scenario_routes(routes, active_models);
+
+            struct ExtEntry
+            {
+                std::string id;
+                std::string tier;
+                std::string proto;
+                std::string latency;
+                std::string status;
+            };
+            std::vector<ExtEntry> entries;
+            std::set<std::string> seen_ids;
+
+            for (const auto &r : routes)
+            {
+                std::string proto_str = to_upper_str(r.transport);
+                if (r.port > 0)
+                    proto_str += ":" + std::to_string(r.port);
+
+                std::string lat_str = (r.latency_budget_ns > 0)
+                                          ? (std::to_string(r.latency_budget_ns) + " ns budget")
+                                          : (latency_cnt > 0 ? (std::to_string(latency_sum / static_cast<double>(latency_cnt)) + " us") : "wire-rate");
+
+                if (!r.plugin_id.empty() && !seen_ids.count(r.plugin_id))
+                {
+                    seen_ids.insert(r.plugin_id);
+                    std::string tier = (r.plugin_id.find(".lua") != std::string::npos)    ? "LuaJIT C-FFI"
+                                       : (r.plugin_id.find(".wasm") != std::string::npos) ? "Rust Wasm3"
+                                                                                          : "Native C++20";
+                    entries.push_back({r.plugin_id, tier, proto_str, lat_str, "ACTIVE"});
+                }
+                if (!r.package_id.empty() && !seen_ids.count(r.package_id))
+                {
+                    seen_ids.insert(r.package_id);
+                    entries.push_back({r.package_id, "Native C++20", proto_str, lat_str, "ACTIVE"});
+                }
+            }
+
+            const std::filesystem::path ssfs_spkg = sentinel::fs::PathResolver::resolve_dir(sentinel::fs::ObjectClass::SpkgInstalled);
+            const std::vector<std::pair<std::filesystem::path, std::string>> ext_dirs = {
+                {ssfs_spkg / "plugins.d", "Native C++20"},
+                {ssfs_spkg / "rules.d", "LuaJIT C-FFI"},
+                {ssfs_spkg / "wasm.d", "Rust Wasm3"},
+                {"/etc/sentinel/plugins.d", "Native C++20"},
+                {"/etc/sentinel/rules.d", "LuaJIT C-FFI"},
+                {"/etc/sentinel/wasm.d", "Rust Wasm3"}
+            };
+            std::error_code ec;
+            for (const auto &[p, tier_label] : ext_dirs)
+            {
+                if (!std::filesystem::exists(p, ec) || ec || !std::filesystem::is_directory(p, ec) || ec)
+                    continue;
+                for (const auto &e : std::filesystem::directory_iterator(p, ec))
+                {
+                    if (ec)
+                        break;
+                    if (!e.is_regular_file(ec))
+                        continue;
+                    std::string fname = e.path().filename().string();
+                    if (!seen_ids.count(fname))
+                    {
+                        seen_ids.insert(fname);
+                        entries.push_back({fname, tier_label, "RUNTIME", "mounted", "ACTIVE"});
+                    }
+                }
+            }
+
+            std::ostringstream ss;
+            ss << "[\n";
+            size_t denom = entries.empty() ? 1 : entries.size();
+            for (size_t i = 0; i < entries.size(); ++i)
+            {
+                const auto &e = entries[i];
+                ss << "  {\n"
+                   << "    \"id\": \"" << json_escape_str(e.id) << "\",\n"
+                   << "    \"tier\": \"" << json_escape_str(e.tier) << "\",\n"
+                   << "    \"proto\": \"" << json_escape_str(e.proto) << "\",\n"
+                   << "    \"latency\": \"" << json_escape_str(e.latency) << "\",\n"
+                   << "    \"frames\": " << (total_packets / denom) << ",\n"
+                   << "    \"drops\": " << (total_drops / denom) << ",\n"
+                   << "    \"status\": \"" << e.status << "\"\n"
+                   << "  }" << (i + 1 < entries.size() ? ",\n" : "\n");
+            }
+            ss << "]";
+            return ss.str();
+        }
         
         
         static std::string build_vault_inventory_json()
