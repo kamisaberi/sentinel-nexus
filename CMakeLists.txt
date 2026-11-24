@@ -112,6 +112,8 @@ set(NEXUS_SOURCES
 add_executable(sentinel-nexus ${NEXUS_SOURCES})
 target_link_libraries(sentinel-nexus
     PRIVATE
+    ${SENTINELFS_LIB}
+
     Threads::Threads
     OpenSSL::SSL
     OpenSSL::Crypto
