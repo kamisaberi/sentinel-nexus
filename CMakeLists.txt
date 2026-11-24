@@ -18,6 +18,9 @@ find_package(OpenSSL REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(gRPC CONFIG REQUIRED)
 
+find_library(SENTINELFS_LIB sentinelfs REQUIRED PATHS /usr/local/lib /usr/lib)
+
+
 set(PROTO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/proto")
 set(PROTO_SRCS
     ${PROTO_DIR}/common.proto
@@ -39,22 +42,22 @@ foreach(proto_file ${PROTO_SRCS})
     get_filename_component(proto_name ${proto_file} NAME_WLE)
     set(proto_hdr "${GENERATED_PROTO_DIR}/${proto_name}.pb.h")
     set(proto_src "${GENERATED_PROTO_DIR}/${proto_name}.pb.cc")
-    set(grpc_hdr  "${GENERATED_PROTO_DIR}/${proto_name}.grpc.pb.h")
-    set(grpc_src  "${GENERATED_PROTO_DIR}/${proto_name}.grpc.pb.cc")
-    
+    set(grpc_hdr "${GENERATED_PROTO_DIR}/${proto_name}.grpc.pb.h")
+    set(grpc_src "${GENERATED_PROTO_DIR}/${proto_name}.grpc.pb.cc")
+
     list(APPEND PROTO_GEN_HDRS ${proto_hdr})
     list(APPEND PROTO_GEN_SRCS ${proto_src})
-    list(APPEND GRPC_GEN_HDRS  ${grpc_hdr})
-    list(APPEND GRPC_GEN_SRCS  ${grpc_src})
-    
+    list(APPEND GRPC_GEN_HDRS ${grpc_hdr})
+    list(APPEND GRPC_GEN_SRCS ${grpc_src})
+
     add_custom_command(
         OUTPUT ${proto_hdr} ${proto_src} ${grpc_hdr} ${grpc_src}
         COMMAND protobuf::protoc
-            --proto_path=${PROTO_DIR}
-            --cpp_out=${GENERATED_PROTO_DIR}
-            --grpc_out=${GENERATED_PROTO_DIR}
-            --plugin=protoc-gen-grpc=$<TARGET_FILE:gRPC::grpc_cpp_plugin>
-            ${proto_file}
+        --proto_path=${PROTO_DIR}
+        --cpp_out=${GENERATED_PROTO_DIR}
+        --grpc_out=${GENERATED_PROTO_DIR}
+        --plugin=protoc-gen-grpc=$<TARGET_FILE:gRPC::grpc_cpp_plugin>
+        ${proto_file}
         DEPENDS ${proto_file} protobuf::protoc gRPC::grpc_cpp_plugin
         COMMENT "Compiling Protobuf & gRPC: ${proto_name}.proto"
     )
@@ -64,6 +67,8 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${GENERATED_PROTO_DIR}
     ${OPENSSL_INCLUDE_DIR}
+    /usr/local/include
+
 )
 
 set(NEXUS_SOURCES
@@ -107,12 +112,12 @@ set(NEXUS_SOURCES
 add_executable(sentinel-nexus ${NEXUS_SOURCES})
 target_link_libraries(sentinel-nexus
     PRIVATE
-        Threads::Threads
-        OpenSSL::SSL
-        OpenSSL::Crypto
-        protobuf::libprotobuf
-        gRPC::grpc++
-        gRPC::grpc++_reflection
+    Threads::Threads
+    OpenSSL::SSL
+    OpenSSL::Crypto
+    protobuf::libprotobuf
+    gRPC::grpc++
+    gRPC::grpc++_reflection
 )
 
 # 2. Operations CLI Target (Auto-resolves tools/nexus-ctl or tools/nexus_ctl)
@@ -125,7 +130,7 @@ add_executable(nexus-ctl ${NEXUS_CTL_SRC})
 target_link_libraries(nexus-ctl PRIVATE Threads::Threads OpenSSL::SSL OpenSSL::Crypto)
 
 # 3. High-Throughput Ingestion Benchmark Target
-add_executable(benchmark_ingest 
+add_executable(benchmark_ingest
     tests/benchmark/benchmark_ingest.cpp
     src/telemetry/ForgeBridge.cpp
     ${PROTO_GEN_SRCS}
