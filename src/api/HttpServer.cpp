@@ -576,98 +576,16 @@ namespace sentinel::nexus::api
             return true;
         }
 
-        static std::filesystem::path locate_node_yaml(const std::string &site, const std::string &host, const std::string &id)
-        {
-            const std::vector<std::string> node_dirs = {
-                "/opt/sentinel-nexus/configs/nodes",
-                "configs/nodes",
-                "../configs/nodes",
-                "/home/kami/sentinel-matrix/configs/nodes",
-                "sentinel-matrix/configs/nodes"};
 
-            std::string s_low = to_lower_str(site);
-            std::string h_low = to_lower_str(host);
-            std::string id_low = to_lower_str(id);
+        
 
-            std::filesystem::path site_fallback;
 
-            for (const auto &dir : node_dirs)
-            {
-                if (!std::filesystem::exists(dir))
-                    continue;
 
-                for (const auto &entry : std::filesystem::directory_iterator(dir))
-                {
-                    if (entry.is_regular_file() && (entry.path().extension() == ".yaml" || entry.path().extension() == ".yml"))
-                    {
-                        std::ifstream f(entry.path());
-                        std::string line;
-                        std::string stem_low = to_lower_str(entry.path().stem().string());
-
-                        // Skip editor backups and copy files
-                        if (stem_low.find("copy") != std::string::npos || stem_low.find("bak") != std::string::npos || stem_low.back() == '~')
-                            continue;
-
-                        while (std::getline(f, line))
-                        {
-                            std::string l_low = to_lower_str(line);
-                            std::string l_trim = trim_str(l_low);
-                            if (l_trim.empty() || l_trim[0] == '#')
-                                continue;
-
-                            const bool is_identity_line =
-                                (l_trim.rfind("identifier:", 0) == 0 ||
-                                 l_trim.rfind("site_identifier:", 0) == 0 ||
-                                 l_trim.rfind("hostname:", 0) == 0);
-
-                            // ---------------------------------------------------------
-                            // PRIORITY 1: Specific Hostname or Node Identifier Match
-                            // ---------------------------------------------------------
-                            if (!id_low.empty() && l_trim.rfind("identifier:", 0) == 0 && l_trim.find(id_low) != std::string::npos)
-                            {
-                                return entry.path();
-                            }
-
-                            if (!h_low.empty() && l_trim.rfind("hostname:", 0) == 0 && l_trim.find(h_low) != std::string::npos)
-                            {
-                                return entry.path();
-                            }
-
-                            // Match specific node tokens between hostname and identity/filename
-                            if (!h_low.empty())
-                            {
-                                auto token_hit = [&](const char *tok) -> bool
-                                {
-                                    return h_low.find(tok) != std::string::npos &&
-                                           (stem_low.find(tok) != std::string::npos ||
-                                            (is_identity_line && l_trim.find(tok) != std::string::npos));
-                                };
-
-                                if (token_hit("alpha") || token_hit("bravo") || token_hit("charlie") ||
-                                    token_hit("substation") || token_hit("hospital") || token_hit("refinery"))
-                                {
-                                    return entry.path();
-                                }
-                            }
-
-                            // ---------------------------------------------------------
-                            // PRIORITY 2: Site Fallback (only used if Priority 1 fails)
-                            // ---------------------------------------------------------
-                            if (site_fallback.empty() && !s_low.empty() && l_trim.rfind("site_identifier:", 0) == 0)
-                            {
-                                if (l_trim.find(s_low) != std::string::npos)
-                                {
-                                    site_fallback = entry.path();
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            return site_fallback;
-        }
-
+        
+        
+        
+        
+        
         // Parse strictly the real sensors connected in this node's routes: section
         static std::vector<DynamicSensorItem> parse_node_yaml_sensors(const std::filesystem::path &yaml_path)
         {
