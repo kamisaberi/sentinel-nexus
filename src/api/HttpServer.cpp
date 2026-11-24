@@ -1827,9 +1827,29 @@ static std::string build_vault_inventory_json()
 
 
         
+static std::filesystem::path resolve_scenario_model_path(const std::string &model_id)
+        {
+            if (model_id.empty())
+                return {};
+            std::error_code ec;
+            const std::vector<std::filesystem::path> model_dirs = {
+                "/opt/sentinel-nexus/models",
+                sentinel::fs::PathResolver::resolve_dir(sentinel::fs::ObjectClass::ModelCalibrated),
+                sentinel::fs::PathResolver::resolve_dir(sentinel::fs::ObjectClass::ModelRegistry),
+                "models",
+                "../models",
+                "/etc/sentinel/models"
+            };
+            for (const auto &d : model_dirs)
+            {
+                std::filesystem::path candidate = d / model_id;
+                if (std::filesystem::exists(candidate, ec) && !ec && std::filesystem::is_regular_file(candidate, ec) && !ec)
+                    return candidate;
+            }
+            return {};
+        }
 
 
-        
 
 
 
