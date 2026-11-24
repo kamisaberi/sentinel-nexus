@@ -33,6 +33,9 @@
 #include <mutex>
 #include <sys/wait.h>
 
+#include <sentinel/fs/PathResolver.hpp>
+
+
 namespace sentinel::nexus::api
 {
 
