@@ -1825,25 +1825,13 @@ static std::string build_vault_inventory_json()
             return body.substr(start + 1, end - start - 1);
         }
 
-        static std::filesystem::path resolve_scenario_model_path(const std::string &model_id)
-        {
-            if (model_id.empty())
-                return {};
-            std::error_code ec;
-            const std::vector<std::string> model_dirs = {
-                "/opt/sentinel-nexus/models",
-                "models",
-                "../models",
-                "/etc/sentinel/models",
-                "/opt/sentinel/models"};
-            for (const auto &d : model_dirs)
-            {
-                std::filesystem::path candidate = std::filesystem::path(d) / model_id;
-                if (std::filesystem::exists(candidate, ec) && !ec && std::filesystem::is_regular_file(candidate, ec) && !ec)
-                    return candidate;
-            }
-            return {};
-        }
+
+        
+
+
+        
+
+
 
         static std::string compute_file_sha256_hex(const std::filesystem::path &file_path)
         {
