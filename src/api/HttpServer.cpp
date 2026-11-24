@@ -1129,49 +1129,14 @@ static std::filesystem::path locate_node_yaml(const std::string &site, const std
             }
         }
 
-        static void ensure_lab_catalog_loaded_locked()
-        {
-            g_lab_attacks.clear();
-            g_lab_categories.clear();
-            g_lab_category_order.clear();
 
-            const std::vector<std::string> matrix_paths = {
-                "/opt/sentinel-nexus/configs/sensor_attack_matrix.json",
-                "configs/sensor_attack_matrix.json",
-                "../configs/sensor_attack_matrix.json",
-                "/home/kami/sentinel-matrix/configs/sensor_attack_matrix.json",
-                "/home/kami/sentinel-nexus/configs/sensor_attack_matrix.json"};
+        
 
-            std::error_code ec;
-            for (const auto &p : matrix_paths)
-            {
-                if (std::filesystem::exists(p, ec) && !ec)
-                {
-                    merge_lab_json_file(p, false);
-                    break;
-                }
-            }
 
-            const std::vector<std::string> plugin_dirs = {
-                "/opt/sentinel-nexus/configs/lab_plugins",
-                "configs/lab_plugins",
-                "../configs/lab_plugins",
-                "/home/kami/sentinel-matrix/configs/lab_plugins"};
-
-            for (const auto &d : plugin_dirs)
-            {
-                if (!std::filesystem::exists(d, ec) || ec || !std::filesystem::is_directory(d, ec) || ec)
-                    continue;
-                for (const auto &e : std::filesystem::directory_iterator(d, ec))
-                {
-                    if (ec)
-                        break;
-                    if (e.is_regular_file(ec) && e.path().extension() == ".json")
-                        merge_lab_json_file(e.path(), true);
-                }
-            }
-        }
-
+        
+        
+        
+        
         static void load_external_attack_matrix(
             std::unordered_map<std::string, DynamicAttackItem> &out_attack_defs,
             std::unordered_map<std::string, std::vector<std::string>> &out_category_map)
